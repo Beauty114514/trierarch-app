@@ -1,6 +1,7 @@
 package app.trierarch.input
 
 import android.content.Context
+import android.text.Editable
 import android.text.InputType
 import android.util.Log
 import android.view.KeyEvent as AndroidKeyEvent
@@ -24,7 +25,8 @@ class AndroidImeController @JvmOverloads constructor(
 ) {
     fun createInputConnection(outAttrs: EditorInfo): InputConnection {
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI or EditorInfo.IME_ACTION_NONE
+        outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI
+        outAttrs.actionLabel = "↵"
         return Connection(target, sink)
     }
 
@@ -37,55 +39,97 @@ class AndroidImeController @JvmOverloads constructor(
     }
 
     private class Connection(
-        target: View,
+        private val targetView: View,
         private val sink: AndroidImeEventSink,
-    ) : BaseInputConnection(target, true) {
-        override fun beginBatchEdit(): Boolean = super.beginBatchEdit().also {
-            if (it) sink.send(AndroidImeEvent.BeginBatchEdit)
+    ) : BaseInputConnection(targetView, false) {
+        private val inputMethodManager = targetView.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        private var batchEditDepth = 0
+        private var cursorPosition = 1
+
+        /*
+         * The guest editor is opaque to Android. Returning no Editable while
+         * offering a stable one-character context mirrors Termux:X11 and
+         * prevents an IME from editing a stale local buffer instead of sending
+         * operations to the desktop target.
+         */
+        override fun getEditable(): Editable? = null
+
+        override fun getTextBeforeCursor(length: Int, flags: Int): CharSequence = " "
+
+        override fun getTextAfterCursor(length: Int, flags: Int): CharSequence = " "
+
+        override fun beginBatchEdit(): Boolean {
+            batchEditDepth++
+            sink.send(AndroidImeEvent.BeginBatchEdit)
+            return true
         }
 
-        override fun endBatchEdit(): Boolean = super.endBatchEdit().also {
-            if (it) sink.send(AndroidImeEvent.EndBatchEdit)
+        override fun endBatchEdit(): Boolean {
+            if (batchEditDepth > 0) batchEditDepth--
+            sink.send(AndroidImeEvent.EndBatchEdit)
+            if (batchEditDepth == 0) reportSelection()
+            return true
         }
 
-        override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean =
-            super.commitText(text, newCursorPosition).also {
-                if (it) sink.send(AndroidImeEvent.CommitText(text.toString(), newCursorPosition))
+        override fun commitText(text: CharSequence, newCursorPosition: Int): Boolean {
+            sink.send(AndroidImeEvent.CommitText(text.toString(), newCursorPosition))
+            cursorPosition = if (newCursorPosition > 0) {
+                (cursorPosition + text.length + newCursorPosition - 1).coerceAtLeast(1)
+            } else {
+                1
             }
-
-        override fun setComposingText(text: CharSequence, newCursorPosition: Int): Boolean =
-            super.setComposingText(text, newCursorPosition).also {
-                if (it) sink.send(AndroidImeEvent.SetComposingText(text.toString(), newCursorPosition))
-            }
-
-        override fun finishComposingText(): Boolean = super.finishComposingText().also {
-            if (it) sink.send(AndroidImeEvent.FinishComposingText)
+            if (batchEditDepth == 0) reportSelection()
+            return true
         }
 
-        override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean =
-            super.deleteSurroundingText(beforeLength, afterLength).also {
-                if (it) sink.send(AndroidImeEvent.DeleteSurroundingText(beforeLength, afterLength))
-            }
-
-        override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean =
-            super.deleteSurroundingTextInCodePoints(beforeLength, afterLength).also {
-                if (it) sink.send(AndroidImeEvent.DeleteSurroundingTextInCodePoints(beforeLength, afterLength))
-            }
-
-        override fun setSelection(start: Int, end: Int): Boolean = super.setSelection(start, end).also {
-            if (it) sink.send(AndroidImeEvent.SetSelection(start, end))
+        override fun setComposingText(text: CharSequence, newCursorPosition: Int): Boolean {
+            sink.send(AndroidImeEvent.SetComposingText(text.toString(), newCursorPosition))
+            return true
         }
 
-        override fun setComposingRegion(start: Int, end: Int): Boolean = super.setComposingRegion(start, end).also {
-            if (it) sink.send(AndroidImeEvent.SetComposingRegion(start, end))
+        override fun finishComposingText(): Boolean {
+            sink.send(AndroidImeEvent.FinishComposingText)
+            return true
         }
 
-        override fun sendKeyEvent(event: AndroidKeyEvent): Boolean = super.sendKeyEvent(event).also {
-            if (it) sink.send(AndroidImeEvent.KeyEvent(event.action, event.keyCode))
+        override fun deleteSurroundingText(beforeLength: Int, afterLength: Int): Boolean {
+            sink.send(AndroidImeEvent.DeleteSurroundingText(beforeLength, afterLength))
+            cursorPosition = (cursorPosition - beforeLength).coerceAtLeast(1)
+            if (batchEditDepth == 0) reportSelection()
+            return true
         }
 
-        override fun performEditorAction(actionCode: Int): Boolean = super.performEditorAction(actionCode).also {
-            if (it) sink.send(AndroidImeEvent.EditorAction(actionCode))
+        override fun deleteSurroundingTextInCodePoints(beforeLength: Int, afterLength: Int): Boolean {
+            sink.send(AndroidImeEvent.DeleteSurroundingTextInCodePoints(beforeLength, afterLength))
+            cursorPosition = (cursorPosition - beforeLength).coerceAtLeast(1)
+            if (batchEditDepth == 0) reportSelection()
+            return true
+        }
+
+        override fun setSelection(start: Int, end: Int): Boolean {
+            sink.send(AndroidImeEvent.SetSelection(start, end))
+            if (start == end) cursorPosition = start.coerceAtLeast(1)
+            if (batchEditDepth == 0) reportSelection()
+            return true
+        }
+
+        override fun setComposingRegion(start: Int, end: Int): Boolean {
+            sink.send(AndroidImeEvent.SetComposingRegion(start, end))
+            return true
+        }
+
+        override fun sendKeyEvent(event: AndroidKeyEvent): Boolean {
+            sink.send(AndroidImeEvent.KeyEvent(event.action, event.keyCode))
+            return true
+        }
+
+        override fun performEditorAction(actionCode: Int): Boolean {
+            sink.send(AndroidImeEvent.EditorAction(actionCode))
+            return true
+        }
+
+        private fun reportSelection() {
+            inputMethodManager.updateSelection(targetView, cursorPosition, cursorPosition, -1, -1)
         }
     }
 }

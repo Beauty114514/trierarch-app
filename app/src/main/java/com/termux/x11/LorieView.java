@@ -10,12 +10,15 @@ import android.view.KeyEvent;
 import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 
+import java.nio.charset.StandardCharsets;
+
 import androidx.annotation.Keep;
 
 import app.trierarch.input.PointerInputRouter;
 import app.trierarch.input.PhysicalKeyEvent;
 import app.trierarch.input.PhysicalKeyboardRouter;
 import app.trierarch.input.AndroidImeController;
+import app.trierarch.input.AndroidImeEvent;
 import com.termux.x11.input.X11PointerEventSink;
 
 import dalvik.annotation.optimization.CriticalNative;
@@ -35,6 +38,8 @@ public final class LorieView extends SurfaceView {
     private final PointerInputRouter inputRouter;
     private final PhysicalKeyboardRouter keyboardRouter;
     private final AndroidImeController androidIme;
+    private String composingText = "";
+    private int imeBatchEditDepth;
 
     public LorieView(Context context) {
         super(context);
@@ -51,7 +56,7 @@ public final class LorieView extends SurfaceView {
                     event.getAction() == PhysicalKeyEvent.Action.DOWN
             );
         });
-        androidIme = new AndroidImeController(this);
+        androidIme = new AndroidImeController(this, this::handleAndroidImeEvent);
         nativeHandle = nativeInit();
         setFocusable(true);
         setFocusableInTouchMode(true);
@@ -117,6 +122,148 @@ public final class LorieView extends SurfaceView {
         boolean handled = inputRouter.onTouchEvent(this, event);
         if (event.getActionMasked() == MotionEvent.ACTION_UP) androidIme.showKeyboard();
         return handled;
+    }
+
+    /**
+     * Android commits are final Unicode text. Lorie's EVENT_UNICODE path maps
+     * each UTF-8 code point to an X11 keysym (adding a dynamic XKB mapping when
+     * needed), so this path does not require a guest X11 input-method daemon.
+     * Editing controls remain key events because they are not document text.
+     */
+    private void handleAndroidImeEvent(AndroidImeEvent event) {
+        if (nativeHandle == 0 || !isConnected()) return;
+        if (event instanceof AndroidImeEvent.BeginBatchEdit) {
+            imeBatchEditDepth++;
+        } else if (event instanceof AndroidImeEvent.EndBatchEdit) {
+            if (imeBatchEditDepth > 0) imeBatchEditDepth--;
+        } else if (event instanceof AndroidImeEvent.CommitText) {
+            replaceComposingText(((AndroidImeEvent.CommitText) event).getText(), false);
+        } else if (event instanceof AndroidImeEvent.SetComposingText) {
+            replaceComposingText(((AndroidImeEvent.SetComposingText) event).getText(), true);
+        } else if (event instanceof AndroidImeEvent.FinishComposingText) {
+            composingText = "";
+        } else if (event instanceof AndroidImeEvent.DeleteSurroundingText) {
+            composingText = "";
+            AndroidImeEvent.DeleteSurroundingText delete = (AndroidImeEvent.DeleteSurroundingText) event;
+            sendEditingKeys(KeyEvent.KEYCODE_DEL, delete.getBeforeLength());
+            sendEditingKeys(KeyEvent.KEYCODE_FORWARD_DEL, delete.getAfterLength());
+        } else if (event instanceof AndroidImeEvent.DeleteSurroundingTextInCodePoints) {
+            composingText = "";
+            AndroidImeEvent.DeleteSurroundingTextInCodePoints delete = (AndroidImeEvent.DeleteSurroundingTextInCodePoints) event;
+            sendEditingKeys(KeyEvent.KEYCODE_DEL, delete.getBeforeLength());
+            sendEditingKeys(KeyEvent.KEYCODE_FORWARD_DEL, delete.getAfterLength());
+        } else if (event instanceof AndroidImeEvent.SetSelection) {
+            AndroidImeEvent.SetSelection selection = (AndroidImeEvent.SetSelection) event;
+            if (imeBatchEditDepth == 0 && selection.getStart() == selection.getEnd()) {
+                if (selection.getStart() < 1) sendKeyPress(KeyEvent.KEYCODE_DPAD_LEFT);
+                else if (selection.getStart() > 1) sendKeyPress(KeyEvent.KEYCODE_DPAD_RIGHT);
+            }
+        } else if (event instanceof AndroidImeEvent.KeyEvent) {
+            AndroidImeEvent.KeyEvent key = (AndroidImeEvent.KeyEvent) event;
+            if (key.getAction() == KeyEvent.ACTION_DOWN && isImeControlKey(key.getKeyCode())) {
+                sendKeyPress(key.getKeyCode());
+            }
+        } else if (event instanceof AndroidImeEvent.EditorAction) {
+            sendEditorAction(((AndroidImeEvent.EditorAction) event).getActionCode());
+        }
+    }
+
+    /** Mirrors Termux:X11's replacement model for Android IME preedit text. */
+    private void replaceComposingText(String replacement, boolean keepComposing) {
+        if (replacement.startsWith(composingText)) {
+            sendCommittedText(replacement.substring(composingText.length()));
+        } else if (composingText.startsWith(replacement)) {
+            sendEditingKeys(KeyEvent.KEYCODE_DEL, codePointCount(composingText) - codePointCount(replacement));
+        } else {
+            sendEditingKeys(KeyEvent.KEYCODE_DEL, codePointCount(composingText));
+            sendCommittedText(replacement);
+        }
+        composingText = keepComposing ? replacement : "";
+    }
+
+    private static int codePointCount(String text) {
+        return text.codePointCount(0, text.length());
+    }
+
+    private void sendCommittedText(String text) {
+        StringBuilder committed = new StringBuilder(text.length());
+        for (int index = 0; index < text.length(); index++) {
+            char character = text.charAt(index);
+            if (character == '\n' || character == '\r' || character == '\u2028' || character == '\u2029') {
+                sendCommittedText(committed);
+                committed.setLength(0);
+                sendKeyPress(KeyEvent.KEYCODE_ENTER);
+                if (character == '\r' && index + 1 < text.length() && text.charAt(index + 1) == '\n') index++;
+            } else if (character == '\t') {
+                sendCommittedText(committed);
+                committed.setLength(0);
+                sendKeyPress(KeyEvent.KEYCODE_TAB);
+            } else if (character == '\b') {
+                sendCommittedText(committed);
+                committed.setLength(0);
+                sendKeyPress(KeyEvent.KEYCODE_DEL);
+            } else if (character == 0x7f) {
+                sendCommittedText(committed);
+                committed.setLength(0);
+                sendKeyPress(KeyEvent.KEYCODE_FORWARD_DEL);
+            } else if (character == 0x1b) {
+                sendCommittedText(committed);
+                committed.setLength(0);
+                sendKeyPress(KeyEvent.KEYCODE_ESCAPE);
+            } else if (character >= ' ') {
+                committed.append(character);
+            }
+        }
+        sendCommittedText(committed);
+    }
+
+    private void sendCommittedText(StringBuilder text) {
+        if (text.length() != 0) sendTextEvent(nativeHandle, text.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void sendEditingKeys(int keyCode, int count) {
+        for (int index = 0; index < count; index++) sendKeyPress(keyCode);
+    }
+
+    private void sendKeyPress(int keyCode) {
+        sendKeyEvent(nativeHandle, 0, keyCode, true);
+        sendKeyEvent(nativeHandle, 0, keyCode, false);
+    }
+
+    private static boolean isImeControlKey(int keyCode) {
+        switch (keyCode) {
+            case KeyEvent.KEYCODE_ENTER:
+            case KeyEvent.KEYCODE_TAB:
+            case KeyEvent.KEYCODE_DEL:
+            case KeyEvent.KEYCODE_FORWARD_DEL:
+            case KeyEvent.KEYCODE_ESCAPE:
+            case KeyEvent.KEYCODE_DPAD_UP:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+            case KeyEvent.KEYCODE_MOVE_HOME:
+            case KeyEvent.KEYCODE_MOVE_END:
+            case KeyEvent.KEYCODE_PAGE_UP:
+            case KeyEvent.KEYCODE_PAGE_DOWN:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    private void sendEditorAction(int actionCode) {
+        switch (actionCode) {
+            case EditorInfo.IME_ACTION_DONE:
+            case EditorInfo.IME_ACTION_GO:
+            case EditorInfo.IME_ACTION_NEXT:
+            case EditorInfo.IME_ACTION_PREVIOUS:
+            case EditorInfo.IME_ACTION_SEARCH:
+            case EditorInfo.IME_ACTION_SEND:
+                sendKeyPress(KeyEvent.KEYCODE_ENTER);
+                break;
+            default:
+                break;
+        }
     }
 
     @Override public boolean onGenericMotionEvent(MotionEvent event) {
