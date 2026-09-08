@@ -10,6 +10,7 @@ import android.graphics.PixelFormat
 import app.trierarch.input.PointerInputRouter
 import app.trierarch.input.PhysicalKeyEvent
 import app.trierarch.input.PhysicalKeyboardRouter
+import app.trierarch.input.AndroidImeController
 
 /** Full-screen, display-only target for the first Wayland milestone. */
 class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
@@ -24,6 +25,7 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
             timeMillis = event.eventTime.toWaylandTime(),
         )
     }
+    private val androidIme = AndroidImeController(this)
 
     init {
         holder.setFormat(PixelFormat.RGBA_8888)
@@ -47,7 +49,11 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
 
     override fun surfaceDestroyed(holder: SurfaceHolder) = Unit
 
-    override fun onTouchEvent(event: MotionEvent): Boolean = inputRouter.onTouchEvent(this, event)
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val handled = inputRouter.onTouchEvent(this, event)
+        if (event.actionMasked == MotionEvent.ACTION_UP) androidIme.showKeyboard()
+        return handled
+    }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean =
         inputRouter.onGenericMotionEvent(this, event) || super.onGenericMotionEvent(event)
@@ -60,6 +66,11 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
         keyboardRouter.dispatchAndroidEvent(event) || super.onKeyUp(keyCode, event)
+
+    override fun onCheckIsTextEditor(): Boolean = true
+
+    override fun onCreateInputConnection(outAttrs: android.view.inputmethod.EditorInfo): android.view.inputmethod.InputConnection =
+        androidIme.createInputConnection(outAttrs)
 
     fun releasePressedKeys() {
         keyboardRouter.releaseAll(SystemClock.uptimeMillis())

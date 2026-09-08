@@ -7,12 +7,15 @@ import android.view.SurfaceHolder;
 import android.view.MotionEvent;
 import android.view.SurfaceView;
 import android.view.KeyEvent;
+import android.view.inputmethod.EditorInfo;
+import android.view.inputmethod.InputConnection;
 
 import androidx.annotation.Keep;
 
 import app.trierarch.input.PointerInputRouter;
 import app.trierarch.input.PhysicalKeyEvent;
 import app.trierarch.input.PhysicalKeyboardRouter;
+import app.trierarch.input.AndroidImeController;
 import com.termux.x11.input.X11PointerEventSink;
 
 import dalvik.annotation.optimization.CriticalNative;
@@ -31,6 +34,7 @@ public final class LorieView extends SurfaceView {
     private int latestHeight;
     private final PointerInputRouter inputRouter;
     private final PhysicalKeyboardRouter keyboardRouter;
+    private final AndroidImeController androidIme;
 
     public LorieView(Context context) {
         super(context);
@@ -47,6 +51,7 @@ public final class LorieView extends SurfaceView {
                     event.getAction() == PhysicalKeyEvent.Action.DOWN
             );
         });
+        androidIme = new AndroidImeController(this);
         nativeHandle = nativeInit();
         setFocusable(true);
         setFocusableInTouchMode(true);
@@ -99,9 +104,19 @@ public final class LorieView extends SurfaceView {
         return super.onKeyUp(keyCode, event);
     }
 
+    @Override public boolean onCheckIsTextEditor() {
+        return true;
+    }
+
+    @Override public InputConnection onCreateInputConnection(EditorInfo outAttrs) {
+        return androidIme.createInputConnection(outAttrs);
+    }
+
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (nativeHandle == 0) return true;
-        return inputRouter.onTouchEvent(this, event);
+        boolean handled = inputRouter.onTouchEvent(this, event);
+        if (event.getActionMasked() == MotionEvent.ACTION_UP) androidIme.showKeyboard();
+        return handled;
     }
 
     @Override public boolean onGenericMotionEvent(MotionEvent event) {
