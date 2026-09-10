@@ -7,6 +7,7 @@ import app.trierarch.compat.GuestCompatibilityRuntime
 import app.trierarch.runtime.InternalShellLaunchSpec
 import app.trierarch.x11.X11Runtime
 import app.trierarch.wayland.WaylandBridge
+import app.trierarch.wayland.WaylandImeBridgeRuntime
 import app.trierarch.virgl.VirglHostController
 import java.io.File
 
@@ -39,6 +40,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             cacheDirectory = app.cacheDir,
             x11SocketDirectory = x11SocketDirectory(profile.display),
             waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+            waylandImeBridge = waylandImeBridge(profile.display),
             virglRuntimeDirectory = virglRuntimeDirectory,
             udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
                 app, profile.compatibility.enablesUdevMonitorShim,
@@ -59,6 +61,8 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             chrootRootfs = profile.rootfs,
             shell = profile.shell,
             x11SocketDirectory = x11SocketDirectory(profile.display),
+            waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+            waylandImeBridge = waylandImeBridge(profile.display),
             launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
             graphicsEnvironment = profile.graphics.environment().toTypedArray(),
             udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
@@ -86,6 +90,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             droidspacesProfile = profile,
             x11SocketDirectory = x11SocketDirectory(profile.display),
             waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+            waylandImeBridge = waylandImeBridge(profile.display),
             virglRuntimeDirectory = virglRuntimeDirectory,
             udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
                 app, profile.compatibility.enablesUdevMonitorShim,
@@ -129,5 +134,12 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
     private fun waylandRuntimeDirectory(display: String): String? =
         File(app.filesDir, "wayland/runtime").also { it.mkdirs() }.absolutePath.takeIf {
             display == ProfileStore.DISPLAY_WAYLAND
+        }
+
+    private fun waylandImeBridge(display: String): String? =
+        if (display == ProfileStore.DISPLAY_WAYLAND) {
+            WaylandImeBridgeRuntime.executable(app).absolutePath
+        } else {
+            null
         }
 }
