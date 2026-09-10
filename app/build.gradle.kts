@@ -29,6 +29,8 @@ val virglRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
 val virglAssetsDirectory = layout.buildDirectory.dir("generated/virglAssets")
 val guestCompatibilityProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/compat")
 val guestCompatibilityAssetsDirectory = layout.buildDirectory.dir("generated/guestCompatibilityAssets")
+val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/wayland-ime-bridge")
+val waylandImeBridgeAssetsDirectory = layout.buildDirectory.dir("generated/waylandImeBridgeAssets")
 
 val cleanNativeJniLibs by tasks.registering(Delete::class) {
     delete(nativeJniLibsDirectory)
@@ -179,6 +181,29 @@ val packageGuestCompatibilityAssets by tasks.registering(Sync::class) {
     }
 }
 
+val buildWaylandImeBridgeArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Linux guest Wayland IME bridge for arm64."
+    workingDir(waylandImeBridgeProjectDirectory)
+    environment("CC", "aarch64-linux-gnu-gcc")
+    commandLine("bash", "scripts/build-linux.sh")
+    inputs.dir(waylandImeBridgeProjectDirectory.resolve("src"))
+    inputs.file(waylandImeBridgeProjectDirectory.resolve("scripts/build-linux.sh"))
+    outputs.file(waylandImeBridgeProjectDirectory.resolve("dist/trierarch-wayland-ime-bridge"))
+}
+
+val packageWaylandImeBridgeAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Linux guest Wayland IME bridge as an APK asset."
+    dependsOn(buildWaylandImeBridgeArm64)
+    val binary = waylandImeBridgeProjectDirectory.resolve("dist/trierarch-wayland-ime-bridge")
+    from(binary) { into("wayland-ime/arm64-v8a") }
+    into(waylandImeBridgeAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing guest Wayland IME bridge." }
+    }
+}
+
 android {
     namespace = "app.trierarch"
     compileSdk {
@@ -226,6 +251,7 @@ android {
             x11AssetsDirectory.get().asFile,
             virglAssetsDirectory.get().asFile,
             guestCompatibilityAssetsDirectory.get().asFile,
+            waylandImeBridgeAssetsDirectory.get().asFile,
         )
     }
     packaging {
@@ -245,6 +271,7 @@ tasks.named("preBuild").configure {
         packageWaylandArm64,
         packageVirglAssets,
         packageGuestCompatibilityAssets,
+        packageWaylandImeBridgeAssets,
     )
 }
 

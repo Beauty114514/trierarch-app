@@ -25,7 +25,8 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
             timeMillis = event.eventTime.toWaylandTime(),
         )
     }
-    private val androidIme = AndroidImeController(this)
+    private val waylandImeSink = WaylandImeEventSink(WaylandImeBridgeRuntime.socket(context))
+    private val androidIme = AndroidImeController(this, waylandImeSink)
 
     init {
         holder.setFormat(PixelFormat.RGBA_8888)
@@ -92,6 +93,7 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
     override fun onDetachedFromWindow() {
         inputRouter.cancel(this)
         releasePressedKeys()
+        waylandImeSink.close()
         super.onDetachedFromWindow()
     }
 
