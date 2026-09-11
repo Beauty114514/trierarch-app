@@ -14,17 +14,20 @@ import java.io.File
 /** Owns the built-in app-internal shell independently of a terminal view instance. */
 class DefaultTerminalViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
+    private var activeProfileId: String? = null
 
     var session: NativePtySession = createInternalShell()
         private set
 
     fun restartInternalShell() {
         session.close()
+        activeProfileId = null
         session = createInternalShell()
     }
 
     fun restartProot(profile: ProfileStore.ProotProfile) {
         session.close()
+        activeProfileId = profile.id
         val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
             VirglHostController.start(app).absolutePath
         } else {
@@ -57,6 +60,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     fun restartChroot(profile: ProfileStore.ChrootProfile) {
         session.close()
+        activeProfileId = profile.id
         session = NativePtySession(
             chrootRootfs = profile.rootfs,
             shell = profile.shell,
@@ -78,6 +82,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     fun restartDroidspaces(profile: ProfileStore.DroidspacesProfile) {
         session.close()
+        activeProfileId = profile.id
         val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
             VirglHostController.start(app).absolutePath
         } else {
@@ -105,9 +110,13 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     fun isRuntimeRunning(): Boolean = session.isRunning()
 
+    /** The profile associated with the active in-app session, if any. */
+    fun activeProfileId(): String? = activeProfileId?.takeIf { session.isRunning() }
+
     /** Trierarch owns the active runtime session, including chroot and PRoot. */
     fun stopRuntime() {
         session.close()
+        activeProfileId = null
         WaylandBridge.stop()
         VirglHostController.stop()
         session = createInternalShell()

@@ -92,6 +92,7 @@ class MainActivity : AppCompatActivity() {
                             attachTerminalSession()
                         },
                         isRuntimeRunning = terminalViewModel::isRuntimeRunning,
+                        activeProfileId = terminalViewModel::activeProfileId,
                         onStopRuntime = {
                             terminalViewModel.stopRuntime()
                             hideWaylandSurface()
