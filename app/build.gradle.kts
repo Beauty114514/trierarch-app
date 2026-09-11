@@ -32,6 +32,15 @@ val guestCompatibilityAssetsDirectory = layout.buildDirectory.dir("generated/gue
 val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/wayland-ime-bridge")
 val waylandImeBridgeAssetsDirectory = layout.buildDirectory.dir("generated/waylandImeBridgeAssets")
 
+val prepareWaylandImeBridgeSysroot by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Fetches the pinned Debian arm64 Wayland client build sysroot."
+    workingDir(waylandImeBridgeProjectDirectory)
+    commandLine("bash", "scripts/fetch-debian-arm64-sysroot.sh")
+    inputs.file(waylandImeBridgeProjectDirectory.resolve("scripts/fetch-debian-arm64-sysroot.sh"))
+    outputs.dir(waylandImeBridgeProjectDirectory.resolve(".sysroot/debian-bookworm-arm64"))
+}
+
 val cleanNativeJniLibs by tasks.registering(Delete::class) {
     delete(nativeJniLibsDirectory)
 }
@@ -190,6 +199,7 @@ val buildWaylandImeBridgeArm64 by tasks.registering(Exec::class) {
     inputs.dir(waylandImeBridgeProjectDirectory.resolve("src"))
     inputs.file(waylandImeBridgeProjectDirectory.resolve("scripts/build-linux.sh"))
     outputs.file(waylandImeBridgeProjectDirectory.resolve("dist/trierarch-wayland-ime-bridge"))
+    dependsOn(prepareWaylandImeBridgeSysroot)
 }
 
 val packageWaylandImeBridgeAssets by tasks.registering(Sync::class) {

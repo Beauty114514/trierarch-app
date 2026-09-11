@@ -13,6 +13,12 @@ object WaylandImeBridgeRuntime {
         check(directory.isDirectory || directory.mkdirs()) {
             "Unable to create Wayland IME runtime directory"
         }
+        // DroidSpaces binds this app-private directory into the guest without
+        // changing its Android UID. The guest bridge must both traverse it and
+        // create its control socket here.
+        check(directory.setReadable(true, false)) { "Unable to make Wayland IME runtime readable" }
+        check(directory.setWritable(true, false)) { "Unable to make Wayland IME runtime writable" }
+        check(directory.setExecutable(true, false)) { "Unable to make Wayland IME runtime traversable" }
         val destination = File(directory, fileName)
         if (!destination.isFile || destination.length() == 0L) {
             val temporary = File(directory, ".${fileName}.${System.nanoTime()}.tmp")
@@ -21,6 +27,7 @@ object WaylandImeBridgeRuntime {
             }
             check(temporary.renameTo(destination)) { "Unable to install Wayland IME bridge" }
         }
+        check(destination.setReadable(true, false)) { "Unable to make Wayland IME bridge readable" }
         check(destination.setExecutable(true, false)) { "Unable to mark Wayland IME bridge executable" }
         return destination
     }
