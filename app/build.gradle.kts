@@ -31,6 +31,8 @@ val guestCompatibilityProjectDirectory = rootProject.projectDir.parentFile.resol
 val guestCompatibilityAssetsDirectory = layout.buildDirectory.dir("generated/guestCompatibilityAssets")
 val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/wayland-ime-bridge")
 val waylandImeBridgeAssetsDirectory = layout.buildDirectory.dir("generated/waylandImeBridgeAssets")
+val sessionSupervisorProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/session-supervisor")
+val sessionSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/sessionSupervisorAssets")
 
 val prepareWaylandImeBridgeSysroot by tasks.registering(Exec::class) {
     group = "build"
@@ -214,6 +216,29 @@ val packageWaylandImeBridgeAssets by tasks.registering(Sync::class) {
     }
 }
 
+val buildSessionSupervisorArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Linux guest Wayland session supervisor for arm64."
+    workingDir(sessionSupervisorProjectDirectory)
+    environment("CC", "aarch64-linux-gnu-gcc")
+    commandLine("bash", "scripts/build-linux.sh")
+    inputs.dir(sessionSupervisorProjectDirectory.resolve("src"))
+    inputs.file(sessionSupervisorProjectDirectory.resolve("scripts/build-linux.sh"))
+    outputs.file(sessionSupervisorProjectDirectory.resolve("dist/trierarch-session-supervisor"))
+}
+
+val packageSessionSupervisorAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Linux guest session supervisor as an APK asset."
+    dependsOn(buildSessionSupervisorArm64)
+    val binary = sessionSupervisorProjectDirectory.resolve("dist/trierarch-session-supervisor")
+    from(binary) { into("wayland-session/arm64-v8a") }
+    into(sessionSupervisorAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing guest session supervisor." }
+    }
+}
+
 android {
     namespace = "app.trierarch"
     compileSdk {
@@ -262,6 +287,7 @@ android {
             virglAssetsDirectory.get().asFile,
             guestCompatibilityAssetsDirectory.get().asFile,
             waylandImeBridgeAssetsDirectory.get().asFile,
+            sessionSupervisorAssetsDirectory.get().asFile,
         )
     }
     packaging {
@@ -282,6 +308,7 @@ tasks.named("preBuild").configure {
         packageVirglAssets,
         packageGuestCompatibilityAssets,
         packageWaylandImeBridgeAssets,
+        packageSessionSupervisorAssets,
     )
 }
 

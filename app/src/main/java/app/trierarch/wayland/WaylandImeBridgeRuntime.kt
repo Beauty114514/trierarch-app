@@ -7,6 +7,8 @@ import java.io.File
 object WaylandImeBridgeRuntime {
     private const val assetPath = "wayland-ime/arm64-v8a/trierarch-wayland-ime-bridge"
     private const val fileName = "trierarch-wayland-ime-bridge"
+    private const val supervisorAssetPath = "wayland-session/arm64-v8a/trierarch-session-supervisor"
+    private const val supervisorFileName = "trierarch-session-supervisor"
 
     fun executable(context: Context): File {
         val directory = File(context.filesDir, "wayland/runtime/ime")
@@ -19,6 +21,12 @@ object WaylandImeBridgeRuntime {
         check(directory.setReadable(true, false)) { "Unable to make Wayland IME runtime readable" }
         check(directory.setWritable(true, false)) { "Unable to make Wayland IME runtime writable" }
         check(directory.setExecutable(true, false)) { "Unable to make Wayland IME runtime traversable" }
+        val destination = install(context, directory, assetPath, fileName)
+        install(context, directory, supervisorAssetPath, supervisorFileName)
+        return destination
+    }
+
+    private fun install(context: Context, directory: File, assetPath: String, fileName: String): File {
         val destination = File(directory, fileName)
         // This guest executable changes independently of the Android app's
         // Kotlin classes. Always replace a previous APK asset atomically so an
