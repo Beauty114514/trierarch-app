@@ -52,7 +52,6 @@ class ProfileStore(context: Context) {
         }
         val runtime = parsed.getString("runtime")?.trim().orEmpty()
         require(runtime.isNotEmpty()) { "runtime is required" }
-        require(parsed.getString("name")?.trim().isNullOrEmpty().not()) { "name is required" }
         val display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }
         require(display == DISPLAY_NONE || display == DISPLAY_X11 || display == DISPLAY_WAYLAND) {
             "display.type must be '$DISPLAY_NONE', '$DISPLAY_X11', or '$DISPLAY_WAYLAND'"
@@ -114,7 +113,6 @@ class ProfileStore(context: Context) {
         }
         return ProotProfile(
             id = required(parsed.getString("id"), "id"),
-            name = required(parsed.getString("name"), "name"),
             rootfs = rootfs,
             shell = shell,
             display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE },
@@ -141,7 +139,6 @@ class ProfileStore(context: Context) {
         }
         return ChrootProfile(
             id = required(parsed.getString("id"), "id"),
-            name = required(parsed.getString("name"), "name"),
             rootfs = rootfs,
             shell = shell,
             display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE },
@@ -159,7 +156,6 @@ class ProfileStore(context: Context) {
         }
         return DroidspacesProfile(
             id = required(parsed.getString("id"), "id"),
-            name = required(parsed.getString("name"), "name"),
             container = required(parsed.getString("container"), "container"),
             user = parsed.getString("user")?.trim().takeUnless { it.isNullOrEmpty() } ?: "root",
             display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE },
@@ -229,7 +225,6 @@ class ProfileStore(context: Context) {
 
     data class ProotProfile(
         val id: String,
-        val name: String,
         val rootfs: File,
         val shell: String,
         val display: String,
@@ -240,7 +235,6 @@ class ProfileStore(context: Context) {
 
     data class ChrootProfile(
         val id: String,
-        val name: String,
         val rootfs: String,
         val shell: String,
         val display: String,
@@ -251,7 +245,6 @@ class ProfileStore(context: Context) {
 
     data class DroidspacesProfile(
         val id: String,
-        val name: String,
         val container: String,
         val user: String,
         val display: String,

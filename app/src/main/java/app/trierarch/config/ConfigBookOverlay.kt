@@ -280,6 +280,6 @@ class ConfigBookOverlay(
         const val BOOK_MAX_WIDTH_FRACTION = .88f
         const val BOOK_MAX_HEIGHT_FRACTION = .78f
         const val ROOT_TWO = 1.41421356f
-        val TEMPLATE = "id = \"\"\nname = \"\"\nruntime = \"internal-shell\"\n\n[display]\ntype = \"none\"\n"
+        val TEMPLATE = "id = \"\"\nruntime = \"internal-shell\"\n\n[display]\ntype = \"none\"\n"
     }
 }
