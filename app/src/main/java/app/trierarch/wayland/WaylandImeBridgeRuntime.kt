@@ -20,13 +20,14 @@ object WaylandImeBridgeRuntime {
         check(directory.setWritable(true, false)) { "Unable to make Wayland IME runtime writable" }
         check(directory.setExecutable(true, false)) { "Unable to make Wayland IME runtime traversable" }
         val destination = File(directory, fileName)
-        if (!destination.isFile || destination.length() == 0L) {
-            val temporary = File(directory, ".${fileName}.${System.nanoTime()}.tmp")
-            context.assets.open(assetPath).use { input ->
-                temporary.outputStream().use(input::copyTo)
-            }
-            check(temporary.renameTo(destination)) { "Unable to install Wayland IME bridge" }
+        // This guest executable changes independently of the Android app's
+        // Kotlin classes. Always replace a previous APK asset atomically so an
+        // app upgrade cannot retain an obsolete bridge binary.
+        val temporary = File(directory, ".${fileName}.${System.nanoTime()}.tmp")
+        context.assets.open(assetPath).use { input ->
+            temporary.outputStream().use(input::copyTo)
         }
+        check(temporary.renameTo(destination)) { "Unable to install Wayland IME bridge" }
         check(destination.setReadable(true, false)) { "Unable to make Wayland IME bridge readable" }
         check(destination.setExecutable(true, false)) { "Unable to mark Wayland IME bridge executable" }
         return destination
