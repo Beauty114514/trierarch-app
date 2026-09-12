@@ -11,6 +11,7 @@ import com.termux.terminal.TerminalSession
 import com.termux.terminal.TerminalSessionClient
 import com.termux.view.DisplayableTermSession
 import java.io.File
+import java.io.FileOutputStream
 
 /**
  * Connects a [TerminalEmulator] to Trierarch's own PTY. It never creates a
@@ -19,6 +20,7 @@ import java.io.File
 class NativePtySession private constructor(
     private val openNativeSession: (rows: Int, columns: Int, callback: SessionCallback) -> Long,
     private val clipboard: TerminalClipboard,
+    diagnosticLog: File? = null,
 ) : TerminalOutput(), SessionCallback, DisplayableTermSession {
     constructor(
         launchSpec: TerminalLaunchSpec,
@@ -84,6 +86,7 @@ class NativePtySession private constructor(
         launchArgv: Array<String>,
         graphicsEnvironment: Array<String>,
         udevCompatibilityLibrary: String,
+        diagnosticLog: File?,
         clipboard: TerminalClipboard,
     ) : this(
         openNativeSession = { rows, columns, callback ->
@@ -102,6 +105,7 @@ class NativePtySession private constructor(
             )
         },
         clipboard = clipboard,
+        diagnosticLog = diagnosticLog,
     )
 
     /** Trierarch owns the DroidSpaces session lifecycle. */
@@ -136,6 +140,8 @@ class NativePtySession private constructor(
     private var sessionId = 0L
     private var closed = false
     private var onScreenChanged: (() -> Unit)? = null
+    private val diagnosticsLock = Any()
+    private var diagnostics: FileOutputStream? = diagnosticLog?.let(::openDiagnostics)
 
     private val emulator = TerminalEmulator(
         this,
@@ -181,7 +187,13 @@ class NativePtySession private constructor(
     fun isRunning(): Boolean = !closed && sessionId != 0L
 
     private fun startNative(rows: Int, columns: Int) {
-        sessionId = openNativeSession(rows, columns, this)
+        try {
+            sessionId = openNativeSession(rows, columns, this)
+        } catch (error: Throwable) {
+            appendDiagnostic("Trierarch session setup failed: ${error.message}\n")
+            closeDiagnostics()
+            throw error
+        }
     }
 
     override fun updateSize(
@@ -198,6 +210,7 @@ class NativePtySession private constructor(
         val id = sessionId
         sessionId = 0L
         if (id != 0L) NativePtyBridge.close(id)
+        closeDiagnostics()
         onScreenChanged = null
     }
 
@@ -236,6 +249,7 @@ class NativePtySession private constructor(
 
     override fun onSessionOutput(sessionId: Long, bytes: ByteArray) {
         if (!closed && sessionId == this.sessionId) {
+            appendDiagnostic(bytes)
             outputRelay.offer(bytes)
         }
     }
@@ -243,8 +257,54 @@ class NativePtySession private constructor(
     override fun onSessionExited(sessionId: Long, exitCode: Int) {
         if (sessionId == this.sessionId) {
             this.sessionId = 0L
+            val message = "\r\n[Trierarch session exited with code $exitCode]\r\n"
+            appendDiagnostic(message)
+            closeDiagnostics()
+            outputRelay.offer(message.toByteArray())
             screenChanged()
         }
+    }
+
+    /** Adds an app-originated diagnostic to the retained terminal transcript. */
+    fun appendDiagnostic(message: String) {
+        appendDiagnostic(message.toByteArray())
+    }
+
+    /** Shows an app-originated status line without sending it to the guest PTY. */
+    fun appendStatus(message: String) {
+        outputRelay.offer(message.toByteArray())
+        screenChanged()
+    }
+
+    private fun appendDiagnostic(bytes: ByteArray) {
+        synchronized(diagnosticsLock) {
+            val output = diagnostics ?: return
+            runCatching {
+                output.write(bytes)
+                output.flush()
+            }.onFailure {
+                Log.e("NativePtySession", "Unable to write session diagnostics", it)
+                runCatching { output.close() }
+                diagnostics = null
+            }
+        }
+    }
+
+    private fun closeDiagnostics() {
+        synchronized(diagnosticsLock) {
+            runCatching { diagnostics?.close() }
+            diagnostics = null
+        }
+    }
+
+    private fun openDiagnostics(file: File): FileOutputStream? = runCatching {
+        check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true) {
+            "Unable to create diagnostics directory"
+        }
+        FileOutputStream(file, false)
+    }.getOrElse {
+        Log.e("NativePtySession", "Unable to open session diagnostics: ${file.absolutePath}", it)
+        null
     }
 
     private fun screenChanged() {

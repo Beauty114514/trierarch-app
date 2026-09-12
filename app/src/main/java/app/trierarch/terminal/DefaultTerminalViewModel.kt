@@ -32,6 +32,14 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         session = usableInternalSession()
     }
 
+    fun reportRuntimeLaunchFailure(profileId: String, error: Throwable) {
+        showInternalShell()
+        internalSession.appendStatus(
+            "\r\n[Trierarch failed to start $profileId: ${error.message ?: error.javaClass.simpleName}]\r\n" +
+                "Session diagnostics: ${sessionDiagnosticLog(profileId).absolutePath}\r\n",
+        )
+    }
+
     fun restartProot(profile: ProfileStore.ProotProfile) {
         closeRuntime(profile.id)
         val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
@@ -80,6 +88,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
                 app, profile.compatibility.enablesUdevMonitorShim,
             )?.absolutePath.orEmpty(),
+            diagnosticLog = sessionDiagnosticLog(profile.id),
             clipboard = AndroidTerminalClipboard(app),
         ).also { next ->
             if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
@@ -203,4 +212,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         } else {
             null
         }
+
+    private fun sessionDiagnosticLog(profileId: String): File =
+        File(app.filesDir, "logs/sessions/$profileId.log")
 }

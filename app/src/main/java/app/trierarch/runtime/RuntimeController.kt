@@ -136,9 +136,8 @@ class RuntimeController(
                 .map { typed -> { terminal.restartDroidspaces(typed) } }
             else -> Result.failure(IllegalArgumentException("runtime '${profile.runtime}' cannot be started"))
         }
-        action.onFailure {
-            pending = null
-            displayHost.showTerminal()
+        action.onFailure { error ->
+            launchFailed(id, error)
         }.onSuccess { start ->
             val started = {
                 start()
@@ -150,20 +149,24 @@ class RuntimeController(
                 displayHost.attachTerminal()
             }
             if (profile.display == ProfileStore.DISPLAY_X11) {
-                displayHost.showX11(onReady = { runCatching(started).onFailure { launchFailed(id) } }, onFailure = { launchFailed(id) })
+                displayHost.showX11(
+                    onReady = { runCatching(started).onFailure { launchFailed(id, it) } },
+                    onFailure = { launchFailed(id, IllegalStateException(it)) },
+                )
             } else {
                 runCatching {
                     if (profile.display == ProfileStore.DISPLAY_WAYLAND) displayHost.showWayland()
                     else displayHost.showTerminal()
                     started()
-                }.onFailure { launchFailed(id) }
+                }.onFailure { launchFailed(id, it) }
             }
         }
     }
 
-    private fun launchFailed(id: String) {
+    private fun launchFailed(id: String, error: Throwable) {
         sourcesByProfile.remove(id)
         pending = null
+        terminal.reportRuntimeLaunchFailure(id, error)
         displayHost.showTerminal()
     }
 
