@@ -77,12 +77,18 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     fun restartChroot(profile: ProfileStore.ChrootProfile) {
         closeRuntime(profile.id)
+        val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
+            VirglHostController.start(app).absolutePath
+        } else {
+            ""
+        }
         val next = NativePtySession(
             chrootRootfs = profile.rootfs,
             shell = profile.shell,
             x11SocketDirectory = x11SocketDirectory(profile.display),
             waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
             waylandImeBridge = waylandImeBridge(profile.display),
+            virglRuntimeDirectory = virglRuntimeDirectory,
             launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
             graphicsEnvironment = profile.graphics.environment().toTypedArray(),
             udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(

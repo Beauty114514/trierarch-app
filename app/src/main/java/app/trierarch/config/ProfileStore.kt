@@ -59,8 +59,8 @@ class ProfileStore(context: Context) {
         val graphics = graphicsProfile(parsed, display)
         compatibilityProfile(parsed)
         if (graphics.renderer == GRAPHICS_VIRGL) {
-            require(runtime == RUNTIME_DROIDSPACES || runtime == RUNTIME_PROOT) {
-                "graphics.renderer '$GRAPHICS_VIRGL' is currently supported by droidspaces and proot"
+            require(runtime == RUNTIME_DROIDSPACES || runtime == RUNTIME_PROOT || runtime == RUNTIME_CHROOT) {
+                "graphics.renderer '$GRAPHICS_VIRGL' is currently supported by droidspaces, proot, and chroot"
             }
             require(display != DISPLAY_NONE) {
                 "graphics.renderer '$GRAPHICS_VIRGL' requires display.type 'x11' or 'wayland'"

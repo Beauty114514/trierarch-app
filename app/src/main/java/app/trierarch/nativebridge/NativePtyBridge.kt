@@ -41,6 +41,7 @@ object NativePtyBridge {
         x11SocketDirectory: String,
         waylandRuntimeDirectory: String,
         waylandImeBridge: String,
+        virglRuntimeDirectory: String,
         launchArgv: Array<String>,
         graphicsEnvironment: Array<String>,
         udevCompatibilityLibrary: String,
