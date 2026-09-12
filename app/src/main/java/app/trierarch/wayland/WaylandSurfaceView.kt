@@ -40,8 +40,7 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
-        WaylandBridge.attachSurface(holder.surface)
-        updateOutputSize(holder.surfaceFrame.width(), holder.surfaceFrame.height())
+        attachHostSurface()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
@@ -75,6 +74,14 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
 
     fun releasePressedKeys() {
         keyboardRouter.releaseAll(SystemClock.uptimeMillis())
+    }
+
+    /** Reattaches a preserved Android Surface after the Wayland host restarts. */
+    fun attachHostSurface() {
+        val surface = holder.surface
+        if (!surface.isValid) return
+        WaylandBridge.attachSurface(surface)
+        updateOutputSize(holder.surfaceFrame.width(), holder.surfaceFrame.height())
     }
 
     override fun onWindowFocusChanged(hasWindowFocus: Boolean) {

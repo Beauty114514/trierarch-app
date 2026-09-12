@@ -6,6 +6,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.viewModels
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -13,6 +14,7 @@ import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
+import app.trierarch.ui.FloatingMenuOrbView
 import app.trierarch.wayland.WaylandSurfaceView
 import app.trierarch.x11.X11HostController
 import com.termux.view.TerminalView
@@ -76,7 +78,22 @@ class MainActivity : AppCompatActivity() {
         runtimeControlServer = RuntimeControlServer(this) { command, completion ->
             runOnUiThread { runtimeController.dispatch(command, completion) }
         }
+        val menuOrb = FloatingMenuOrbView(
+            context = this,
+            preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
+            onClick = {
+                terminalViewModel.showInternalShell()
+                showTerminal()
+                attachTerminalSession()
+            },
+        )
+        terminalContainer.addView(menuOrb)
+        ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
+            menuOrb.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            insets
+        }
         setContentView(terminalContainer)
+        ViewCompat.requestApplyInsets(terminalContainer)
 
         attachTerminalSession()
     }
@@ -101,7 +118,11 @@ class MainActivity : AppCompatActivity() {
                 ),
             )
         }
-        waylandSurface?.requestFocus()
+        waylandSurface?.apply {
+            visibility = android.view.View.VISIBLE
+            attachHostSurface()
+            requestFocus()
+        }
         terminalView?.visibility = android.view.View.INVISIBLE
     }
 
@@ -133,9 +154,8 @@ class MainActivity : AppCompatActivity() {
     private fun hideWaylandSurface() {
         waylandSurface?.let {
             it.releasePressedKeys()
-            terminalContainer.removeView(it)
+            it.visibility = android.view.View.INVISIBLE
         }
-        waylandSurface = null
     }
 
     override fun onDestroy() {

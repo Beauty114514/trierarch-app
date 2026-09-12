@@ -40,7 +40,7 @@ class FloatingMenuOrbView(
 
     init {
         layoutParams = FrameLayout.LayoutParams(sizePx, sizePx)
-        contentDescription = "Configuration"
+        contentDescription = "Open management shell"
         scaleType = ScaleType.CENTER_INSIDE
         setPadding(context.dp(8), context.dp(8), context.dp(8), context.dp(8))
         setImageResource(R.drawable.ic_launcher_foreground)
