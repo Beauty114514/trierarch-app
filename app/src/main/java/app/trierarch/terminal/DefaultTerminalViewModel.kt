@@ -14,9 +14,9 @@ import java.io.File
 /** Owns the built-in app-internal shell independently of a terminal view instance. */
 class DefaultTerminalViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
-    private var activeProfileId: String? = null
     private var internalSession: NativePtySession = createInternalShell()
-    private var runtimeSession: NativePtySession? = null
+    private val runtimeSessions = linkedMapOf<String, RuntimeSession>()
+    private var displayedProfileId: String? = null
 
     /** The PTY currently displayed by the terminal surface. */
     var session: NativePtySession = internalSession
@@ -33,8 +33,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun restartProot(profile: ProfileStore.ProotProfile) {
-        closeRuntime()
-        activeProfileId = profile.id
+        closeRuntime(profile.id)
         val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
             VirglHostController.start(app).absolutePath
         } else {
@@ -63,13 +62,13 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 next.start()
             }
         }
-        runtimeSession = next
+        runtimeSessions[profile.id] = RuntimeSession(next, profile.display, profile.graphics.renderer)
+        displayedProfileId = profile.id
         session = next
     }
 
     fun restartChroot(profile: ProfileStore.ChrootProfile) {
-        closeRuntime()
-        activeProfileId = profile.id
+        closeRuntime(profile.id)
         val next = NativePtySession(
             chrootRootfs = profile.rootfs,
             shell = profile.shell,
@@ -87,13 +86,13 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 next.start()
             }
         }
-        runtimeSession = next
+        runtimeSessions[profile.id] = RuntimeSession(next, profile.display, profile.graphics.renderer)
+        displayedProfileId = profile.id
         session = next
     }
 
     fun restartDroidspaces(profile: ProfileStore.DroidspacesProfile) {
-        closeRuntime()
-        activeProfileId = profile.id
+        closeRuntime(profile.id)
         val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
             VirglHostController.start(app).absolutePath
         } else {
@@ -117,26 +116,43 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 next.start()
             }
         }
-        runtimeSession = next
+        runtimeSessions[profile.id] = RuntimeSession(next, profile.display, profile.graphics.renderer)
+        displayedProfileId = profile.id
         session = next
     }
 
-    fun isRuntimeRunning(): Boolean = runtimeSession?.isRunning() == true
+    fun isRuntimeRunning(): Boolean = runningProfileIds().isNotEmpty()
 
-    /** The profile associated with the active in-app session, if any. */
-    fun activeProfileId(): String? = activeProfileId?.takeIf { isRuntimeRunning() }
+    /** The profile currently attached to Trierarch's foreground terminal surface. */
+    fun activeProfileId(): String? = displayedProfileId?.takeIf { isProfileRunning(it) }
 
-    /** Trierarch owns the active runtime session, including chroot and PRoot. */
-    fun stopRuntime() {
-        closeRuntime()
-        activeProfileId = null
-        WaylandBridge.stop()
-        VirglHostController.stop()
+    fun isProfileRunning(id: String): Boolean = runtimeSessions[id]?.session?.isRunning() == true
+
+    fun runningProfileIds(): Set<String> = runtimeSessions
+        .filterValues { it.session.isRunning() }
+        .keys
+
+    /** Makes an already-running session visible without changing its lifecycle. */
+    fun showRuntime(id: String): Boolean {
+        val runtime = runtimeSessions[id] ?: return false
+        if (!runtime.session.isRunning()) return false
+        displayedProfileId = id
+        session = runtime.session
+        return true
+    }
+
+    /** Stops one Trierarch-owned profile session, or every session when no id is supplied. */
+    fun stopRuntime(id: String? = null) {
+        if (id == null) {
+            runtimeSessions.keys.toList().forEach(::closeRuntime)
+        } else {
+            closeRuntime(id)
+        }
         session = usableInternalSession()
     }
 
     override fun onCleared() {
-        closeRuntime()
+        stopRuntime()
         internalSession.close()
     }
 
@@ -154,10 +170,22 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         return internalSession
     }
 
-    private fun closeRuntime() {
-        runtimeSession?.close()
-        runtimeSession = null
+    private fun closeRuntime(id: String) {
+        runtimeSessions.remove(id)?.session?.close()
+        if (displayedProfileId == id) displayedProfileId = null
+        if (runtimeSessions.values.none { it.display == ProfileStore.DISPLAY_WAYLAND }) {
+            WaylandBridge.stop()
+        }
+        if (runtimeSessions.values.none { it.renderer == ProfileStore.GRAPHICS_VIRGL }) {
+            VirglHostController.stop()
+        }
     }
+
+    private data class RuntimeSession(
+        val session: NativePtySession,
+        val display: String,
+        val renderer: String,
+    )
 
     private fun x11SocketDirectory(display: String): String? =
         X11Runtime.socketDirectory(app).absolutePath.takeIf {
