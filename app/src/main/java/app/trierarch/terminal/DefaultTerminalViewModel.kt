@@ -15,18 +15,25 @@ import java.io.File
 class DefaultTerminalViewModel(application: Application) : AndroidViewModel(application) {
     private val app = application
     private var activeProfileId: String? = null
+    private var internalSession: NativePtySession = createInternalShell()
+    private var runtimeSession: NativePtySession? = null
 
-    var session: NativePtySession = createInternalShell()
+    /** The PTY currently displayed by the terminal surface. */
+    var session: NativePtySession = internalSession
         private set
 
     fun restartInternalShell() {
-        session.close()
-        activeProfileId = null
-        session = createInternalShell()
+        stopRuntime()
+        session = usableInternalSession()
+    }
+
+    /** Shows the persistent management shell without stopping a profile runtime. */
+    fun showInternalShell() {
+        session = usableInternalSession()
     }
 
     fun restartProot(profile: ProfileStore.ProotProfile) {
-        session.close()
+        closeRuntime()
         activeProfileId = profile.id
         val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
             VirglHostController.start(app).absolutePath
@@ -36,7 +43,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
             check(WaylandBridge.start(app)) { "Unable to start Wayland host" }
         }
-        session = NativePtySession(
+        val next = NativePtySession(
             rootfsDirectory = profile.rootfs,
             shell = profile.shell,
             nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
@@ -56,12 +63,14 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 next.start()
             }
         }
+        runtimeSession = next
+        session = next
     }
 
     fun restartChroot(profile: ProfileStore.ChrootProfile) {
-        session.close()
+        closeRuntime()
         activeProfileId = profile.id
-        session = NativePtySession(
+        val next = NativePtySession(
             chrootRootfs = profile.rootfs,
             shell = profile.shell,
             x11SocketDirectory = x11SocketDirectory(profile.display),
@@ -78,10 +87,12 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 next.start()
             }
         }
+        runtimeSession = next
+        session = next
     }
 
     fun restartDroidspaces(profile: ProfileStore.DroidspacesProfile) {
-        session.close()
+        closeRuntime()
         activeProfileId = profile.id
         val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
             VirglHostController.start(app).absolutePath
@@ -91,7 +102,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
             check(WaylandBridge.start(app)) { "Unable to start Wayland host" }
         }
-        session = NativePtySession(
+        val next = NativePtySession(
             droidspacesProfile = profile,
             x11SocketDirectory = x11SocketDirectory(profile.display),
             waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
@@ -106,24 +117,27 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 next.start()
             }
         }
+        runtimeSession = next
+        session = next
     }
 
-    fun isRuntimeRunning(): Boolean = session.isRunning()
+    fun isRuntimeRunning(): Boolean = runtimeSession?.isRunning() == true
 
     /** The profile associated with the active in-app session, if any. */
-    fun activeProfileId(): String? = activeProfileId?.takeIf { session.isRunning() }
+    fun activeProfileId(): String? = activeProfileId?.takeIf { isRuntimeRunning() }
 
     /** Trierarch owns the active runtime session, including chroot and PRoot. */
     fun stopRuntime() {
-        session.close()
+        closeRuntime()
         activeProfileId = null
         WaylandBridge.stop()
         VirglHostController.stop()
-        session = createInternalShell()
+        session = usableInternalSession()
     }
 
     override fun onCleared() {
-        session.close()
+        closeRuntime()
+        internalSession.close()
     }
 
     private fun createInternalShell() = NativePtySession(
@@ -134,6 +148,16 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         ),
         clipboard = AndroidTerminalClipboard(app),
     )
+
+    private fun usableInternalSession(): NativePtySession {
+        if (!internalSession.isRunning()) internalSession = createInternalShell()
+        return internalSession
+    }
+
+    private fun closeRuntime() {
+        runtimeSession?.close()
+        runtimeSession = null
+    }
 
     private fun x11SocketDirectory(display: String): String? =
         X11Runtime.socketDirectory(app).absolutePath.takeIf {

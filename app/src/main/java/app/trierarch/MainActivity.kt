@@ -11,6 +11,8 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import app.trierarch.config.ConfigBookOverlay
+import app.trierarch.runtime.RuntimeControlServer
+import app.trierarch.runtime.RuntimeController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
 import app.trierarch.ui.FloatingMenuOrbView
@@ -21,6 +23,8 @@ import com.termux.view.TerminalView
 /** The first Trierarch profile: a shell using the app's private files directory as its home. */
 class MainActivity : AppCompatActivity() {
     private val terminalViewModel: DefaultTerminalViewModel by viewModels()
+    private lateinit var runtimeController: RuntimeController
+    private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
     private var configBook: ConfigBookOverlay? = null
     private lateinit var terminalContainer: FrameLayout
@@ -60,6 +64,21 @@ class MainActivity : AppCompatActivity() {
                     ViewGroup.LayoutParams.MATCH_PARENT,
                 ),
             )
+        }
+        runtimeController = RuntimeController(
+            context = this,
+            terminal = terminalViewModel,
+            displayHost = object : RuntimeController.DisplayHost {
+                override fun attachTerminal() = attachTerminalSession()
+                override fun showTerminal() = this@MainActivity.showTerminal()
+                override fun showWayland() = showWaylandSurface()
+                override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
+                    showX11Display(onReady, onFailure)
+                override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
+            },
+        )
+        runtimeControlServer = RuntimeControlServer(this) { command, completion ->
+            runOnUiThread { runtimeController.dispatch(command, completion) }
         }
         val menuOrb = FloatingMenuOrbView(
             context = this,
@@ -178,6 +197,12 @@ class MainActivity : AppCompatActivity() {
             (book.parent as? ViewGroup)?.removeView(book)
             configBook = null
         } ?: super.onBackPressed()
+    }
+
+    override fun onDestroy() {
+        runtimeControlServer?.close()
+        runtimeControlServer = null
+        super.onDestroy()
     }
 
 }
