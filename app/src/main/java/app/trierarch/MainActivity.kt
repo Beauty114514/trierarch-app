@@ -6,16 +6,13 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.viewModels
-import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import app.trierarch.config.ConfigBookOverlay
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
-import app.trierarch.ui.FloatingMenuOrbView
 import app.trierarch.wayland.WaylandSurfaceView
 import app.trierarch.x11.X11HostController
 import com.termux.view.TerminalView
@@ -26,7 +23,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var runtimeController: RuntimeController
     private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
-    private var configBook: ConfigBookOverlay? = null
     private lateinit var terminalContainer: FrameLayout
     private val x11Host by lazy { X11HostController(this) }
     private var x11Starting = false
@@ -80,57 +76,7 @@ class MainActivity : AppCompatActivity() {
         runtimeControlServer = RuntimeControlServer(this) { command, completion ->
             runOnUiThread { runtimeController.dispatch(command, completion) }
         }
-        val menuOrb = FloatingMenuOrbView(
-            context = this,
-            preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
-            onClick = {
-                if (configBook == null) {
-                    configBook = ConfigBookOverlay(
-                        context = this,
-                        onDismiss = { configBook = null },
-                        onStartInternalShell = {
-                            terminalViewModel.restartInternalShell()
-                            attachTerminalSession()
-                        },
-                        onStartProot = { profile ->
-                            if (profile.display == app.trierarch.config.ProfileStore.DISPLAY_WAYLAND) {
-                                showWaylandSurface()
-                            }
-                            terminalViewModel.restartProot(profile)
-                            attachTerminalSession()
-                        },
-                        onStartChroot = { profile ->
-                            terminalViewModel.restartChroot(profile)
-                            attachTerminalSession()
-                        },
-                        onStartDroidspaces = { profile ->
-                            if (profile.display == app.trierarch.config.ProfileStore.DISPLAY_WAYLAND) {
-                                showWaylandSurface()
-                            }
-                            terminalViewModel.restartDroidspaces(profile)
-                            attachTerminalSession()
-                        },
-                        isRuntimeRunning = terminalViewModel::isRuntimeRunning,
-                        activeProfileId = terminalViewModel::activeProfileId,
-                        onStopRuntime = {
-                            terminalViewModel.stopRuntime()
-                            hideWaylandSurface()
-                        },
-                        onStartX11 = { onReady, onFailure -> showX11Display(onReady, onFailure) },
-                        onShowTerminal = { showTerminal() },
-                    )
-                    terminalContainer.addView(configBook)
-                }
-            },
-        )
-        terminalContainer.addView(menuOrb)
-        ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
-            val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
-            menuOrb.setImeBottomInset(imeBottom)
-            insets
-        }
         setContentView(terminalContainer)
-        ViewCompat.requestApplyInsets(terminalContainer)
 
         attachTerminalSession()
     }
@@ -190,13 +136,6 @@ class MainActivity : AppCompatActivity() {
             terminalContainer.removeView(it)
         }
         waylandSurface = null
-    }
-
-    override fun onBackPressed() {
-        configBook?.let { book ->
-            (book.parent as? ViewGroup)?.removeView(book)
-            configBook = null
-        } ?: super.onBackPressed()
     }
 
     override fun onDestroy() {
