@@ -20,8 +20,8 @@ object InternalShellLaunchSpec {
             """
             . /system/etc/mkshrc
             TRIERARCH_ROOT="${'$'}PWD"
-            trierarch-rootfs() {
-                "${'$'}TRIERARCH_NATIVE_LIB_DIR/libtrierarch-rootfs.so" "${'$'}@"
+            trierarch() {
+                "${'$'}TRIERARCH_NATIVE_LIB_DIR/libtrierarch-cli.so" "${'$'}@"
             }
             trierarch_prompt_path() {
                 case "${'$'}PWD" in
