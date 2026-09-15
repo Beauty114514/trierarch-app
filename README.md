@@ -2,6 +2,9 @@
 > # Warning: KWin Instability on Trierarch
 >
 >Due to recent KDE updates, Trierarch encounters KWin crashes. Developers are actively working to resolve these compatibility issues. If the situation remains unfixable, a transition to the Debian distribution is planned, as testing confirms that Debian’s stable KDE version remains functional on Trierarch.
+
+> [!NOTE]
+> Good news, everyone! I’ve successfully fixed the crash issue. Right now, I'm in the middle of reworking trierarch to add several highly requested features from the community. Thanks for bearing with me—I really want to bring you a much better version of trierarch!
 # Trierarch
 
 [中文](README.zh.md) | English
