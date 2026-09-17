@@ -264,9 +264,8 @@ class ProfileStore(context: Context) {
                 add("MESA_LOADER_DRIVER_OVERRIDE=llvmpipe")
             }
             if (renderer == GRAPHICS_VIRGL) {
-                add("LIBGL_ALWAYS_SOFTWARE=0")
+                add("LIBGL_ALWAYS_SOFTWARE=1")
                 add("GALLIUM_DRIVER=virpipe")
-                add("MESA_LOADER_DRIVER_OVERRIDE=virpipe")
             }
             if (qtQuickBackend == QT_QUICK_SOFTWARE) add("QT_QUICK_BACKEND=software")
         }
