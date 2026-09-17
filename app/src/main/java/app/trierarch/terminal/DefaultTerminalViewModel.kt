@@ -82,6 +82,9 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         } else {
             ""
         }
+        if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
+            check(WaylandBridge.start(app)) { "Unable to start Wayland host" }
+        }
         val next = NativePtySession(
             chrootRootfs = profile.rootfs,
             shell = profile.shell,
