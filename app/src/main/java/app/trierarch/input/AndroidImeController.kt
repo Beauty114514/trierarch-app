@@ -119,7 +119,14 @@ class AndroidImeController @JvmOverloads constructor(
         }
 
         override fun sendKeyEvent(event: AndroidKeyEvent): Boolean {
-            sink.send(AndroidImeEvent.KeyEvent(event.action, event.keyCode))
+            sink.send(
+                AndroidImeEvent.KeyEvent(
+                    action = event.action,
+                    keyCode = event.keyCode,
+                    metaState = event.metaState,
+                    repeatCount = event.repeatCount,
+                ),
+            )
             return true
         }
 
@@ -145,7 +152,18 @@ sealed interface AndroidImeEvent {
     data class DeleteSurroundingTextInCodePoints(val beforeLength: Int, val afterLength: Int) : AndroidImeEvent
     data class SetSelection(val start: Int, val end: Int) : AndroidImeEvent
     data class SetComposingRegion(val start: Int, val end: Int) : AndroidImeEvent
-    data class KeyEvent(val action: Int, val keyCode: Int) : AndroidImeEvent
+    /**
+     * A non-text key reported by an Android IME.  Keep modifiers and repeat
+     * information here rather than trying to infer them from text commits:
+     * later protocol backends need them for Ctrl/Alt combinations and held
+     * cursor keys.
+     */
+    data class KeyEvent(
+        val action: Int,
+        val keyCode: Int,
+        val metaState: Int,
+        val repeatCount: Int,
+    ) : AndroidImeEvent
     data class EditorAction(val actionCode: Int) : AndroidImeEvent
 }
 
@@ -168,7 +186,7 @@ private object LoggingAndroidImeEventSink : AndroidImeEventSink {
             is AndroidImeEvent.DeleteSurroundingTextInCodePoints -> "deleteSurroundingTextInCodePoints before=${event.beforeLength} after=${event.afterLength}"
             is AndroidImeEvent.SetSelection -> "setSelection start=${event.start} end=${event.end}"
             is AndroidImeEvent.SetComposingRegion -> "setComposingRegion start=${event.start} end=${event.end}"
-            is AndroidImeEvent.KeyEvent -> "keyEvent action=${event.action} keyCode=${event.keyCode}"
+            is AndroidImeEvent.KeyEvent -> "keyEvent action=${event.action} keyCode=${event.keyCode} meta=${event.metaState} repeat=${event.repeatCount}"
             is AndroidImeEvent.EditorAction -> "editorAction code=${event.actionCode}"
         }
         Log.i(TAG, summary)
