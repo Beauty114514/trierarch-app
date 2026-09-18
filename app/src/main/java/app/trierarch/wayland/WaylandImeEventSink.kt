@@ -16,18 +16,34 @@ import java.util.concurrent.Executors
 class WaylandImeEventSink(socket: File) : AndroidImeEventSink, AutoCloseable {
     private val socketPath = socket.absolutePath
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
+    private var composingText = ""
+    private var batchEditDepth = 0
 
     override fun send(event: AndroidImeEvent) {
         executor.execute {
             when (event) {
-                is AndroidImeEvent.CommitText -> if (event.text.isNotEmpty()) sendCommit(event.text)
+                AndroidImeEvent.BeginBatchEdit -> batchEditDepth++
+                AndroidImeEvent.EndBatchEdit -> if (batchEditDepth > 0) batchEditDepth--
+                is AndroidImeEvent.CommitText -> replaceComposingText(event.text, keepComposing = false)
+                is AndroidImeEvent.SetComposingText -> replaceComposingText(event.text, keepComposing = true)
+                AndroidImeEvent.FinishComposingText -> composingText = ""
                 is AndroidImeEvent.DeleteSurroundingText -> {
+                    composingText = ""
                     sendRepeatedKeysym(XK_BACK_SPACE, event.beforeLength)
                     sendRepeatedKeysym(XK_DELETE, event.afterLength)
                 }
                 is AndroidImeEvent.DeleteSurroundingTextInCodePoints -> {
+                    composingText = ""
                     sendRepeatedKeysym(XK_BACK_SPACE, event.beforeLength)
                     sendRepeatedKeysym(XK_DELETE, event.afterLength)
+                }
+                is AndroidImeEvent.SetSelection -> {
+                    if (batchEditDepth == 0 && event.start == event.end) {
+                        when {
+                            event.start < 1 -> sendRepeatedKeysym(XK_LEFT, 1)
+                            event.start > 1 -> sendRepeatedKeysym(XK_RIGHT, 1)
+                        }
+                    }
                 }
                 is AndroidImeEvent.KeyEvent -> sendKeyEvent(event)
                 is AndroidImeEvent.EditorAction -> sendEditorAction(event.actionCode)
@@ -40,7 +56,65 @@ class WaylandImeEventSink(socket: File) : AndroidImeEventSink, AutoCloseable {
         executor.shutdownNow()
     }
 
-    private fun sendCommit(text: String) {
+    /** Mirrors X11's preedit replacement without exposing stale Android state. */
+    private fun replaceComposingText(replacement: String, keepComposing: Boolean) {
+        when {
+            replacement.startsWith(composingText) -> sendCommittedText(replacement.drop(composingText.length))
+            composingText.startsWith(replacement) -> {
+                sendRepeatedKeysym(XK_BACK_SPACE, composingText.codePointCount(0, composingText.length) - replacement.codePointCount(0, replacement.length))
+            }
+            else -> {
+                sendRepeatedKeysym(XK_BACK_SPACE, composingText.codePointCount(0, composingText.length))
+                sendCommittedText(replacement)
+            }
+        }
+        composingText = if (keepComposing) replacement else ""
+    }
+
+    /** Split control characters from final UTF-8 text exactly as the X11 path does. */
+    private fun sendCommittedText(text: String) {
+        val committed = StringBuilder(text.length)
+        var index = 0
+        while (index < text.length) {
+            when (val character = text[index]) {
+                '\n', '\r', '\u2028', '\u2029' -> {
+                    sendTextCommit(committed)
+                    committed.setLength(0)
+                    sendRepeatedKeysym(XK_RETURN, 1)
+                    if (character == '\r' && index + 1 < text.length && text[index + 1] == '\n') index++
+                }
+                '\t' -> {
+                    sendTextCommit(committed)
+                    committed.setLength(0)
+                    sendRepeatedKeysym(XK_TAB, 1)
+                }
+                '\b' -> {
+                    sendTextCommit(committed)
+                    committed.setLength(0)
+                    sendRepeatedKeysym(XK_BACK_SPACE, 1)
+                }
+                '\u007f' -> {
+                    sendTextCommit(committed)
+                    committed.setLength(0)
+                    sendRepeatedKeysym(XK_DELETE, 1)
+                }
+                '\u001b' -> {
+                    sendTextCommit(committed)
+                    committed.setLength(0)
+                    sendRepeatedKeysym(XK_ESCAPE, 1)
+                }
+                else -> if (character >= ' ') committed.append(character)
+            }
+            index++
+        }
+        sendTextCommit(committed)
+    }
+
+    private fun sendTextCommit(text: StringBuilder) {
+        if (text.isNotEmpty()) sendTextCommit(text.toString())
+    }
+
+    private fun sendTextCommit(text: String) {
         val bytes = text.toByteArray(Charsets.UTF_8)
         sendFrame(bytes.size, bytes)
     }
@@ -114,6 +188,10 @@ class WaylandImeEventSink(socket: File) : AndroidImeEventSink, AutoCloseable {
         KeyEvent.KEYCODE_DPAD_DOWN -> XK_DOWN
         KeyEvent.KEYCODE_DPAD_LEFT -> XK_LEFT
         KeyEvent.KEYCODE_DPAD_RIGHT -> XK_RIGHT
+        KeyEvent.KEYCODE_MOVE_HOME -> XK_HOME
+        KeyEvent.KEYCODE_MOVE_END -> XK_END
+        KeyEvent.KEYCODE_PAGE_UP -> XK_PAGE_UP
+        KeyEvent.KEYCODE_PAGE_DOWN -> XK_PAGE_DOWN
         else -> null
     }
 
@@ -133,6 +211,10 @@ class WaylandImeEventSink(socket: File) : AndroidImeEventSink, AutoCloseable {
         const val XK_UP = 0xff52
         const val XK_RIGHT = 0xff53
         const val XK_DOWN = 0xff54
+        const val XK_HOME = 0xff50
+        const val XK_END = 0xff57
+        const val XK_PAGE_UP = 0xff55
+        const val XK_PAGE_DOWN = 0xff56
         const val XK_DELETE = 0xffff
     }
 }
