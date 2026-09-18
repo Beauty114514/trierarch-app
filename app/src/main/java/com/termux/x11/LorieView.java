@@ -38,6 +38,7 @@ public final class LorieView extends SurfaceView {
     private final PointerInputRouter inputRouter;
     private final PhysicalKeyboardRouter keyboardRouter;
     private final AndroidImeController androidIme;
+    private Runnable keyboardRequestListener;
     private String composingText = "";
     private int imeBatchEditDepth;
 
@@ -120,8 +121,21 @@ public final class LorieView extends SurfaceView {
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (nativeHandle == 0) return true;
         boolean handled = inputRouter.onTouchEvent(this, event);
-        if (event.getActionMasked() == MotionEvent.ACTION_UP) androidIme.showKeyboard();
+        if (event.getActionMasked() == MotionEvent.ACTION_UP) requestAndroidKeyboard();
         return handled;
+    }
+
+    public void setKeyboardRequestListener(Runnable listener) {
+        keyboardRequestListener = listener;
+    }
+
+    public void showAndroidKeyboard() {
+        androidIme.showKeyboard();
+    }
+
+    private void requestAndroidKeyboard() {
+        if (keyboardRequestListener != null) keyboardRequestListener.run();
+        else androidIme.showKeyboard();
     }
 
     /**

@@ -27,6 +27,7 @@ class X11HostController(context: Context) {
     /** Starts Lorie and reports only when its client connection and X0 socket are usable. */
     fun showIn(
         container: FrameLayout,
+        onKeyboardRequested: () -> Unit,
         onReady: () -> Unit,
         onFailure: (String) -> Unit,
     ) {
@@ -44,6 +45,7 @@ class X11HostController(context: Context) {
                 ),
             )
         }
+        view.setKeyboardRequestListener { onKeyboardRequested() }
         view.visibility = android.view.View.VISIBLE
         view.requestFocus()
         // Lorie renders into SurfaceView's separate surface. Its ordinary View layer
@@ -70,6 +72,10 @@ class X11HostController(context: Context) {
             releasePressedKeys()
             visibility = android.view.View.INVISIBLE
         }
+    }
+
+    fun showAndroidKeyboard() {
+        display?.showAndroidKeyboard()
     }
 
     private fun bindServerIfNeeded() {

@@ -13,7 +13,10 @@ import app.trierarch.input.PhysicalKeyboardRouter
 import app.trierarch.input.AndroidImeController
 
 /** Full-screen, display-only target for the first Wayland milestone. */
-class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder.Callback {
+class WaylandSurfaceView(
+    context: Context,
+    private val onKeyboardRequested: (WaylandSurfaceView) -> Unit,
+) : SurfaceView(context), SurfaceHolder.Callback {
     private val inputRouter = PointerInputRouter(context, WaylandPointerEventSink) {
         WaylandBridge.setCursorVisible(it)
     }
@@ -51,7 +54,7 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val handled = inputRouter.onTouchEvent(this, event)
-        if (event.actionMasked == MotionEvent.ACTION_UP) androidIme.showKeyboard()
+        if (event.actionMasked == MotionEvent.ACTION_UP) onKeyboardRequested(this)
         return handled
     }
 
@@ -75,6 +78,8 @@ class WaylandSurfaceView(context: Context) : SurfaceView(context), SurfaceHolder
     fun releasePressedKeys() {
         keyboardRouter.releaseAll(SystemClock.uptimeMillis())
     }
+
+    fun showAndroidKeyboard() = androidIme.showKeyboard()
 
     /** Reattaches a preserved Android Surface after the Wayland host restarts. */
     fun attachHostSurface() {

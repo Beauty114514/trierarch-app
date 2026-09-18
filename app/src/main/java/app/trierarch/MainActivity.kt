@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
+import app.trierarch.input.KeyboardPanelController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
 import app.trierarch.ui.FloatingActionMenuView
@@ -26,6 +27,7 @@ class MainActivity : AppCompatActivity() {
     private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
     private lateinit var terminalContainer: FrameLayout
+    private lateinit var keyboardPanel: KeyboardPanelController
     private val x11Host by lazy { X11HostController(this) }
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
@@ -66,6 +68,7 @@ class MainActivity : AppCompatActivity() {
                 ),
             )
         }
+        keyboardPanel = KeyboardPanelController(terminalContainer)
         runtimeController = RuntimeController(
             context = this,
             terminal = terminalViewModel,
@@ -100,6 +103,7 @@ class MainActivity : AppCompatActivity() {
         )
         setDisplayedSurface(DisplaySurface.INTERNAL_SHELL)
         ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
+            keyboardPanel.updateInsets(insets)
             floatingMenu.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             insets
         }
@@ -119,7 +123,9 @@ class MainActivity : AppCompatActivity() {
 
     private fun showWaylandSurface() {
         if (waylandSurface == null) {
-            waylandSurface = WaylandSurfaceView(this)
+            waylandSurface = WaylandSurfaceView(this) { target ->
+                keyboardPanel.requestShowFromTouch(target::showAndroidKeyboard)
+            }
             terminalContainer.addView(
                 waylandSurface,
                 0,
@@ -145,6 +151,9 @@ class MainActivity : AppCompatActivity() {
         x11Starting = true
         x11Host.showIn(
             terminalContainer,
+            onKeyboardRequested = {
+                keyboardPanel.requestShowFromTouch(x11Host::showAndroidKeyboard)
+            },
             onReady = {
                 onReady()
                 if (x11Starting) {
