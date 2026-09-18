@@ -29,6 +29,8 @@ class MainActivity : AppCompatActivity() {
     private val x11Host by lazy { X11HostController(this) }
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
+    /** Authoritative host state for controls that only apply to graphical displays. */
+    private var displayedSurface = DisplaySurface.TERMINAL
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -130,6 +132,7 @@ class MainActivity : AppCompatActivity() {
             requestFocus()
         }
         terminalView?.visibility = android.view.View.INVISIBLE
+        displayedSurface = DisplaySurface.WAYLAND
     }
 
     private fun showX11Display(onReady: () -> Unit, onFailure: (String) -> Unit) {
@@ -141,7 +144,10 @@ class MainActivity : AppCompatActivity() {
             terminalContainer,
             onReady = {
                 onReady()
-                if (x11Starting) terminalView?.visibility = android.view.View.INVISIBLE
+                if (x11Starting) {
+                    terminalView?.visibility = android.view.View.INVISIBLE
+                    displayedSurface = DisplaySurface.X11
+                }
             },
             onFailure = onFailure,
         )
@@ -155,6 +161,7 @@ class MainActivity : AppCompatActivity() {
             visibility = android.view.View.VISIBLE
             requestFocus()
         }
+        displayedSurface = DisplaySurface.TERMINAL
     }
 
     private fun hideWaylandSurface() {
@@ -168,6 +175,12 @@ class MainActivity : AppCompatActivity() {
         runtimeControlServer?.close()
         runtimeControlServer = null
         super.onDestroy()
+    }
+
+    private enum class DisplaySurface {
+        TERMINAL,
+        X11,
+        WAYLAND,
     }
 
 }
