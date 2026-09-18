@@ -29,8 +29,8 @@ class MainActivity : AppCompatActivity() {
     private val x11Host by lazy { X11HostController(this) }
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
-    /** Authoritative host state for controls that only apply to graphical displays. */
-    private var displayedSurface = DisplaySurface.TERMINAL
+    /** Authoritative presentation state for controls scoped to a runtime surface. */
+    private var displayedSurface = DisplaySurface.INTERNAL_SHELL
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -70,7 +70,8 @@ class MainActivity : AppCompatActivity() {
             terminal = terminalViewModel,
             displayHost = object : RuntimeController.DisplayHost {
                 override fun attachTerminal() = attachTerminalSession()
-                override fun showTerminal() = this@MainActivity.showTerminal()
+                override fun showInternalTerminal() = showTerminal(DisplaySurface.INTERNAL_SHELL)
+                override fun showRuntimeTerminal() = showTerminal(DisplaySurface.RUNTIME_SHELL)
                 override fun showWayland() = showWaylandSurface()
                 override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
                     showX11Display(onReady, onFailure)
@@ -85,7 +86,7 @@ class MainActivity : AppCompatActivity() {
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
             onReturnToShell = {
                 terminalViewModel.showInternalShell()
-                showTerminal()
+                showTerminal(DisplaySurface.INTERNAL_SHELL)
                 attachTerminalSession()
             },
         )
@@ -153,7 +154,7 @@ class MainActivity : AppCompatActivity() {
         )
     }
 
-    private fun showTerminal() {
+    private fun showTerminal(surface: DisplaySurface) {
         x11Starting = false
         x11Host.hide()
         hideWaylandSurface()
@@ -161,7 +162,7 @@ class MainActivity : AppCompatActivity() {
             visibility = android.view.View.VISIBLE
             requestFocus()
         }
-        displayedSurface = DisplaySurface.TERMINAL
+        displayedSurface = surface
     }
 
     private fun hideWaylandSurface() {
@@ -178,7 +179,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private enum class DisplaySurface {
-        TERMINAL,
+        INTERNAL_SHELL,
+        RUNTIME_SHELL,
         X11,
         WAYLAND,
     }

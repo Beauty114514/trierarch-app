@@ -18,7 +18,8 @@ class RuntimeController(
 
     interface DisplayHost {
         fun attachTerminal()
-        fun showTerminal()
+        fun showInternalTerminal()
+        fun showRuntimeTerminal()
         fun showWayland()
         fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit)
         fun runOnMain(action: () -> Unit)
@@ -106,7 +107,7 @@ class RuntimeController(
                 val source = sourcesByProfile.remove(target) ?: loadProfileSilently(target)?.source
                 terminal.stopRuntime(target)
                 source?.let(::stopSourceIfUnused)
-                displayHost.showTerminal()
+                displayHost.showInternalTerminal()
                 pending = null
             }
         })
@@ -153,11 +154,19 @@ class RuntimeController(
                     onReady = { runCatching(started).onFailure { launchFailed(id, it) } },
                     onFailure = { launchFailed(id, IllegalStateException(it)) },
                 )
+            } else if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
+                runCatching {
+                    displayHost.showWayland()
+                    started()
+                }.onFailure { launchFailed(id, it) }
             } else {
                 runCatching {
-                    if (profile.display == ProfileStore.DISPLAY_WAYLAND) displayHost.showWayland()
-                    else displayHost.showTerminal()
                     started()
+                    if (profile.runtime == ProfileStore.RUNTIME_INTERNAL_SHELL) {
+                        displayHost.showInternalTerminal()
+                    } else {
+                        displayHost.showRuntimeTerminal()
+                    }
                 }.onFailure { launchFailed(id, it) }
             }
         }
@@ -167,7 +176,7 @@ class RuntimeController(
         sourcesByProfile.remove(id)
         pending = null
         terminal.reportRuntimeLaunchFailure(id, error)
-        displayHost.showTerminal()
+        displayHost.showInternalTerminal()
     }
 
     private fun stopSourceIfUnused(source: LaunchSource) {

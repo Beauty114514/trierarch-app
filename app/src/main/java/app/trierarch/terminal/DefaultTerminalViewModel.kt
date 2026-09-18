@@ -30,6 +30,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
     /** Shows the persistent management shell without stopping a profile runtime. */
     fun showInternalShell() {
         session = usableInternalSession()
+        displayedProfileId = null
     }
 
     fun reportRuntimeLaunchFailure(profileId: String, error: Throwable) {
