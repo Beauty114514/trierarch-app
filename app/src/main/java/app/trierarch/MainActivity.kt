@@ -14,7 +14,7 @@ import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
-import app.trierarch.ui.FloatingMenuOrbView
+import app.trierarch.ui.FloatingActionMenuView
 import app.trierarch.wayland.WaylandSurfaceView
 import app.trierarch.x11.X11HostController
 import com.termux.view.TerminalView
@@ -78,13 +78,24 @@ class MainActivity : AppCompatActivity() {
         runtimeControlServer = RuntimeControlServer(this) { command, completion ->
             runOnUiThread { runtimeController.dispatch(command, completion) }
         }
-        val menuOrb = FloatingMenuOrbView(
+        val floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
+            onReturnToShell = {
+                terminalViewModel.showInternalShell()
+                showTerminal()
+                attachTerminalSession()
+            },
         )
-        terminalContainer.addView(menuOrb)
+        terminalContainer.addView(
+            floatingMenu,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
         ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
-            menuOrb.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            floatingMenu.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             insets
         }
         setContentView(terminalContainer)

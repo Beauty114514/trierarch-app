@@ -1,12 +1,17 @@
 package app.trierarch.ui
 
+import android.animation.PropertyValuesHolder
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.SharedPreferences
+import android.graphics.Canvas
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
+import android.graphics.Paint
+import android.graphics.RectF
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.FrameLayout
 import androidx.appcompat.widget.AppCompatImageView
 import androidx.core.content.edit
@@ -25,9 +30,19 @@ class FloatingMenuOrbView(
     context: Context,
     private val preferences: SharedPreferences,
     private val onClick: (() -> Unit)? = null,
+    private val onDragStarted: (() -> Unit)? = null,
+    private val onPositionChanged: (() -> Unit)? = null,
 ) : AppCompatImageView(context) {
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
-    private val sizePx = context.dp(48)
+    private val sizePx = context.dp(56)
+    private val shellInset = context.dp(4).toFloat()
+    private val shellStrokeWidth = context.dp(1).toFloat()
+    private val shellFill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = SHELL_FILL }
+    private val shellStroke = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = SHELL_STROKE
+        style = Paint.Style.STROKE
+        strokeWidth = shellStrokeWidth
+    }
 
     private var centerXFraction = preferences.getFloat(PREF_CENTER_X, DEFAULT_CENTER_X)
     private var centerYFraction = preferences.getFloat(PREF_CENTER_Y, DEFAULT_CENTER_Y)
@@ -37,18 +52,17 @@ class FloatingMenuOrbView(
     private var startX = 0f
     private var startY = 0f
     private var dragging = false
+    private var shellScaleX = 1f
+    private var shellScaleY = 1f
+    private var shellAnimator: ValueAnimator? = null
 
     init {
         layoutParams = FrameLayout.LayoutParams(sizePx, sizePx)
         contentDescription = "Trierarch menu"
         scaleType = ScaleType.CENTER_INSIDE
-        setPadding(context.dp(8), context.dp(8), context.dp(8), context.dp(8))
+        setPadding(context.dp(12), context.dp(12), context.dp(12), context.dp(12))
         setImageResource(R.drawable.ic_launcher_foreground)
-        background = GradientDrawable().apply {
-            shape = GradientDrawable.OVAL
-            setColor(Color.argb(184, 26, 26, 26))
-            setStroke(context.dp(1), Color.argb(140, 255, 255, 255))
-        }
+        setWillNotDraw(false)
         elevation = context.dp(8).toFloat()
         isClickable = true
         isFocusable = true
@@ -81,6 +95,7 @@ class FloatingMenuOrbView(
             val deltaY = event.rawY - downRawY
             if (!dragging && (abs(deltaX) > touchSlop || abs(deltaY) > touchSlop)) {
                 dragging = true
+                onDragStarted?.invoke()
             }
             if (dragging) moveTo(
                 (startX + deltaX).roundToInt(),
@@ -108,6 +123,48 @@ class FloatingMenuOrbView(
         return true
     }
 
+    /** Bounces the glass shell while leaving the Trierarch logo unchanged. */
+    fun playShellBounce(launching: Boolean) {
+        shellAnimator?.cancel()
+        val shellX = if (launching) {
+            floatArrayOf(1f, 0.86f, 1.10f, 1.035f, 0.99f, 1f)
+        } else {
+            floatArrayOf(1f, 1.10f, 0.86f, 0.965f, 1.01f, 1f)
+        }
+        val shellY = if (launching) {
+            floatArrayOf(1f, 1.11f, 0.94f, 0.98f, 1.005f, 1f)
+        } else {
+            floatArrayOf(1f, 0.94f, 1.11f, 1.02f, 0.995f, 1f)
+        }
+        shellAnimator = ValueAnimator.ofPropertyValuesHolder(
+            PropertyValuesHolder.ofFloat("shellX", *shellX),
+            PropertyValuesHolder.ofFloat("shellY", *shellY),
+        ).apply {
+            duration = BOUNCE_MILLIS
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { animator ->
+                shellScaleX = animator.getAnimatedValue("shellX") as Float
+                shellScaleY = animator.getAnimatedValue("shellY") as Float
+                invalidate()
+            }
+            start()
+        }
+    }
+
+    /** Re-applies the saved relative position after a host size change. */
+    fun refreshPosition() = placeFromSavedPosition()
+
+    override fun onDraw(canvas: Canvas) {
+        val centerX = width / 2f
+        val centerY = height / 2f
+        val radiusX = (width - shellStrokeWidth - shellInset * 2f) / 2f * shellScaleX
+        val radiusY = (height - shellStrokeWidth - shellInset * 2f) / 2f * shellScaleY
+        val bounds = RectF(centerX - radiusX, centerY - radiusY, centerX + radiusX, centerY + radiusY)
+        canvas.drawOval(bounds, shellFill)
+        canvas.drawOval(bounds, shellStroke)
+        super.onDraw(canvas)
+    }
+
     private fun placeFromSavedPosition() {
         val host = parent as? View ?: return
         if (host.width == 0 || usableHeight(host) == 0) return
@@ -123,6 +180,7 @@ class FloatingMenuOrbView(
         val maxTop = (usableHeight(host) - height).coerceAtLeast(0)
         x = requestedLeft.coerceIn(0, maxLeft).toFloat()
         y = requestedTop.coerceIn(0, maxTop).toFloat()
+        onPositionChanged?.invoke()
     }
 
     private fun persistPosition() {
@@ -142,6 +200,9 @@ class FloatingMenuOrbView(
         (value * resources.displayMetrics.density).roundToInt()
 
     private companion object {
+        const val BOUNCE_MILLIS = 360L
+        val SHELL_FILL = Color.argb(184, 26, 26, 26)
+        val SHELL_STROKE = Color.argb(140, 255, 255, 255)
         const val PREF_CENTER_X = "menu_orb_center_x_fraction"
         const val PREF_CENTER_Y = "menu_orb_center_y_fraction"
         const val DEFAULT_CENTER_X = 0.88f
