@@ -81,11 +81,6 @@ class MainActivity : AppCompatActivity() {
         val menuOrb = FloatingMenuOrbView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
-            onClick = {
-                terminalViewModel.showInternalShell()
-                showTerminal()
-                attachTerminalSession()
-            },
         )
         terminalContainer.addView(menuOrb)
         ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->

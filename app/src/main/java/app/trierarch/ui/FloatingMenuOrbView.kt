@@ -24,7 +24,7 @@ import kotlin.math.roundToInt
 class FloatingMenuOrbView(
     context: Context,
     private val preferences: SharedPreferences,
-    private val onClick: () -> Unit,
+    private val onClick: (() -> Unit)? = null,
 ) : AppCompatImageView(context) {
     private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
     private val sizePx = context.dp(48)
@@ -40,7 +40,7 @@ class FloatingMenuOrbView(
 
     init {
         layoutParams = FrameLayout.LayoutParams(sizePx, sizePx)
-        contentDescription = "Open management shell"
+        contentDescription = "Trierarch menu"
         scaleType = ScaleType.CENTER_INSIDE
         setPadding(context.dp(8), context.dp(8), context.dp(8), context.dp(8))
         setImageResource(R.drawable.ic_launcher_foreground)
@@ -104,7 +104,7 @@ class FloatingMenuOrbView(
 
     override fun performClick(): Boolean {
         super.performClick()
-        onClick()
+        onClick?.invoke()
         return true
     }
 
