@@ -189,6 +189,14 @@ class FloatingMenuOrbView(
         }
     }
 
+    /** Stops a menu transition before the orb is hidden with its host surface. */
+    fun cancelShellMotion() {
+        shellAnimator?.cancel()
+        shellScaleX = 1f
+        shellScaleY = 1f
+        invalidate()
+    }
+
     /** Re-applies the saved relative position after a host size change. */
     fun refreshPosition() = placeFromSavedPosition()
 

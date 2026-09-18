@@ -29,6 +29,7 @@ class MainActivity : AppCompatActivity() {
     private val x11Host by lazy { X11HostController(this) }
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
+    private lateinit var floatingMenu: FloatingActionMenuView
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
 
@@ -81,7 +82,7 @@ class MainActivity : AppCompatActivity() {
         runtimeControlServer = RuntimeControlServer(this) { command, completion ->
             runOnUiThread { runtimeController.dispatch(command, completion) }
         }
-        val floatingMenu = FloatingActionMenuView(
+        floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
             onReturnToShell = {
@@ -97,6 +98,7 @@ class MainActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
+        setDisplayedSurface(DisplaySurface.INTERNAL_SHELL)
         ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
             floatingMenu.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             insets
@@ -133,7 +135,7 @@ class MainActivity : AppCompatActivity() {
             requestFocus()
         }
         terminalView?.visibility = android.view.View.INVISIBLE
-        displayedSurface = DisplaySurface.WAYLAND
+        setDisplayedSurface(DisplaySurface.WAYLAND)
     }
 
     private fun showX11Display(onReady: () -> Unit, onFailure: (String) -> Unit) {
@@ -147,7 +149,7 @@ class MainActivity : AppCompatActivity() {
                 onReady()
                 if (x11Starting) {
                     terminalView?.visibility = android.view.View.INVISIBLE
-                    displayedSurface = DisplaySurface.X11
+                    setDisplayedSurface(DisplaySurface.X11)
                 }
             },
             onFailure = onFailure,
@@ -162,7 +164,7 @@ class MainActivity : AppCompatActivity() {
             visibility = android.view.View.VISIBLE
             requestFocus()
         }
-        displayedSurface = surface
+        setDisplayedSurface(surface)
     }
 
     private fun hideWaylandSurface() {
@@ -170,6 +172,11 @@ class MainActivity : AppCompatActivity() {
             it.releasePressedKeys()
             it.visibility = android.view.View.INVISIBLE
         }
+    }
+
+    private fun setDisplayedSurface(surface: DisplaySurface) {
+        displayedSurface = surface
+        floatingMenu.setDisplayActive(surface == DisplaySurface.RUNTIME_SHELL)
     }
 
     override fun onDestroy() {

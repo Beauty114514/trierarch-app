@@ -43,6 +43,7 @@ class FloatingActionMenuView(
     )
 
     private var expanded = false
+    private var displayActive = true
     private var imeBottomInset = 0
 
     init {
@@ -56,6 +57,26 @@ class FloatingActionMenuView(
         imeBottomInset = inset.coerceAtLeast(0)
         mainOrb.setImeBottomInset(imeBottomInset)
         if (expanded) post { placeSatellites(animate = false) }
+    }
+
+    /** Hides menu controls when the current surface has no available actions. */
+    fun setDisplayActive(active: Boolean) {
+        if (displayActive == active) return
+        displayActive = active
+        if (active) {
+            visibility = View.VISIBLE
+            return
+        }
+        expanded = false
+        mainOrb.cancelShellMotion()
+        satellites.forEach { satellite ->
+            satellite.animate().cancel()
+            satellite.visibility = View.INVISIBLE
+            satellite.alpha = 0f
+            satellite.scaleX = COLLAPSED_SCALE
+            satellite.scaleY = COLLAPSED_SCALE
+        }
+        visibility = View.GONE
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
