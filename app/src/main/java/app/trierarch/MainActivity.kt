@@ -15,6 +15,7 @@ import app.trierarch.runtime.RuntimeController
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
+import app.trierarch.ui.FloatingMenuAction
 import app.trierarch.ui.FloatingActionMenuView
 import app.trierarch.wayland.WaylandSurfaceView
 import app.trierarch.x11.X11HostController
@@ -88,11 +89,6 @@ class MainActivity : AppCompatActivity() {
         floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
-            onReturnToShell = {
-                terminalViewModel.showInternalShell()
-                showTerminal(DisplaySurface.INTERNAL_SHELL)
-                attachTerminalSession()
-            },
         )
         terminalContainer.addView(
             floatingMenu,
@@ -103,7 +99,6 @@ class MainActivity : AppCompatActivity() {
         )
         setDisplayedSurface(DisplaySurface.INTERNAL_SHELL)
         ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
-            keyboardPanel.updateInsets(insets)
             floatingMenu.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             insets
         }
@@ -185,7 +180,39 @@ class MainActivity : AppCompatActivity() {
 
     private fun setDisplayedSurface(surface: DisplaySurface) {
         displayedSurface = surface
-        floatingMenu.setDisplayActive(surface == DisplaySurface.RUNTIME_SHELL)
+        floatingMenu.setActions(actionsFor(surface))
+    }
+
+    private fun actionsFor(surface: DisplaySurface): List<FloatingMenuAction> = when (surface) {
+        DisplaySurface.INTERNAL_SHELL -> emptyList()
+        DisplaySurface.RUNTIME_SHELL -> listOf(returnToShellAction())
+        DisplaySurface.X11,
+        DisplaySurface.WAYLAND
+        -> listOf(returnToShellAction(), keyboardAction())
+    }
+
+    private fun returnToShellAction() = FloatingMenuAction(
+        id = "return-shell",
+        icon = R.drawable.ic_floating_action_terminal,
+        contentDescription = "Return to Trierarch shell",
+    ) {
+        terminalViewModel.showInternalShell()
+        showTerminal(DisplaySurface.INTERNAL_SHELL)
+        attachTerminalSession()
+    }
+
+    private fun keyboardAction() = FloatingMenuAction(
+        id = "toggle-keyboard",
+        icon = R.drawable.ic_floating_action_keyboard,
+        contentDescription = "Show or hide Android keyboard",
+    ) {
+        when (displayedSurface) {
+            DisplaySurface.X11 -> keyboardPanel.toggle(x11Host::showAndroidKeyboard)
+            DisplaySurface.WAYLAND -> waylandSurface?.let { surface ->
+                keyboardPanel.toggle(surface::showAndroidKeyboard)
+            }
+            else -> Unit
+        }
     }
 
     override fun onDestroy() {

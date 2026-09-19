@@ -9,7 +9,6 @@ import android.view.View
 import android.view.animation.DecelerateInterpolator
 import android.widget.FrameLayout
 import androidx.appcompat.widget.AppCompatImageView
-import app.trierarch.R
 import kotlin.math.PI
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -17,23 +16,23 @@ import kotlin.math.min
 import kotlin.math.sin
 import kotlin.math.roundToInt
 
+data class FloatingMenuAction(
+    val id: String,
+    val icon: Int,
+    val contentDescription: String,
+    val onClick: () -> Unit,
+)
+
 /**
  * A draggable in-app action menu.
  */
 class FloatingActionMenuView(
     context: Context,
     preferences: SharedPreferences,
-    private val onReturnToShell: () -> Unit,
 ) : FrameLayout(context) {
     private val orbSize = context.dp(48)
     private val fanRadius = context.dp(108).toFloat()
-    private val satellites = listOf(
-        createSatellite(
-            icon = R.drawable.ic_floating_action_terminal,
-            description = "Return to Trierarch shell",
-            onClick = ::returnToShell,
-        ),
-    )
+    private val satellites = mutableListOf<AppCompatImageView>()
     private val mainOrb = FloatingMenuOrbView(
         context = context,
         preferences = preferences,
@@ -43,14 +42,12 @@ class FloatingActionMenuView(
     )
 
     private var expanded = false
-    private var displayActive = true
     private var imeBottomInset = 0
 
     init {
         clipChildren = false
         clipToPadding = false
         addView(mainOrb)
-        satellites.forEach(::addView)
     }
 
     fun setImeBottomInset(inset: Int) {
@@ -59,14 +56,21 @@ class FloatingActionMenuView(
         if (expanded) post { placeSatellites(animate = false) }
     }
 
-    /** Hides menu controls when the current surface has no available actions. */
-    fun setDisplayActive(active: Boolean) {
-        if (displayActive == active) return
-        displayActive = active
-        if (active) {
-            visibility = View.VISIBLE
-            return
+    /** Replaces the actions available for the active presentation surface. */
+    fun setActions(actions: List<FloatingMenuAction>) {
+        collapseImmediately()
+        satellites.forEach(::removeView)
+        satellites.clear()
+        actions.forEach { action ->
+            createSatellite(action).also { satellite ->
+                satellites += satellite
+                addView(satellite)
+            }
         }
+        visibility = if (actions.isEmpty()) View.GONE else View.VISIBLE
+    }
+
+    private fun collapseImmediately() {
         expanded = false
         mainOrb.cancelShellMotion()
         satellites.forEach { satellite ->
@@ -76,7 +80,6 @@ class FloatingActionMenuView(
             satellite.scaleX = COLLAPSED_SCALE
             satellite.scaleY = COLLAPSED_SCALE
         }
-        visibility = View.GONE
     }
 
     override fun onSizeChanged(width: Int, height: Int, oldWidth: Int, oldHeight: Int) {
@@ -88,6 +91,7 @@ class FloatingActionMenuView(
     }
 
     private fun toggle() {
+        if (satellites.isEmpty()) return
         if (expanded) collapse() else expand()
     }
 
@@ -139,11 +143,6 @@ class FloatingActionMenuView(
         }
     }
 
-    private fun returnToShell() {
-        collapse()
-        onReturnToShell()
-    }
-
     private fun placeSatellites(animate: Boolean) {
         if (!expanded) return
         satellites.zip(satelliteTargets()).forEach { (satellite, target) ->
@@ -156,7 +155,7 @@ class FloatingActionMenuView(
         }
     }
 
-    /** Chooses a satellite position toward the largest safe interior area. */
+    /** Chooses a satellite fan toward the largest safe interior area. */
     private fun satelliteTargets(): List<PointF> {
         if (width == 0 || height == 0) return satellites.map { PointF(mainOrb.x, mainOrb.y) }
         val usableHeight = (height - imeBottomInset).coerceAtLeast(orbSize)
@@ -168,12 +167,23 @@ class FloatingActionMenuView(
             .map { index -> -PI.toFloat() + index * (fullTurn / 8f) }
             .sortedBy { angularDistance(it, preferred) }
 
+        val offsets = satelliteAngleOffsets()
         return candidateAxes
-            .map { axis -> pointFor(centerX, centerY, axis) }
-            .firstOrNull(::fitsUsableArea)
-            ?.let(::listOf)
-            ?: listOf(pointFor(centerX, centerY, preferred).clampToUsableArea())
+            .map { axis -> offsets.map { offset -> pointFor(centerX, centerY, axis + offset) } }
+            .firstOrNull { points -> points.all(::fitsUsableArea) }
+            ?: offsets.map { offset -> pointFor(centerX, centerY, preferred + offset).clampToUsableArea() }
     }
+
+    private fun satelliteAngleOffsets(): List<Float> = when (satellites.size) {
+        0 -> emptyList()
+        1 -> listOf(0f)
+        2 -> listOf(-24f, 24f)
+        3 -> listOf(-36f, 0f, 36f)
+        else -> List(satellites.size) { index ->
+            val progress = index.toFloat() / satellites.lastIndex
+            -48f + 96f * progress
+        }
+    }.map { degrees -> Math.toRadians(degrees.toDouble()).toFloat() }
 
     private fun pointFor(centerX: Float, centerY: Float, angle: Float): PointF = PointF(
         centerX + fanRadius * cos(angle.toDouble()).toFloat() - orbSize / 2f,
@@ -200,16 +210,13 @@ class FloatingActionMenuView(
 
     private fun angleOf(y: Float, x: Float): Float = atan2(y.toDouble(), x.toDouble()).toFloat()
 
-    private fun createSatellite(
-        icon: Int,
-        description: String,
-        onClick: () -> Unit,
-    ): AppCompatImageView = AppCompatImageView(context).apply {
+    private fun createSatellite(action: FloatingMenuAction): AppCompatImageView = AppCompatImageView(context).apply {
         layoutParams = LayoutParams(orbSize, orbSize)
-        contentDescription = description
+        tag = action.id
+        contentDescription = action.contentDescription
         scaleType = android.widget.ImageView.ScaleType.CENTER_INSIDE
         setPadding(context.dp(12), context.dp(12), context.dp(12), context.dp(12))
-        setImageResource(icon)
+        setImageResource(action.icon)
         background = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.argb(170, 38, 42, 54))
@@ -219,7 +226,10 @@ class FloatingActionMenuView(
         visibility = View.INVISIBLE
         isClickable = true
         isFocusable = true
-        setOnClickListener { onClick() }
+        setOnClickListener {
+            collapse()
+            action.onClick()
+        }
     }
 
     private fun Context.dp(value: Int): Int =
