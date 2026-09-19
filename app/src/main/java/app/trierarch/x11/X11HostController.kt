@@ -8,12 +8,16 @@ import android.os.Build
 import android.os.IBinder
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import app.trierarch.input.InputModeController
 import com.termux.x11.IX11Server
 import com.termux.x11.LorieView
 import com.termux.x11.X11ServerService
 
 /** Connects one embedded Lorie SurfaceView to the isolated X11 server process. */
-class X11HostController(context: Context) {
+class X11HostController(
+    context: Context,
+    private val inputMode: InputModeController,
+) {
     private val appContext = context.applicationContext
     private var server: IX11Server? = null
     private var display: LorieView? = null
@@ -33,7 +37,7 @@ class X11HostController(context: Context) {
         check(Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             "The bundled Lorie X11 host requires Android 8.0 or newer"
         }
-        val view = display ?: LorieView(container.context).also { display = it }
+        val view = display ?: LorieView(container.context, inputMode).also { display = it }
         if (view.parent == null) {
             container.addView(
                 view,

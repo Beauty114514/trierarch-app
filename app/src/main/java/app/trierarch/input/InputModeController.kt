@@ -22,6 +22,7 @@ enum class InputMode {
 class InputModeController(
     initialMode: InputMode = InputMode.TEXT,
 ) {
+    @Volatile
     var current: InputMode = initialMode
         private set
 

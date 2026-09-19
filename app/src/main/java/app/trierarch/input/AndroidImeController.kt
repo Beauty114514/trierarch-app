@@ -123,6 +123,8 @@ class AndroidImeController @JvmOverloads constructor(
                 AndroidImeEvent.KeyEvent(
                     action = event.action,
                     keyCode = event.keyCode,
+                    scanCode = event.scanCode,
+                    eventTime = event.eventTime,
                     metaState = event.metaState,
                     repeatCount = event.repeatCount,
                 ),
@@ -161,6 +163,8 @@ sealed interface AndroidImeEvent {
     data class KeyEvent(
         val action: Int,
         val keyCode: Int,
+        val scanCode: Int,
+        val eventTime: Long,
         val metaState: Int,
         val repeatCount: Int,
     ) : AndroidImeEvent
@@ -186,7 +190,7 @@ private object LoggingAndroidImeEventSink : AndroidImeEventSink {
             is AndroidImeEvent.DeleteSurroundingTextInCodePoints -> "deleteSurroundingTextInCodePoints before=${event.beforeLength} after=${event.afterLength}"
             is AndroidImeEvent.SetSelection -> "setSelection start=${event.start} end=${event.end}"
             is AndroidImeEvent.SetComposingRegion -> "setComposingRegion start=${event.start} end=${event.end}"
-            is AndroidImeEvent.KeyEvent -> "keyEvent action=${event.action} keyCode=${event.keyCode} meta=${event.metaState} repeat=${event.repeatCount}"
+            is AndroidImeEvent.KeyEvent -> "keyEvent action=${event.action} keyCode=${event.keyCode} scanCode=${event.scanCode} meta=${event.metaState} repeat=${event.repeatCount}"
             is AndroidImeEvent.EditorAction -> "editorAction code=${event.actionCode}"
         }
         Log.i(TAG, summary)

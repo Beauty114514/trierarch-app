@@ -7,20 +7,30 @@ import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import app.trierarch.input.AndroidImeEvent
 import app.trierarch.input.AndroidImeEventSink
+import app.trierarch.input.InputMode
+import app.trierarch.input.InputModeController
 import java.io.DataOutputStream
 import java.io.File
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 
 /** Delivers Android IME text and base editing keys to the guest bridge in order. */
-class WaylandImeEventSink(socket: File) : AndroidImeEventSink, AutoCloseable {
+class WaylandImeEventSink(
+    socket: File,
+    private val inputMode: InputModeController,
+) : AndroidImeEventSink, AutoCloseable {
     private val socketPath = socket.absolutePath
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var composingText = ""
     private var batchEditDepth = 0
 
     override fun send(event: AndroidImeEvent) {
+        val mode = inputMode.current
         executor.execute {
+            if (mode == InputMode.KEY) {
+                if (event is AndroidImeEvent.KeyEvent) sendRawKeyEvent(event)
+                return@execute
+            }
             when (event) {
                 AndroidImeEvent.BeginBatchEdit -> batchEditDepth++
                 AndroidImeEvent.EndBatchEdit -> if (batchEditDepth > 0) batchEditDepth--
@@ -127,6 +137,20 @@ class WaylandImeEventSink(socket: File) : AndroidImeEventSink, AutoCloseable {
             else -> return
         }
         sendKeysym(keysym, state)
+    }
+
+    private fun sendRawKeyEvent(event: AndroidImeEvent.KeyEvent) {
+        val pressed = when (event.action) {
+            KeyEvent.ACTION_DOWN -> true
+            KeyEvent.ACTION_UP -> false
+            else -> return
+        }
+        WaylandBridge.setKeyboardKey(
+            keyCode = event.keyCode,
+            scanCode = event.scanCode,
+            pressed = pressed,
+            timeMillis = (event.eventTime and 0x7fff_ffffL).toInt(),
+        )
     }
 
     private fun sendEditorAction(actionCode: Int) {

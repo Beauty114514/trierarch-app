@@ -19,6 +19,8 @@ import app.trierarch.input.PhysicalKeyEvent;
 import app.trierarch.input.PhysicalKeyboardRouter;
 import app.trierarch.input.AndroidImeController;
 import app.trierarch.input.AndroidImeEvent;
+import app.trierarch.input.InputMode;
+import app.trierarch.input.InputModeController;
 import com.termux.x11.input.X11PointerEventSink;
 
 import dalvik.annotation.optimization.CriticalNative;
@@ -38,11 +40,13 @@ public final class LorieView extends SurfaceView {
     private final PointerInputRouter inputRouter;
     private final PhysicalKeyboardRouter keyboardRouter;
     private final AndroidImeController androidIme;
+    private final InputModeController inputMode;
     private String composingText = "";
     private int imeBatchEditDepth;
 
-    public LorieView(Context context) {
+    public LorieView(Context context, InputModeController inputMode) {
         super(context);
+        this.inputMode = inputMode;
         inputRouter = new PointerInputRouter(context,
                 new X11PointerEventSink((x, y, button, down, relative) ->
                         sendMouseEvent(nativeHandle, x, y, button, down, relative)),
@@ -134,6 +138,16 @@ public final class LorieView extends SurfaceView {
      */
     private void handleAndroidImeEvent(AndroidImeEvent event) {
         if (nativeHandle == 0 || !isConnected()) return;
+        if (inputMode.getCurrent() == InputMode.KEY) {
+            if (event instanceof AndroidImeEvent.KeyEvent) {
+                AndroidImeEvent.KeyEvent key = (AndroidImeEvent.KeyEvent) event;
+                boolean pressed = key.getAction() == KeyEvent.ACTION_DOWN;
+                if (pressed || key.getAction() == KeyEvent.ACTION_UP) {
+                    sendKeyEvent(nativeHandle, key.getScanCode(), key.getKeyCode(), pressed);
+                }
+            }
+            return;
+        }
         if (event instanceof AndroidImeEvent.BeginBatchEdit) {
             imeBatchEditDepth++;
         } else if (event instanceof AndroidImeEvent.EndBatchEdit) {

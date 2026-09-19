@@ -31,7 +31,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var terminalContainer: FrameLayout
     private lateinit var keyboardPanel: KeyboardPanelController
     private val inputMode = InputModeController()
-    private val x11Host by lazy { X11HostController(this) }
+    private val x11Host by lazy { X11HostController(this, inputMode) }
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
     private lateinit var floatingMenu: FloatingActionMenuView
@@ -120,7 +120,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showWaylandSurface() {
         if (waylandSurface == null) {
-            waylandSurface = WaylandSurfaceView(this)
+            waylandSurface = WaylandSurfaceView(this, inputMode)
             terminalContainer.addView(
                 waylandSurface,
                 0,
