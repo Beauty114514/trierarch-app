@@ -80,6 +80,10 @@ class X11HostController(
         display?.showAndroidKeyboard()
     }
 
+    fun resetInputModeState() {
+        display?.resetInputModeState()
+    }
+
     private fun bindServerIfNeeded() {
         if (binding || server != null) return
         binding = appContext.bindService(

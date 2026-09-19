@@ -11,6 +11,8 @@ import android.view.inputmethod.EditorInfo;
 import android.view.inputmethod.InputConnection;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Map;
 
 import androidx.annotation.Keep;
 
@@ -41,6 +43,7 @@ public final class LorieView extends SurfaceView {
     private final PhysicalKeyboardRouter keyboardRouter;
     private final AndroidImeController androidIme;
     private final InputModeController inputMode;
+    private final Map<Integer, Integer> rawImePressedKeys = new HashMap<>();
     private String composingText = "";
     private int imeBatchEditDepth;
 
@@ -140,11 +143,7 @@ public final class LorieView extends SurfaceView {
         if (nativeHandle == 0 || !isConnected()) return;
         if (inputMode.getCurrent() == InputMode.KEY) {
             if (event instanceof AndroidImeEvent.KeyEvent) {
-                AndroidImeEvent.KeyEvent key = (AndroidImeEvent.KeyEvent) event;
-                boolean pressed = key.getAction() == KeyEvent.ACTION_DOWN;
-                if (pressed || key.getAction() == KeyEvent.ACTION_UP) {
-                    sendKeyEvent(nativeHandle, key.getScanCode(), key.getKeyCode(), pressed);
-                }
+                sendRawImeKeyEvent((AndroidImeEvent.KeyEvent) event);
             }
             return;
         }
@@ -182,6 +181,32 @@ public final class LorieView extends SurfaceView {
         } else if (event instanceof AndroidImeEvent.EditorAction) {
             sendEditorAction(((AndroidImeEvent.EditorAction) event).getActionCode());
         }
+    }
+
+    /** Discards text preedit and releases raw IME keys before a mode transition. */
+    public void resetInputModeState() {
+        composingText = "";
+        imeBatchEditDepth = 0;
+        if (nativeHandle != 0 && isConnected()) {
+            for (Map.Entry<Integer, Integer> entry : rawImePressedKeys.entrySet()) {
+                sendKeyEvent(nativeHandle, entry.getValue(), entry.getKey(), false);
+            }
+        }
+        rawImePressedKeys.clear();
+        androidIme.restartInput();
+    }
+
+    private void sendRawImeKeyEvent(AndroidImeEvent.KeyEvent key) {
+        boolean pressed;
+        if (key.getAction() == KeyEvent.ACTION_DOWN) pressed = true;
+        else if (key.getAction() == KeyEvent.ACTION_UP) pressed = false;
+        else return;
+        int scanCode = pressed ? key.getScanCode()
+                : rawImePressedKeys.getOrDefault(key.getKeyCode(), key.getScanCode());
+        if (sendKeyEvent(nativeHandle, scanCode, key.getKeyCode(), pressed) && pressed) {
+            rawImePressedKeys.put(key.getKeyCode(), scanCode);
+        }
+        if (!pressed) rawImePressedKeys.remove(key.getKeyCode());
     }
 
     /** Mirrors Termux:X11's replacement model for Android IME preedit text. */

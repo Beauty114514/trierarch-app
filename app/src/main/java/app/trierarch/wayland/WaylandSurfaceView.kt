@@ -81,6 +81,12 @@ class WaylandSurfaceView(
         keyboardRouter.releaseAll(SystemClock.uptimeMillis())
     }
 
+    fun resetInputModeState() {
+        releasePressedKeys()
+        waylandImeSink.resetInputState()
+        androidIme.restartInput()
+    }
+
     fun showAndroidKeyboard() = androidIme.showKeyboard()
 
     /** Reattaches a preserved Android Surface after the Wayland host restarts. */

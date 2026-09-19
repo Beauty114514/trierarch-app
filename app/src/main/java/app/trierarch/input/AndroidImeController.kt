@@ -23,6 +23,11 @@ class AndroidImeController @JvmOverloads constructor(
     private val target: View,
     private val sink: AndroidImeEventSink = LoggingAndroidImeEventSink,
 ) {
+    fun restartInput() {
+        val inputMethodManager = target.context.getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager
+        inputMethodManager.restartInput(target)
+    }
+
     fun createInputConnection(outAttrs: EditorInfo): InputConnection {
         outAttrs.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
         outAttrs.imeOptions = EditorInfo.IME_FLAG_NO_EXTRACT_UI

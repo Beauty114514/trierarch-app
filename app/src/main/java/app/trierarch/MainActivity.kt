@@ -13,6 +13,7 @@ import androidx.core.view.WindowInsetsControllerCompat
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
 import app.trierarch.input.InputModeController
+import app.trierarch.input.InputMode
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
@@ -185,7 +186,7 @@ class MainActivity : AppCompatActivity() {
         DisplaySurface.RUNTIME_SHELL -> listOf(returnToShellAction())
         DisplaySurface.X11,
         DisplaySurface.WAYLAND
-        -> listOf(returnToShellAction(), keyboardAction())
+        -> listOf(returnToShellAction(), keyboardAction(), virtualKeyboardModeAction())
     }
 
     private fun returnToShellAction() = FloatingMenuAction(
@@ -210,6 +211,33 @@ class MainActivity : AppCompatActivity() {
             }
             else -> Unit
         }
+    }
+
+    /**
+     * Selects Android IME delivery only. Hardware keyboards always keep their
+     * direct PhysicalKeyboardRouter path and are not switched by this action.
+     */
+    private fun virtualKeyboardModeAction() = when (inputMode.current) {
+        InputMode.TEXT -> FloatingMenuAction(
+            id = "virtual-keyboard-mode",
+            icon = R.drawable.ic_floating_action_text,
+            contentDescription = "Android virtual keyboard: switch to key-event mode",
+        ) { switchVirtualKeyboardMode() }
+        InputMode.KEY -> FloatingMenuAction(
+            id = "virtual-keyboard-mode",
+            icon = R.drawable.ic_floating_action_key_events,
+            contentDescription = "Android virtual keyboard: switch to text-input mode",
+        ) { switchVirtualKeyboardMode() }
+    }
+
+    private fun switchVirtualKeyboardMode() {
+        when (displayedSurface) {
+            DisplaySurface.X11 -> x11Host.resetInputModeState()
+            DisplaySurface.WAYLAND -> waylandSurface?.resetInputModeState()
+            else -> return
+        }
+        inputMode.toggle()
+        setDisplayedSurface(displayedSurface)
     }
 
     override fun onDestroy() {

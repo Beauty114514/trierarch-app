@@ -3,6 +3,7 @@ package app.trierarch.wayland
 import android.net.LocalSocket
 import android.net.LocalSocketAddress
 import android.util.Log
+import android.os.SystemClock
 import android.view.KeyEvent
 import android.view.inputmethod.EditorInfo
 import app.trierarch.input.AndroidImeEvent
@@ -23,6 +24,7 @@ class WaylandImeEventSink(
     private val executor: ExecutorService = Executors.newSingleThreadExecutor()
     private var composingText = ""
     private var batchEditDepth = 0
+    private val rawPressedKeys = mutableMapOf<Int, Int>()
 
     override fun send(event: AndroidImeEvent) {
         val mode = inputMode.current
@@ -64,6 +66,23 @@ class WaylandImeEventSink(
 
     override fun close() {
         executor.shutdownNow()
+    }
+
+    /** Discards text preedit and releases raw IME keys before a mode transition. */
+    fun resetInputState() {
+        executor.execute {
+            composingText = ""
+            batchEditDepth = 0
+            rawPressedKeys.forEach { (keyCode, scanCode) ->
+                WaylandBridge.setKeyboardKey(
+                    keyCode = keyCode,
+                    scanCode = scanCode,
+                    pressed = false,
+                    timeMillis = SystemClock.uptimeMillis().toWaylandTime(),
+                )
+            }
+            rawPressedKeys.clear()
+        }
     }
 
     /** Mirrors X11's preedit replacement without exposing stale Android state. */
@@ -145,12 +164,14 @@ class WaylandImeEventSink(
             KeyEvent.ACTION_UP -> false
             else -> return
         }
-        WaylandBridge.setKeyboardKey(
+        val scanCode = if (pressed) event.scanCode else rawPressedKeys.remove(event.keyCode) ?: event.scanCode
+        val delivered = WaylandBridge.setKeyboardKey(
             keyCode = event.keyCode,
-            scanCode = event.scanCode,
+            scanCode = scanCode,
             pressed = pressed,
             timeMillis = (event.eventTime and 0x7fff_ffffL).toInt(),
         )
+        if (pressed && delivered) rawPressedKeys[event.keyCode] = scanCode
     }
 
     private fun sendEditorAction(actionCode: Int) {
@@ -218,6 +239,8 @@ class WaylandImeEventSink(
         KeyEvent.KEYCODE_PAGE_DOWN -> XK_PAGE_DOWN
         else -> null
     }
+
+    private fun Long.toWaylandTime(): Int = (this and 0x7fff_ffffL).toInt()
 
     private companion object {
         const val TAG = "TrierarchWaylandIme"
