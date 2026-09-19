@@ -15,7 +15,6 @@ import app.trierarch.input.AndroidImeController
 /** Full-screen, display-only target for the first Wayland milestone. */
 class WaylandSurfaceView(
     context: Context,
-    private val onKeyboardRequested: (WaylandSurfaceView) -> Unit,
 ) : SurfaceView(context), SurfaceHolder.Callback {
     private val inputRouter = PointerInputRouter(context, WaylandPointerEventSink) {
         WaylandBridge.setCursorVisible(it)
@@ -53,9 +52,7 @@ class WaylandSurfaceView(
     override fun surfaceDestroyed(holder: SurfaceHolder) = Unit
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
-        val handled = inputRouter.onTouchEvent(this, event)
-        if (event.actionMasked == MotionEvent.ACTION_UP) onKeyboardRequested(this)
-        return handled
+        return inputRouter.onTouchEvent(this, event)
     }
 
     override fun onGenericMotionEvent(event: MotionEvent): Boolean =

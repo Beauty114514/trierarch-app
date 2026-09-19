@@ -12,11 +12,6 @@ import androidx.core.view.WindowInsetsCompat
 class KeyboardPanelController(
     private val hostView: View,
 ) {
-    /** Allows an ordinary display tap to summon the IME. */
-    fun requestShowFromTouch(showKeyboard: () -> Unit) {
-        showKeyboard()
-    }
-
     /** Toggles the panel from the Android window's current, uncached IME state. */
     fun toggle(showKeyboard: () -> Unit) {
         if (isImeVisibleNow()) hide() else showKeyboard()

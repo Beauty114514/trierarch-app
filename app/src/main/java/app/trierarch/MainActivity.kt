@@ -118,9 +118,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showWaylandSurface() {
         if (waylandSurface == null) {
-            waylandSurface = WaylandSurfaceView(this) { target ->
-                keyboardPanel.requestShowFromTouch(target::showAndroidKeyboard)
-            }
+            waylandSurface = WaylandSurfaceView(this)
             terminalContainer.addView(
                 waylandSurface,
                 0,
@@ -146,9 +144,6 @@ class MainActivity : AppCompatActivity() {
         x11Starting = true
         x11Host.showIn(
             terminalContainer,
-            onKeyboardRequested = {
-                keyboardPanel.requestShowFromTouch(x11Host::showAndroidKeyboard)
-            },
             onReady = {
                 onReady()
                 if (x11Starting) {
