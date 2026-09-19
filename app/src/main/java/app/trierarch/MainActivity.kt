@@ -12,6 +12,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
+import app.trierarch.input.InputModeController
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
@@ -29,6 +30,7 @@ class MainActivity : AppCompatActivity() {
     private var terminalView: TerminalView? = null
     private lateinit var terminalContainer: FrameLayout
     private lateinit var keyboardPanel: KeyboardPanelController
+    private val inputMode = InputModeController()
     private val x11Host by lazy { X11HostController(this) }
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
