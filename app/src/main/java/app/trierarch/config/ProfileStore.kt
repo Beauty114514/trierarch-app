@@ -66,6 +66,14 @@ class ProfileStore(context: Context) {
                 "graphics.renderer '$GRAPHICS_VIRGL' requires display.type 'x11' or 'wayland'"
             }
         }
+        if (graphics.renderer == GRAPHICS_ADRENO) {
+            require(runtime == RUNTIME_DROIDSPACES) {
+                "graphics.renderer '$GRAPHICS_ADRENO' is currently supported by droidspaces only"
+            }
+            require(display == DISPLAY_WAYLAND) {
+                "graphics.renderer '$GRAPHICS_ADRENO' currently requires display.type 'wayland'"
+            }
+        }
         launchArgv(parsed)
         if (runtime == RUNTIME_PROOT || runtime == RUNTIME_CHROOT) {
             val rootfs = parsed.getString("rootfs")?.trim().orEmpty()
@@ -181,8 +189,12 @@ class ProfileStore(context: Context) {
      */
     private fun graphicsProfile(parsed: TomlParseResult, display: String): GraphicsProfile {
         val renderer = parsed.getString("graphics.renderer")?.trim().orEmpty().ifEmpty { GRAPHICS_AUTO }
-        require(renderer == GRAPHICS_AUTO || renderer == GRAPHICS_LLVMPIPE || renderer == GRAPHICS_VIRGL) {
-            "graphics.renderer must be '$GRAPHICS_AUTO', '$GRAPHICS_LLVMPIPE', or '$GRAPHICS_VIRGL'"
+        require(
+            renderer == GRAPHICS_AUTO || renderer == GRAPHICS_LLVMPIPE ||
+                renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_ADRENO,
+        ) {
+            "graphics.renderer must be '$GRAPHICS_AUTO', '$GRAPHICS_LLVMPIPE', " +
+                "'$GRAPHICS_VIRGL', or '$GRAPHICS_ADRENO'"
         }
         val qtQuickBackend = parsed.getString("graphics.qt_quick_backend")?.trim().orEmpty()
             .ifEmpty {
@@ -267,6 +279,18 @@ class ProfileStore(context: Context) {
                 add("LIBGL_ALWAYS_SOFTWARE=1")
                 add("GALLIUM_DRIVER=virpipe")
             }
+            if (renderer == GRAPHICS_ADRENO) {
+                add("TRIERARCH_ADRENO_MESA=$ADRENO_MESA_ROOT")
+                add("LD_LIBRARY_PATH=$ADRENO_MESA_ROOT/lib")
+                add("LIBGL_DRIVERS_PATH=$ADRENO_MESA_ROOT/lib/dri")
+                add("GBM_BACKENDS_PATH=$ADRENO_MESA_ROOT/lib/gbm")
+                add("__EGL_VENDOR_LIBRARY_DIRS=$ADRENO_MESA_ROOT/share/glvnd/egl_vendor.d")
+                add("VK_ICD_FILENAMES=$ADRENO_MESA_ROOT/share/vulkan/icd.d/freedreno_icd.aarch64.json")
+                add("MESA_LOADER_DRIVER_OVERRIDE=kgsl")
+                add("GALLIUM_DRIVER=freedreno")
+                add("FD_FORCE_KGSL=1")
+                add("KWIN_RENDER_NODES=/dev/dri/renderD128")
+            }
             if (qtQuickBackend == QT_QUICK_SOFTWARE) add("QT_QUICK_BACKEND=software")
         }
     }
@@ -288,6 +312,8 @@ class ProfileStore(context: Context) {
         const val GRAPHICS_AUTO = "auto"
         const val GRAPHICS_LLVMPIPE = "llvmpipe"
         const val GRAPHICS_VIRGL = "virgl"
+        const val GRAPHICS_ADRENO = "adreno"
+        private const val ADRENO_MESA_ROOT = "/opt/trierarch/mesa/adreno/current"
         const val QT_QUICK_SOFTWARE = "software"
         const val COMPAT_AUTO = "auto"
         const val COMPAT_OFF = "off"
