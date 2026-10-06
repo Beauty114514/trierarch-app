@@ -280,16 +280,9 @@ class ProfileStore(context: Context) {
                 add("GALLIUM_DRIVER=virpipe")
             }
             if (renderer == GRAPHICS_ADRENO) {
-                add("TRIERARCH_ADRENO_MESA=$ADRENO_MESA_ROOT")
-                add("LD_LIBRARY_PATH=$ADRENO_MESA_ROOT/lib")
-                add("LIBGL_DRIVERS_PATH=$ADRENO_MESA_ROOT/lib/dri")
-                add("GBM_BACKENDS_PATH=$ADRENO_MESA_ROOT/lib/gbm")
-                add("__EGL_VENDOR_LIBRARY_DIRS=$ADRENO_MESA_ROOT/share/glvnd/egl_vendor.d")
-                add("VK_ICD_FILENAMES=$ADRENO_MESA_ROOT/share/vulkan/icd.d/freedreno_icd.aarch64.json")
                 add("MESA_LOADER_DRIVER_OVERRIDE=kgsl")
-                add("GALLIUM_DRIVER=freedreno")
+                add("GALLIUM_DRIVER=kgsl")
                 add("FD_FORCE_KGSL=1")
-                add("KWIN_RENDER_NODES=/dev/dri/renderD128")
             }
             if (qtQuickBackend == QT_QUICK_SOFTWARE) add("QT_QUICK_BACKEND=software")
         }
@@ -313,7 +306,6 @@ class ProfileStore(context: Context) {
         const val GRAPHICS_LLVMPIPE = "llvmpipe"
         const val GRAPHICS_VIRGL = "virgl"
         const val GRAPHICS_ADRENO = "adreno"
-        private const val ADRENO_MESA_ROOT = "/opt/trierarch/mesa/adreno/current"
         const val QT_QUICK_SOFTWARE = "software"
         const val COMPAT_AUTO = "auto"
         const val COMPAT_OFF = "off"
