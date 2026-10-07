@@ -281,7 +281,8 @@ class ProfileStore(context: Context) {
             }
             if (renderer == GRAPHICS_ADRENO) {
                 add("MESA_LOADER_DRIVER_OVERRIDE=kgsl")
-                add("GALLIUM_DRIVER=kgsl")
+                add("TURNIP_KMD=kgsl")
+                add("GALLIUM_DRIVER=freedreno")
                 add("FD_FORCE_KGSL=1")
             }
             if (qtQuickBackend == QT_QUICK_SOFTWARE) add("QT_QUICK_BACKEND=software")
