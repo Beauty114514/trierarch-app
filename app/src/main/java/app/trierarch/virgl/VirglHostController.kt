@@ -22,7 +22,7 @@ object VirglHostController {
     )
 
     @Synchronized
-    fun start(context: Context): File {
+    fun start(context: Context, venus: Boolean): File {
         val payload = File(context.filesDir, "virgl")
         extractPayload(context, payload)
         val runtime = File(context.filesDir, "virgl-run").apply { mkdirs() }
@@ -31,6 +31,7 @@ object VirglHostController {
             runtime.absolutePath,
             payload.absolutePath,
             context.applicationInfo.nativeLibraryDir,
+            venus,
         )
         return runtime
     }

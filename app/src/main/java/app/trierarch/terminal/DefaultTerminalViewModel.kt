@@ -43,8 +43,8 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     fun restartProot(profile: ProfileStore.ProotProfile) {
         closeRuntime(profile.id)
-        val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
-            VirglHostController.start(app).absolutePath
+        val virglRuntimeDirectory = if (usesVtestTransport(profile.graphics.renderer)) {
+            VirglHostController.start(app, profile.graphics.renderer == ProfileStore.GRAPHICS_VENUS).absolutePath
         } else {
             ""
         }
@@ -78,8 +78,8 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     fun restartChroot(profile: ProfileStore.ChrootProfile) {
         closeRuntime(profile.id)
-        val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
-            VirglHostController.start(app).absolutePath
+        val virglRuntimeDirectory = if (usesVtestTransport(profile.graphics.renderer)) {
+            VirglHostController.start(app, profile.graphics.renderer == ProfileStore.GRAPHICS_VENUS).absolutePath
         } else {
             ""
         }
@@ -112,8 +112,8 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     fun restartDroidspaces(profile: ProfileStore.DroidspacesProfile) {
         closeRuntime(profile.id)
-        val virglRuntimeDirectory = if (profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL) {
-            VirglHostController.start(app).absolutePath
+        val virglRuntimeDirectory = if (usesVtestTransport(profile.graphics.renderer)) {
+            VirglHostController.start(app, profile.graphics.renderer == ProfileStore.GRAPHICS_VENUS).absolutePath
         } else {
             ""
         }
@@ -195,7 +195,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         if (runtimeSessions.values.none { it.display == ProfileStore.DISPLAY_WAYLAND }) {
             WaylandBridge.stop()
         }
-        if (runtimeSessions.values.none { it.renderer == ProfileStore.GRAPHICS_VIRGL }) {
+        if (runtimeSessions.values.none { usesVtestTransport(it.renderer) }) {
             VirglHostController.stop()
         }
     }
@@ -205,6 +205,9 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         val display: String,
         val renderer: String,
     )
+
+    private fun usesVtestTransport(renderer: String): Boolean =
+        renderer == ProfileStore.GRAPHICS_VIRGL || renderer == ProfileStore.GRAPHICS_VENUS
 
     private fun x11SocketDirectory(display: String): String? =
         X11Runtime.socketDirectory(app).absolutePath.takeIf {

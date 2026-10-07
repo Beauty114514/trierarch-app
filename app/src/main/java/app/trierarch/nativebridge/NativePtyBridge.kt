@@ -71,6 +71,7 @@ object NativePtyBridge {
         runtimeDirectory: String,
         payloadDirectory: String,
         nativeLibraryDirectory: String,
+        venus: Boolean,
     )
 
     external fun stopVirglHost()

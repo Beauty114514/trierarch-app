@@ -21,4 +21,17 @@ class GraphicsProfileTest {
         assertFalse(environment.any { it.startsWith("LD_LIBRARY_PATH=") })
         assertFalse(environment.any { it.startsWith("LIBGL_ALWAYS_SOFTWARE=") })
     }
+
+    @Test
+    fun venusSelectsTheVtestTransportWithoutForcingAGalliumDriver() {
+        val environment = ProfileStore.GraphicsProfile(
+            renderer = ProfileStore.GRAPHICS_VENUS,
+            qtQuickBackend = ProfileStore.GRAPHICS_AUTO,
+        ).environment()
+
+        assertTrue(environment.contains("VN_DEBUG=vtest"))
+        assertFalse(environment.any { it.startsWith("GALLIUM_DRIVER=") })
+        assertFalse(environment.any { it.startsWith("MESA_LOADER_DRIVER_OVERRIDE=") })
+        assertFalse(environment.any { it.startsWith("LIBGL_ALWAYS_SOFTWARE=") })
+    }
 }

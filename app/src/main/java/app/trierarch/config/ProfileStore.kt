@@ -58,12 +58,12 @@ class ProfileStore(context: Context) {
         }
         val graphics = graphicsProfile(parsed, display)
         compatibilityProfile(parsed)
-        if (graphics.renderer == GRAPHICS_VIRGL) {
+        if (graphics.renderer == GRAPHICS_VIRGL || graphics.renderer == GRAPHICS_VENUS) {
             require(runtime == RUNTIME_DROIDSPACES || runtime == RUNTIME_PROOT || runtime == RUNTIME_CHROOT) {
-                "graphics.renderer '$GRAPHICS_VIRGL' is currently supported by droidspaces, proot, and chroot"
+                "graphics.renderer '${graphics.renderer}' is currently supported by droidspaces, proot, and chroot"
             }
             require(display != DISPLAY_NONE) {
-                "graphics.renderer '$GRAPHICS_VIRGL' requires display.type 'x11' or 'wayland'"
+                "graphics.renderer '${graphics.renderer}' requires display.type 'x11' or 'wayland'"
             }
         }
         if (graphics.renderer == GRAPHICS_ADRENO) {
@@ -191,14 +191,19 @@ class ProfileStore(context: Context) {
         val renderer = parsed.getString("graphics.renderer")?.trim().orEmpty().ifEmpty { GRAPHICS_AUTO }
         require(
             renderer == GRAPHICS_AUTO || renderer == GRAPHICS_LLVMPIPE ||
-                renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_ADRENO,
+                renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_VENUS ||
+                renderer == GRAPHICS_ADRENO,
         ) {
             "graphics.renderer must be '$GRAPHICS_AUTO', '$GRAPHICS_LLVMPIPE', " +
-                "'$GRAPHICS_VIRGL', or '$GRAPHICS_ADRENO'"
+                "'$GRAPHICS_VIRGL', '$GRAPHICS_VENUS', or '$GRAPHICS_ADRENO'"
         }
         val qtQuickBackend = parsed.getString("graphics.qt_quick_backend")?.trim().orEmpty()
             .ifEmpty {
-                if (display == DISPLAY_NONE || renderer == GRAPHICS_VIRGL) GRAPHICS_AUTO else QT_QUICK_SOFTWARE
+                if (display == DISPLAY_NONE || renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_VENUS) {
+                    GRAPHICS_AUTO
+                } else {
+                    QT_QUICK_SOFTWARE
+                }
             }
         require(qtQuickBackend == GRAPHICS_AUTO || qtQuickBackend == QT_QUICK_SOFTWARE) {
             "graphics.qt_quick_backend must be '$GRAPHICS_AUTO' or '$QT_QUICK_SOFTWARE'"
@@ -279,6 +284,9 @@ class ProfileStore(context: Context) {
                 add("LIBGL_ALWAYS_SOFTWARE=1")
                 add("GALLIUM_DRIVER=virpipe")
             }
+            if (renderer == GRAPHICS_VENUS) {
+                add("VN_DEBUG=vtest")
+            }
             if (renderer == GRAPHICS_ADRENO) {
                 add("MESA_LOADER_DRIVER_OVERRIDE=kgsl")
                 add("TURNIP_KMD=kgsl")
@@ -306,6 +314,7 @@ class ProfileStore(context: Context) {
         const val GRAPHICS_AUTO = "auto"
         const val GRAPHICS_LLVMPIPE = "llvmpipe"
         const val GRAPHICS_VIRGL = "virgl"
+        const val GRAPHICS_VENUS = "venus"
         const val GRAPHICS_ADRENO = "adreno"
         const val QT_QUICK_SOFTWARE = "software"
         const val COMPAT_AUTO = "auto"
