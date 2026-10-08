@@ -9,6 +9,8 @@ object WaylandImeBridgeRuntime {
     private const val fileName = "trierarch-wayland-ime-bridge"
     private const val supervisorAssetPath = "wayland-session/arm64-v8a/trierarch-session-supervisor"
     private const val supervisorFileName = "trierarch-session-supervisor"
+    private const val dmabufDeviceReportAssetPath = "wayland-dmabuf/arm64-v8a/trierarch-dmabuf-device-report"
+    private const val dmabufDeviceReportFileName = "trierarch-dmabuf-device-report"
 
     fun executable(context: Context): File {
         val directory = File(context.filesDir, "wayland/runtime/ime")
@@ -23,6 +25,7 @@ object WaylandImeBridgeRuntime {
         check(directory.setExecutable(true, false)) { "Unable to make Wayland IME runtime traversable" }
         val destination = install(context, directory, assetPath, fileName)
         install(context, directory, supervisorAssetPath, supervisorFileName)
+        install(context, directory, dmabufDeviceReportAssetPath, dmabufDeviceReportFileName)
         return destination
     }
 

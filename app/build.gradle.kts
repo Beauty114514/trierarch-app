@@ -33,6 +33,8 @@ val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve
 val waylandImeBridgeAssetsDirectory = layout.buildDirectory.dir("generated/waylandImeBridgeAssets")
 val sessionSupervisorProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/session-supervisor")
 val sessionSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/sessionSupervisorAssets")
+val dmabufDeviceReportProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/dmabuf-device-report")
+val dmabufDeviceReportAssetsDirectory = layout.buildDirectory.dir("generated/dmabufDeviceReportAssets")
 
 val prepareWaylandImeBridgeSysroot by tasks.registering(Exec::class) {
     group = "build"
@@ -245,6 +247,30 @@ val packageSessionSupervisorAssets by tasks.registering(Sync::class) {
     }
 }
 
+val buildDmabufDeviceReportArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Linux guest dma-buf device reporter for arm64."
+    workingDir(dmabufDeviceReportProjectDirectory)
+    environment("CC", "aarch64-linux-gnu-gcc")
+    commandLine("bash", "scripts/build-linux.sh")
+    inputs.dir(dmabufDeviceReportProjectDirectory.resolve("include"))
+    inputs.dir(dmabufDeviceReportProjectDirectory.resolve("src"))
+    inputs.file(dmabufDeviceReportProjectDirectory.resolve("scripts/build-linux.sh"))
+    outputs.file(dmabufDeviceReportProjectDirectory.resolve("dist/trierarch-dmabuf-device-report"))
+}
+
+val packageDmabufDeviceReportAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Linux guest dma-buf device reporter as an APK asset."
+    dependsOn(buildDmabufDeviceReportArm64)
+    val binary = dmabufDeviceReportProjectDirectory.resolve("dist/trierarch-dmabuf-device-report")
+    from(binary) { into("wayland-dmabuf/arm64-v8a") }
+    into(dmabufDeviceReportAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing guest dma-buf device reporter." }
+    }
+}
+
 android {
     namespace = "app.trierarch"
     compileSdk {
@@ -294,6 +320,7 @@ android {
             guestCompatibilityAssetsDirectory.get().asFile,
             waylandImeBridgeAssetsDirectory.get().asFile,
             sessionSupervisorAssetsDirectory.get().asFile,
+            dmabufDeviceReportAssetsDirectory.get().asFile,
         )
     }
     packaging {
@@ -315,6 +342,7 @@ tasks.named("preBuild").configure {
         packageGuestCompatibilityAssets,
         packageWaylandImeBridgeAssets,
         packageSessionSupervisorAssets,
+        packageDmabufDeviceReportAssets,
     )
 }
 
