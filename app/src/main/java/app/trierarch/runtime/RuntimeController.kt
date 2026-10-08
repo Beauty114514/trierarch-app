@@ -35,7 +35,20 @@ class RuntimeController(
             is RuntimeCommand.Stop -> stop(command.id, completion)
             is RuntimeCommand.Rerun -> rerun(command.id, completion)
             is RuntimeCommand.AdrenoProbe -> probeAdreno(command, completion)
+            is RuntimeCommand.AdrenoImportProbe -> configureAdrenoImportProbe(command, completion)
         }
+    }
+
+    private fun configureAdrenoImportProbe(command: RuntimeCommand.AdrenoImportProbe,
+            completion: (RuntimeCommandResult) -> Unit) {
+        val directory = File(command.driverDirectory)
+        val driver = File(directory, command.driverName)
+        if (!directory.isDirectory || !driver.isFile) {
+            completion(RuntimeCommandResult(false, "driver is not a regular file: $driver"))
+            return
+        }
+        val queued = WaylandBridge.configureAdrenoProbe(appContext, directory.absolutePath, command.driverName)
+        completion(RuntimeCommandResult(queued, if (queued) "Adreno dma-buf probe configuration queued" else "Wayland host is not running"))
     }
 
     private fun probeAdreno(command: RuntimeCommand.AdrenoProbe,

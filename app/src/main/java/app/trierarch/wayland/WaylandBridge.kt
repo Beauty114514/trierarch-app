@@ -63,6 +63,11 @@ object WaylandBridge {
             driverName,
         )
 
+    @JvmStatic
+    fun configureAdrenoProbe(context: Context, driverDirectory: String, driverName: String): Boolean =
+        nativeConfigureAdrenoProbe(context.applicationInfo.nativeLibraryDir,
+            driverDirectory.let { if (it.endsWith('/')) it else "$it/" }, driverName)
+
     private external fun nativeStart(runtimeDirectory: String): Boolean
     private external fun nativeStop()
     private external fun nativeAttachSurface(surface: Surface)
@@ -84,4 +89,7 @@ object WaylandBridge {
         driverDirectory: String,
         driverName: String,
     ): String
+    private external fun nativeConfigureAdrenoProbe(
+        hookLibraryDirectory: String, driverDirectory: String, driverName: String,
+    ): Boolean
 }

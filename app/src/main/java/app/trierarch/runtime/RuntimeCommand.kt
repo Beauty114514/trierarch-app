@@ -7,6 +7,7 @@ sealed interface RuntimeCommand {
     data class Stop(val id: String?) : RuntimeCommand
     data class Rerun(val id: String) : RuntimeCommand
     data class AdrenoProbe(val driverDirectory: String, val driverName: String) : RuntimeCommand
+    data class AdrenoImportProbe(val driverDirectory: String, val driverName: String) : RuntimeCommand
 }
 
 data class RuntimeCommandResult(
