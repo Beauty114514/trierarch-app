@@ -76,7 +76,7 @@ class RuntimeControlServer(
 
     private fun parseRequest(request: String?): RuntimeCommand? {
         val fields = request?.split('\t') ?: return null
-        if (fields.size !in 2..3 || fields[0] != token) return null
+        if (fields.size !in 2..4 || fields[0] != token) return null
         return when (fields[1]) {
             "status" if (fields.size == 2) -> RuntimeCommand.Status(null)
             "status" if (fields.size == 3) -> RuntimeCommand.Status(fields[2])
@@ -84,6 +84,7 @@ class RuntimeControlServer(
             "stop" if (fields.size == 2) -> RuntimeCommand.Stop(null)
             "stop" if (fields.size == 3) -> RuntimeCommand.Stop(fields[2])
             "rerun" if (fields.size == 3) -> RuntimeCommand.Rerun(fields[2])
+            "adreno-probe" if (fields.size == 4) -> RuntimeCommand.AdrenoProbe(fields[2], fields[3])
             else -> null
         }
     }

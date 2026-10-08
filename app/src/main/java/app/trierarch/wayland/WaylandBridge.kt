@@ -54,6 +54,15 @@ object WaylandBridge {
 
     @JvmStatic fun setCursorVisible(visible: Boolean) = nativeSetCursorVisible(visible)
 
+    /** Explicit diagnostic only; it does not start or alter a Wayland session. */
+    @JvmStatic
+    fun probeAdrenoDriver(context: Context, driverDirectory: String, driverName: String): String =
+        nativeProbeAdrenoDriver(
+            context.applicationInfo.nativeLibraryDir,
+            driverDirectory.let { if (it.endsWith('/')) it else "$it/" },
+            driverName,
+        )
+
     private external fun nativeStart(runtimeDirectory: String): Boolean
     private external fun nativeStop()
     private external fun nativeAttachSurface(surface: Surface)
@@ -70,4 +79,9 @@ object WaylandBridge {
         timeMillis: Int,
     ): Boolean
     private external fun nativeSetCursorVisible(visible: Boolean)
+    private external fun nativeProbeAdrenoDriver(
+        hookLibraryDirectory: String,
+        driverDirectory: String,
+        driverName: String,
+    ): String
 }
