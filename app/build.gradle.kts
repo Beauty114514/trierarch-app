@@ -149,7 +149,13 @@ val packageVirglAssets by tasks.registering(Sync::class) {
     description = "Packages the Trierarch VirGL host arm64 runtime assets."
     notCompatibleWithConfigurationCache("VirGL artifacts are copied from an external package workspace")
     from(virglRuntimeDirectory) {
-        include("virgl_test_server_android", "virgl_render_server", "libvirglrenderer.so", "libepoxy.so")
+        include(
+            "virgl_test_server_android",
+            "virgl_render_server",
+            "adreno_external_memory_probe",
+            "libvirglrenderer.so",
+            "libepoxy.so",
+        )
         into("virgl/arm64-v8a")
     }
     from(virglRuntimeDirectory.resolve("angle/vulkan")) {

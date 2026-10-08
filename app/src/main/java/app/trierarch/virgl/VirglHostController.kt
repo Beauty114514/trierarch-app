@@ -42,6 +42,7 @@ object VirglHostController {
     private fun extractPayload(context: Context, payload: File) {
         copyAsset(context, "$ASSET_ROOT/virgl_test_server_android", File(payload, "bin/virgl_test_server_android"))
         copyAsset(context, "$ASSET_ROOT/virgl_render_server", File(payload, "bin/virgl_render_server"))
+        copyAsset(context, "$ASSET_ROOT/adreno_external_memory_probe", File(payload, "bin/adreno_external_memory_probe"))
         copyAsset(context, "$ASSET_ROOT/libvirglrenderer.so", File(payload, "lib/libvirglrenderer.so"))
         copyAsset(context, "$ASSET_ROOT/libepoxy.so", File(payload, "lib/libepoxy.so"))
         angleLibraries.forEach { library ->
