@@ -68,6 +68,24 @@ object WaylandBridge {
         nativeConfigureAdrenoProbe(context.applicationInfo.nativeLibraryDir,
             driverDirectory.let { if (it.endsWith('/')) it else "$it/" }, driverName)
 
+    /**
+     * Configure the host-side importer with the Android system Adreno Vulkan
+     * driver. The guest Mesa driver produces the dma-buf; this driver is only
+     * used by the Android-side Vulkan importer to copy it into an
+     * AHardwareBuffer.
+     */
+    @JvmStatic
+    fun configureDefaultAdrenoProbe(context: Context): Boolean {
+        val candidates = listOf(
+            File("/vendor/lib64/hw") to "vulkan.adreno.so",
+            File("/system/lib64/hw") to "vulkan.adreno.so",
+        )
+        val candidate = candidates.firstOrNull { (directory, name) ->
+            File(directory, name).isFile
+        } ?: return false
+        return configureAdrenoProbe(context, candidate.first.absolutePath, candidate.second)
+    }
+
     private external fun nativeStart(runtimeDirectory: String): Boolean
     private external fun nativeStop()
     private external fun nativeAttachSurface(surface: Surface)
