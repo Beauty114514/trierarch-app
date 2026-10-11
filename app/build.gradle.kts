@@ -154,7 +154,6 @@ val packageVirglAssets by tasks.registering(Sync::class) {
         include(
             "virgl_test_server_android",
             "virgl_render_server",
-            "adreno_external_memory_probe",
             "libvirglrenderer.so",
             "libepoxy.so",
         )
