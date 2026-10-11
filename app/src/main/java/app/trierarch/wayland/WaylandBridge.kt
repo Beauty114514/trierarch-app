@@ -1,6 +1,7 @@
 package app.trierarch.wayland
 
 import android.content.Context
+import android.util.Log
 import android.view.Surface
 import java.io.File
 
@@ -82,8 +83,15 @@ object WaylandBridge {
         )
         val candidate = candidates.firstOrNull { (directory, name) ->
             File(directory, name).isFile
-        } ?: return false
-        return configureAdrenoProbe(context, candidate.first.absolutePath, candidate.second)
+        }
+        if (candidate == null) {
+            Log.e("TrierarchWayland", "Adreno importer: no Android Vulkan driver candidate")
+            return false
+        }
+        Log.i("TrierarchWayland", "Adreno importer: driver=${candidate.first}/${candidate.second}")
+        val queued = configureAdrenoProbe(context, candidate.first.absolutePath, candidate.second)
+        Log.i("TrierarchWayland", "Adreno importer: configure command queued=$queued")
+        return queued
     }
 
     private external fun nativeStart(runtimeDirectory: String): Boolean
