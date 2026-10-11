@@ -49,7 +49,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             ""
         }
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost(profile.graphics.renderer)
+            startWaylandHost()
         }
         val next = NativePtySession(
             rootfsDirectory = profile.rootfs,
@@ -84,7 +84,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             ""
         }
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost(profile.graphics.renderer)
+            startWaylandHost()
         }
         val next = NativePtySession(
             chrootRootfs = profile.rootfs,
@@ -118,7 +118,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             ""
         }
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost(profile.graphics.renderer)
+            startWaylandHost()
         }
         val next = NativePtySession(
             droidspacesProfile = profile,
@@ -209,16 +209,8 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
     private fun usesVtestTransport(renderer: String): Boolean =
         renderer == ProfileStore.GRAPHICS_VIRGL || renderer == ProfileStore.GRAPHICS_VENUS
 
-    private fun startWaylandHost(renderer: String) {
+    private fun startWaylandHost() {
         check(WaylandBridge.start(app)) { "Unable to start Wayland host" }
-        if (renderer == ProfileStore.GRAPHICS_ADRENO &&
-            !WaylandBridge.configureDefaultAdrenoProbe(app)
-        ) {
-            android.util.Log.w(
-                "TrierarchWayland",
-                "Android Adreno Vulkan importer could not be configured; continuing with fallback paths",
-            )
-        }
     }
 
     private fun x11SocketDirectory(display: String): String? =

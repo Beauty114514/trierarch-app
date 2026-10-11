@@ -84,8 +84,6 @@ class RuntimeControlServer(
             "stop" if (fields.size == 2) -> RuntimeCommand.Stop(null)
             "stop" if (fields.size == 3) -> RuntimeCommand.Stop(fields[2])
             "rerun" if (fields.size == 3) -> RuntimeCommand.Rerun(fields[2])
-            "adreno-probe" if (fields.size == 4) -> RuntimeCommand.AdrenoProbe(fields[2], fields[3])
-            "adreno-import-probe" if (fields.size == 4) -> RuntimeCommand.AdrenoImportProbe(fields[2], fields[3])
             else -> null
         }
     }

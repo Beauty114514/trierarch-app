@@ -5,7 +5,6 @@ import app.trierarch.config.ProfileStore
 import app.trierarch.nativebridge.NativePtyBridge
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.wayland.WaylandBridge
-import java.io.File
 
 /** Controls profile sessions separately from the containers/rootfs they enter. */
 class RuntimeController(
@@ -13,7 +12,6 @@ class RuntimeController(
     private val terminal: DefaultTerminalViewModel,
     private val displayHost: DisplayHost,
 ) {
-    private val appContext = context.applicationContext
     private val store = ProfileStore(context.applicationContext)
     private var pending: Pending? = null
     private val sourcesByProfile = mutableMapOf<String, LaunchSource>()
@@ -34,33 +32,7 @@ class RuntimeController(
             is RuntimeCommand.Run -> start(command.id, completion)
             is RuntimeCommand.Stop -> stop(command.id, completion)
             is RuntimeCommand.Rerun -> rerun(command.id, completion)
-            is RuntimeCommand.AdrenoProbe -> probeAdreno(command, completion)
-            is RuntimeCommand.AdrenoImportProbe -> configureAdrenoImportProbe(command, completion)
         }
-    }
-
-    private fun configureAdrenoImportProbe(command: RuntimeCommand.AdrenoImportProbe,
-            completion: (RuntimeCommandResult) -> Unit) {
-        val directory = File(command.driverDirectory)
-        val driver = File(directory, command.driverName)
-        if (!directory.isDirectory || !driver.isFile) {
-            completion(RuntimeCommandResult(false, "driver is not a regular file: $driver"))
-            return
-        }
-        val queued = WaylandBridge.configureAdrenoProbe(appContext, directory.absolutePath, command.driverName)
-        completion(RuntimeCommandResult(queued, if (queued) "Adreno dma-buf probe configuration queued" else "Wayland host is not running"))
-    }
-
-    private fun probeAdreno(command: RuntimeCommand.AdrenoProbe,
-            completion: (RuntimeCommandResult) -> Unit) {
-        val directory = File(command.driverDirectory)
-        val driver = File(directory, command.driverName)
-        if (!directory.isDirectory || !driver.isFile) {
-            completion(RuntimeCommandResult(false, "driver is not a regular file: $driver"))
-            return
-        }
-        completion(RuntimeCommandResult(true,
-            WaylandBridge.probeAdrenoDriver(appContext, directory.absolutePath, command.driverName)))
     }
 
     private fun status(id: String?, completion: (RuntimeCommandResult) -> Unit) {

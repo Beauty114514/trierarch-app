@@ -1,7 +1,6 @@
 package app.trierarch.wayland
 
 import android.content.Context
-import android.util.Log
 import android.view.Surface
 import java.io.File
 
@@ -55,44 +54,6 @@ object WaylandBridge {
 
     @JvmStatic fun setCursorVisible(visible: Boolean) = nativeSetCursorVisible(visible)
 
-    /** Explicit diagnostic only; it does not start or alter a Wayland session. */
-    @JvmStatic
-    fun probeAdrenoDriver(context: Context, driverDirectory: String, driverName: String): String =
-        nativeProbeAdrenoDriver(
-            context.applicationInfo.nativeLibraryDir,
-            driverDirectory.let { if (it.endsWith('/')) it else "$it/" },
-            driverName,
-        )
-
-    @JvmStatic
-    fun configureAdrenoProbe(context: Context, driverDirectory: String, driverName: String): Boolean =
-        nativeConfigureAdrenoProbe(context.applicationInfo.nativeLibraryDir,
-            driverDirectory.let { if (it.endsWith('/')) it else "$it/" }, driverName)
-
-    /**
-     * Configure the host-side importer with the Android system Adreno Vulkan
-     * driver. The guest Mesa driver produces the dma-buf; this driver is only
-     * used by the Android-side Vulkan importer to copy it into an
-     * AHardwareBuffer.
-     */
-    @JvmStatic
-    fun configureDefaultAdrenoProbe(context: Context): Boolean {
-        val candidates = listOf(
-            File("/vendor/lib64/hw") to "vulkan.adreno.so",
-            File("/system/lib64/hw") to "vulkan.adreno.so",
-        )
-        val candidate = candidates.firstOrNull { (directory, name) ->
-            File(directory, name).isFile
-        }
-        if (candidate == null) {
-            Log.e("TrierarchWayland", "Adreno importer: no Android Vulkan driver candidate")
-            return false
-        }
-        Log.i("TrierarchWayland", "Adreno importer: driver=${candidate.first}/${candidate.second}")
-        val queued = configureAdrenoProbe(context, candidate.first.absolutePath, candidate.second)
-        Log.i("TrierarchWayland", "Adreno importer: configure command queued=$queued")
-        return queued
-    }
 
     private external fun nativeStart(runtimeDirectory: String): Boolean
     private external fun nativeStop()
@@ -110,12 +71,4 @@ object WaylandBridge {
         timeMillis: Int,
     ): Boolean
     private external fun nativeSetCursorVisible(visible: Boolean)
-    private external fun nativeProbeAdrenoDriver(
-        hookLibraryDirectory: String,
-        driverDirectory: String,
-        driverName: String,
-    ): String
-    private external fun nativeConfigureAdrenoProbe(
-        hookLibraryDirectory: String, driverDirectory: String, driverName: String,
-    ): Boolean
 }
