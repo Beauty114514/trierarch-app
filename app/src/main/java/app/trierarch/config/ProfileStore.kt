@@ -67,8 +67,8 @@ class ProfileStore(context: Context) {
             }
         }
         if (graphics.renderer == GRAPHICS_ADRENO) {
-            require(runtime == RUNTIME_DROIDSPACES) {
-                "graphics.renderer '$GRAPHICS_ADRENO' is currently supported by droidspaces only"
+            require(runtime == RUNTIME_DROIDSPACES || runtime == RUNTIME_CHROOT) {
+                "graphics.renderer '$GRAPHICS_ADRENO' is currently supported by droidspaces and chroot"
             }
             require(display == DISPLAY_WAYLAND) {
                 "graphics.renderer '$GRAPHICS_ADRENO' currently requires display.type 'wayland'"
