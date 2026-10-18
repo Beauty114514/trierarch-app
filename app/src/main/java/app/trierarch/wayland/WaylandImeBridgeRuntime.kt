@@ -14,6 +14,21 @@ object WaylandImeBridgeRuntime {
 
     fun executable(context: Context): File {
         val directory = File(context.filesDir, "wayland/runtime/ime")
+        prepareDirectory(directory)
+        val destination = install(context, directory, assetPath, fileName)
+        install(context, directory, supervisorAssetPath, supervisorFileName)
+        install(context, directory, dmabufDeviceReportAssetPath, dmabufDeviceReportFileName)
+        return destination
+    }
+
+    /** Installs only the lifecycle supervisor for chroot sessions. */
+    fun supervisor(context: Context): File {
+        val directory = File(context.filesDir, "wayland/runtime/ime")
+        prepareDirectory(directory)
+        return install(context, directory, supervisorAssetPath, supervisorFileName)
+    }
+
+    private fun prepareDirectory(directory: File) {
         check(directory.isDirectory || directory.mkdirs()) {
             "Unable to create Wayland IME runtime directory"
         }
@@ -23,10 +38,6 @@ object WaylandImeBridgeRuntime {
         check(directory.setReadable(true, false)) { "Unable to make Wayland IME runtime readable" }
         check(directory.setWritable(true, false)) { "Unable to make Wayland IME runtime writable" }
         check(directory.setExecutable(true, false)) { "Unable to make Wayland IME runtime traversable" }
-        val destination = install(context, directory, assetPath, fileName)
-        install(context, directory, supervisorAssetPath, supervisorFileName)
-        install(context, directory, dmabufDeviceReportAssetPath, dmabufDeviceReportFileName)
-        return destination
     }
 
     private fun install(context: Context, directory: File, assetPath: String, fileName: String): File {

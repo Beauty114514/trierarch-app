@@ -92,6 +92,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             x11SocketDirectory = x11SocketDirectory(profile.display),
             waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
             waylandImeBridge = waylandImeBridge(profile.display),
+            chrootSupervisor = WaylandImeBridgeRuntime.supervisor(app).absolutePath,
             virglRuntimeDirectory = virglRuntimeDirectory,
             launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
             graphicsEnvironment = profile.graphics.environment().toTypedArray(),
