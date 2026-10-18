@@ -207,6 +207,7 @@ val buildWaylandImeBridgeArm64 by tasks.registering(Exec::class) {
     commandLine("bash", "scripts/build-linux.sh")
     inputs.dir(waylandImeBridgeProjectDirectory.resolve("src"))
     inputs.file(waylandImeBridgeProjectDirectory.resolve("scripts/build-linux.sh"))
+    inputs.file(waylandImeBridgeProjectDirectory.resolve("input-method-unstable-v2.xml"))
     outputs.file(waylandImeBridgeProjectDirectory.resolve("dist/trierarch-wayland-ime-bridge"))
     dependsOn(prepareWaylandImeBridgeSysroot)
 }
