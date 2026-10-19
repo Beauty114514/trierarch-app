@@ -61,6 +61,9 @@ val buildNativeArm64 by tasks.registering(Exec::class) {
     inputs.dir(nativeProjectDirectory.resolve("src"))
     inputs.file(nativeProjectDirectory.resolve("Cargo.toml"))
     inputs.file(nativeProjectDirectory.resolve("Cargo.lock"))
+    inputs.file(
+        nativeProjectDirectory.parentFile.resolve("wayland-ime-bridge/data/trierarch-wayland-ime.desktop"),
+    )
     outputs.dir(nativeJniLibsDirectory)
     dependsOn(cleanNativeJniLibs)
 }
