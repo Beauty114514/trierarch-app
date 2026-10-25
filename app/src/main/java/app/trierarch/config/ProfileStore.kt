@@ -281,8 +281,8 @@ class ProfileStore(context: Context) {
                 add("MESA_LOADER_DRIVER_OVERRIDE=llvmpipe")
             }
             if (renderer == GRAPHICS_VIRGL) {
-                add("LIBGL_ALWAYS_SOFTWARE=1")
                 add("GALLIUM_DRIVER=virpipe")
+                add("MESA_LOADER_DRIVER_OVERRIDE=virpipe")
             }
             if (renderer == GRAPHICS_VENUS) {
                 add("VN_DEBUG=vtest")
