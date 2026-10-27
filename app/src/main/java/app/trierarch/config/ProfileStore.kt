@@ -220,7 +220,25 @@ class ProfileStore(context: Context) {
         require(qtQuickBackend == GRAPHICS_AUTO || qtQuickBackend == QT_QUICK_SOFTWARE) {
             "graphics.qt_quick_backend must be '$GRAPHICS_AUTO' or '$QT_QUICK_SOFTWARE'"
         }
-        return GraphicsProfile(renderer, qtQuickBackend)
+        val buffer = parsed.getString("graphics.buffer")?.trim().orEmpty().ifEmpty { BUFFER_AUTO }
+        require(buffer == BUFFER_AUTO || buffer == BUFFER_SHM || buffer == BUFFER_DMABUF) {
+            "graphics.buffer must be '$BUFFER_AUTO', '$BUFFER_SHM', or '$BUFFER_DMABUF'"
+        }
+        // The buffer path only exists for a Wayland parent compositor; X11 has
+        // no dmabuf contract, so a non-auto value there would be silently
+        // meaningless rather than effective.
+        require(display == DISPLAY_WAYLAND || buffer == BUFFER_AUTO) {
+            "graphics.buffer is only supported when display.type is '$DISPLAY_WAYLAND'"
+        }
+        // virpipe/vtest cannot allocate or export a local dma-buf: the guest
+        // has no DRM device behind the GL context.  Advertising dmabuf for it
+        // is exactly the failure mode that made KWin abort before its first
+        // buffer, so reject the combination instead of starting a black screen.
+        val usesVtestTransport = renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_VENUS
+        require(!(buffer == BUFFER_DMABUF && usesVtestTransport)) {
+            "graphics.buffer '$BUFFER_DMABUF' is not supported by graphics.renderer '$renderer'"
+        }
+        return GraphicsProfile(renderer, qtQuickBackend, buffer)
     }
 
     /**
@@ -291,7 +309,23 @@ class ProfileStore(context: Context) {
     data class GraphicsProfile(
         val renderer: String,
         val qtQuickBackend: String,
+        val buffer: String = BUFFER_AUTO,
     ) {
+        /**
+         * Buffer path the host should advertise for this profile.
+         *
+         * `auto` keeps the historical behaviour (dmabuf) for renderers that
+         * own a local DRM device, and falls back to shm for the vtest
+         * transports: virpipe/venus only render on the host, so the guest has
+         * no device that could back a dmabuf.
+         */
+        val resolvedBuffer: String
+            get() = when {
+                buffer != BUFFER_AUTO -> buffer
+                renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_VENUS -> BUFFER_SHM
+                else -> BUFFER_DMABUF
+            }
+
         fun environment(): List<String> = buildList {
             if (renderer == GRAPHICS_LLVMPIPE) {
                 add("LIBGL_ALWAYS_SOFTWARE=1")
@@ -299,8 +333,11 @@ class ProfileStore(context: Context) {
                 add("MESA_LOADER_DRIVER_OVERRIDE=llvmpipe")
             }
             if (renderer == GRAPHICS_VIRGL) {
+                // virpipe is a Gallium driver reached through the software DRI
+                // frontend; MESA_LOADER_DRIVER_OVERRIDE=virpipe is not a valid
+                // loader name and makes eglInitialize() fail outright.
+                add("LIBGL_ALWAYS_SOFTWARE=1")
                 add("GALLIUM_DRIVER=virpipe")
-                add("MESA_LOADER_DRIVER_OVERRIDE=virpipe")
             }
             if (renderer == GRAPHICS_VENUS) {
                 add("VN_DEBUG=vtest")
@@ -310,6 +347,18 @@ class ProfileStore(context: Context) {
                 add("TURNIP_KMD=kgsl")
                 add("GALLIUM_DRIVER=freedreno")
                 add("FD_FORCE_KGSL=1")
+            }
+            if (resolvedBuffer == BUFFER_SHM) {
+                // KWin still ships the QPainter compositor up to 6.7; without
+                // this it prefers OpenGL, finds no usable render device and
+                // aborts before its first buffer.  KWin 6.8 dropped QPainter
+                // entirely, so KWIN_COMPOSE=Q there fails loudly instead of
+                // leaving a black screen (the profile should not choose shm
+                // for it in the first place).
+                add("KWIN_COMPOSE=Q")
+                // wlroots compositors must not try GLES2 when the host only
+                // offers wl_shm.
+                add("WLR_RENDERER=pixman")
             }
             if (qtQuickBackend == QT_QUICK_SOFTWARE) add("QT_QUICK_BACKEND=software")
         }
@@ -334,6 +383,9 @@ class ProfileStore(context: Context) {
         const val GRAPHICS_VIRGL = "virgl"
         const val GRAPHICS_VENUS = "venus"
         const val GRAPHICS_ADRENO = "adreno"
+        const val BUFFER_AUTO = "auto"
+        const val BUFFER_SHM = "shm"
+        const val BUFFER_DMABUF = "dmabuf"
         const val QT_QUICK_SOFTWARE = "software"
         const val AUDIO_OFF = "off"
         const val AUDIO_PIPEWIRE = "pipewire"

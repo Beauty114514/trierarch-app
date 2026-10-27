@@ -7,21 +7,45 @@ import java.io.File
 object WaylandBridge {
     const val AXIS_SOURCE_WHEEL = 0
     const val AXIS_SOURCE_FINGER = 1
+    const val BUFFER_SHM = "shm"
+    const val BUFFER_DMABUF = "dmabuf"
+
     init {
         System.loadLibrary("wayland-server")
         System.loadLibrary("ffi")
         System.loadLibrary("trierarch-wayland-host")
     }
 
+    /** Buffer path the running server was started with, or null when stopped. */
+    private var activeBufferMode: String? = null
+
     @JvmStatic
-    fun start(context: Context): Boolean {
+    fun start(context: Context, bufferMode: String): Boolean {
         val runtime = File(context.filesDir, "wayland/runtime")
         check(runtime.isDirectory || runtime.mkdirs()) { "Unable to create Wayland runtime directory" }
-        return nativeStart(runtime.absolutePath)
+        val mode = if (bufferMode == BUFFER_SHM) BUFFER_SHM else BUFFER_DMABUF
+        // The server owns the linux-dmabuf global for its whole lifetime and
+        // cannot switch buffer paths without disconnecting every client.
+        // Refuse a conflicting session instead of silently tearing down the
+        // display of one that is already running; closing the last Wayland
+        // session stops the host, so switching modes afterwards works.
+        if (activeBufferMode != null && activeBufferMode != mode) {
+            android.util.Log.w(
+                "TrierarchWayland",
+                "refusing to start Wayland host: running buffer mode $activeBufferMode, requested $mode",
+            )
+            return false
+        }
+        val started = nativeStart(runtime.absolutePath, mode)
+        activeBufferMode = if (started) mode else null
+        return started
     }
 
     @JvmStatic
-    fun stop() = nativeStop()
+    fun stop() {
+        nativeStop()
+        activeBufferMode = null
+    }
 
     @JvmStatic
     fun attachSurface(surface: Surface) = nativeAttachSurface(surface)
@@ -55,7 +79,7 @@ object WaylandBridge {
     @JvmStatic fun setCursorVisible(visible: Boolean) = nativeSetCursorVisible(visible)
 
 
-    private external fun nativeStart(runtimeDirectory: String): Boolean
+    private external fun nativeStart(runtimeDirectory: String, bufferMode: String): Boolean
     private external fun nativeStop()
     private external fun nativeAttachSurface(surface: Surface)
     private external fun nativeSetOutputSize(width: Int, height: Int)

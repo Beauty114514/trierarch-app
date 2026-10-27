@@ -50,7 +50,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             ""
         }
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost()
+            startWaylandHost(profile.graphics.resolvedBuffer)
         }
         val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
             PipeWireHostController.start(app).absolutePath
@@ -101,7 +101,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             ""
         }
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost()
+            startWaylandHost(profile.graphics.resolvedBuffer)
         }
         val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
             PipeWireHostController.start(app).absolutePath
@@ -152,7 +152,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             ""
         }
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost()
+            startWaylandHost(profile.graphics.resolvedBuffer)
         }
         val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
             PipeWireHostController.start(app).absolutePath
@@ -263,8 +263,8 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
     private fun usesVtestTransport(renderer: String): Boolean =
         renderer == ProfileStore.GRAPHICS_VIRGL || renderer == ProfileStore.GRAPHICS_VENUS
 
-    private fun startWaylandHost() {
-        check(WaylandBridge.start(app)) { "Unable to start Wayland host" }
+    private fun startWaylandHost(bufferMode: String) {
+        check(WaylandBridge.start(app, bufferMode)) { "Unable to start Wayland host" }
     }
 
     private fun x11SocketDirectory(display: String): String? =
