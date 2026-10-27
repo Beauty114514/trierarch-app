@@ -5,7 +5,7 @@ import app.trierarch.nativebridge.NativePtyBridge
 import java.io.File
 import java.io.FileOutputStream
 
-/** Deploys and supervises the Android PipeWire playback service for DroidSpaces. */
+/** Deploys and supervises the Android PipeWire playback service for runtime profiles. */
 object PipeWireHostController {
     private const val ASSET_ROOT = "pipewire/arm64-v8a"
     @Synchronized

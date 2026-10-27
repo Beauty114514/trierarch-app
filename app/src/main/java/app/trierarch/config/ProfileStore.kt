@@ -63,8 +63,8 @@ class ProfileStore(context: Context) {
             "audio.backend must be '$AUDIO_OFF' or '$AUDIO_PIPEWIRE'"
         }
         if (audioBackend == AUDIO_PIPEWIRE) {
-            require(runtime == RUNTIME_DROIDSPACES || runtime == RUNTIME_CHROOT) {
-                "audio.backend = '$AUDIO_PIPEWIRE' is currently supported by DroidSpaces and chroot"
+            require(runtime == RUNTIME_DROIDSPACES || runtime == RUNTIME_PROOT || runtime == RUNTIME_CHROOT) {
+                "audio.backend = '$AUDIO_PIPEWIRE' is currently supported by DroidSpaces, PRoot, and chroot"
             }
         }
         if (graphics.renderer == GRAPHICS_VIRGL || graphics.renderer == GRAPHICS_VENUS) {
@@ -136,6 +136,7 @@ class ProfileStore(context: Context) {
             launchArgv = launchArgv(parsed),
             graphics = graphicsProfile(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             compatibility = compatibilityProfile(parsed),
+            audioBackend = audioBackend(parsed),
         )
     }
 
@@ -262,6 +263,7 @@ class ProfileStore(context: Context) {
         val launchArgv: List<String>?,
         val graphics: GraphicsProfile,
         val compatibility: CompatibilityProfile,
+        val audioBackend: String,
     )
 
     data class ChrootProfile(

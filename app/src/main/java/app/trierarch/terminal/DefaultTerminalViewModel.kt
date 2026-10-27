@@ -52,27 +52,43 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
             startWaylandHost()
         }
-        val next = NativePtySession(
-            rootfsDirectory = profile.rootfs,
-            shell = profile.shell,
-            nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
-            cacheDirectory = app.cacheDir,
-            x11SocketDirectory = x11SocketDirectory(profile.display),
-            waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
-            waylandImeBridge = waylandImeBridge(profile.display),
-            virglRuntimeDirectory = virglRuntimeDirectory,
-            udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
-                app, profile.compatibility.enablesUdevMonitorShim,
-            )?.absolutePath.orEmpty(),
-            launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
-            graphicsEnvironment = profile.graphics.environment().toTypedArray(),
-            clipboard = AndroidTerminalClipboard(app),
-        ).also { next ->
-            if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
-                next.start()
-            }
+        val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
+            PipeWireHostController.start(app).absolutePath
+        } else {
+            ""
         }
-        runtimeSessions[profile.id] = RuntimeSession(next, profile.display, profile.graphics.renderer)
+        val next = try {
+            NativePtySession(
+                rootfsDirectory = profile.rootfs,
+                shell = profile.shell,
+                nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
+                cacheDirectory = app.cacheDir,
+                x11SocketDirectory = x11SocketDirectory(profile.display),
+                waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+                waylandImeBridge = waylandImeBridge(profile.display),
+                virglRuntimeDirectory = virglRuntimeDirectory,
+                pipewireRuntimeDirectory = pipewireRuntimeDirectory,
+                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
+                    app, profile.compatibility.enablesUdevMonitorShim,
+                )?.absolutePath.orEmpty(),
+                launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
+                graphicsEnvironment = profile.graphics.environment().toTypedArray(),
+                clipboard = AndroidTerminalClipboard(app),
+            ).also { next ->
+                if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
+                    next.start()
+                }
+            }
+        } catch (error: Throwable) {
+            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
+            throw error
+        }
+        runtimeSessions[profile.id] = RuntimeSession(
+            next,
+            profile.display,
+            profile.graphics.renderer,
+            profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
+        )
         displayedProfileId = profile.id
         session = next
     }

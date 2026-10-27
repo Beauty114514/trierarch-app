@@ -10,10 +10,11 @@ class InternalShellLaunchSpecTest {
     fun internalShellStartsInTheAppFilesDirectory() {
         val root = File(System.getProperty("java.io.tmpdir"), "trierarch-files")
         val cache = File(System.getProperty("java.io.tmpdir"), "trierarch-cache")
+        val nativeLibraries = File(System.getProperty("java.io.tmpdir"), "trierarch-native-libs")
         root.deleteRecursively()
         cache.deleteRecursively()
 
-        val spec = InternalShellLaunchSpec.create(root, cache)
+        val spec = InternalShellLaunchSpec.create(root, cache, nativeLibraries)
 
         assertEquals("/system/bin/sh", spec.command)
         assertEquals(root, spec.workingDirectory)

@@ -26,6 +26,7 @@ object NativePtyBridge {
         waylandRuntimeDirectory: String,
         waylandImeBridge: String,
         virglRuntimeDirectory: String,
+        pipewireRuntimeDirectory: String,
         udevCompatibilityLibrary: String,
         launchArgv: Array<String>,
         graphicsEnvironment: Array<String>,
