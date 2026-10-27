@@ -62,6 +62,8 @@ class GraphicsProfileTest {
         assertEquals(ProfileStore.BUFFER_SHM, virgl.resolvedBuffer)
         assertTrue(virgl.environment().contains("KWIN_COMPOSE=Q"))
         assertTrue(virgl.environment().contains("WLR_RENDERER=pixman"))
+        assertTrue(virgl.environment().contains("TRIERARCH_BUFFER=shm"))
+        assertTrue(virgl.environment().contains("TRIERARCH_RENDERER=virgl"))
 
         val venus = ProfileStore.GraphicsProfile(
             renderer = ProfileStore.GRAPHICS_VENUS,

@@ -327,6 +327,11 @@ class ProfileStore(context: Context) {
             }
 
         fun environment(): List<String> = buildList {
+            // The guest-side launch scripts use these to gate the render-node
+            // report and to pick the compositor's software path.  They also
+            // make session logs self-describing.
+            add("TRIERARCH_BUFFER=$resolvedBuffer")
+            add("TRIERARCH_RENDERER=$renderer")
             if (renderer == GRAPHICS_LLVMPIPE) {
                 add("LIBGL_ALWAYS_SOFTWARE=1")
                 add("GALLIUM_DRIVER=llvmpipe")
