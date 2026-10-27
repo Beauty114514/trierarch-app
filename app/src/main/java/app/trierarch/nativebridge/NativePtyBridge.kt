@@ -43,6 +43,7 @@ object NativePtyBridge {
         waylandImeBridge: String,
         chrootSupervisor: String,
         virglRuntimeDirectory: String,
+        pipewireRuntimeDirectory: String,
         launchArgv: Array<String>,
         graphicsEnvironment: Array<String>,
         udevCompatibilityLibrary: String,

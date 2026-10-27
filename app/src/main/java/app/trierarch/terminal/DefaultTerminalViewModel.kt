@@ -87,27 +87,43 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
             startWaylandHost()
         }
-        val next = NativePtySession(
-            chrootRootfs = profile.rootfs,
-            shell = profile.shell,
-            x11SocketDirectory = x11SocketDirectory(profile.display),
-            waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
-            waylandImeBridge = waylandImeBridge(profile.display),
-            chrootSupervisor = WaylandImeBridgeRuntime.supervisor(app).absolutePath,
-            virglRuntimeDirectory = virglRuntimeDirectory,
-            launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
-            graphicsEnvironment = profile.graphics.environment().toTypedArray(),
-            udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
-                app, profile.compatibility.enablesUdevMonitorShim,
-            )?.absolutePath.orEmpty(),
-            diagnosticLog = sessionDiagnosticLog(profile.id),
-            clipboard = AndroidTerminalClipboard(app),
-        ).also { next ->
-            if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
-                next.start()
-            }
+        val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
+            PipeWireHostController.start(app).absolutePath
+        } else {
+            ""
         }
-        runtimeSessions[profile.id] = RuntimeSession(next, profile.display, profile.graphics.renderer)
+        val next = try {
+            NativePtySession(
+                chrootRootfs = profile.rootfs,
+                shell = profile.shell,
+                x11SocketDirectory = x11SocketDirectory(profile.display),
+                waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+                waylandImeBridge = waylandImeBridge(profile.display),
+                chrootSupervisor = WaylandImeBridgeRuntime.supervisor(app).absolutePath,
+                virglRuntimeDirectory = virglRuntimeDirectory,
+                pipewireRuntimeDirectory = pipewireRuntimeDirectory,
+                launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
+                graphicsEnvironment = profile.graphics.environment().toTypedArray(),
+                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
+                    app, profile.compatibility.enablesUdevMonitorShim,
+                )?.absolutePath.orEmpty(),
+                diagnosticLog = sessionDiagnosticLog(profile.id),
+                clipboard = AndroidTerminalClipboard(app),
+            ).also { next ->
+                if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
+                    next.start()
+                }
+            }
+        } catch (error: Throwable) {
+            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
+            throw error
+        }
+        runtimeSessions[profile.id] = RuntimeSession(
+            next,
+            profile.display,
+            profile.graphics.renderer,
+            profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
+        )
         displayedProfileId = profile.id
         session = next
     }
