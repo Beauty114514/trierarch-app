@@ -2,6 +2,7 @@ package app.trierarch.terminal
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
+import app.trierarch.audio.PipeWireHostController
 import app.trierarch.config.ProfileStore
 import app.trierarch.compat.GuestCompatibilityRuntime
 import app.trierarch.runtime.InternalShellLaunchSpec
@@ -121,22 +122,38 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
             startWaylandHost()
         }
-        val next = NativePtySession(
-            droidspacesProfile = profile,
-            x11SocketDirectory = x11SocketDirectory(profile.display),
-            waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
-            waylandImeBridge = waylandImeBridge(profile.display),
-            virglRuntimeDirectory = virglRuntimeDirectory,
-            udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
-                app, profile.compatibility.enablesUdevMonitorShim,
-            )?.absolutePath.orEmpty(),
-            clipboard = AndroidTerminalClipboard(app),
-        ).also { next ->
-            if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
-                next.start()
-            }
+        val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
+            PipeWireHostController.start(app).absolutePath
+        } else {
+            ""
         }
-        runtimeSessions[profile.id] = RuntimeSession(next, profile.display, profile.graphics.renderer)
+        val next = try {
+            NativePtySession(
+                droidspacesProfile = profile,
+                x11SocketDirectory = x11SocketDirectory(profile.display),
+                waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+                waylandImeBridge = waylandImeBridge(profile.display),
+                virglRuntimeDirectory = virglRuntimeDirectory,
+                pipewireRuntimeDirectory = pipewireRuntimeDirectory,
+                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
+                    app, profile.compatibility.enablesUdevMonitorShim,
+                )?.absolutePath.orEmpty(),
+                clipboard = AndroidTerminalClipboard(app),
+            ).also { next ->
+                if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
+                    next.start()
+                }
+            }
+        } catch (error: Throwable) {
+            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
+            throw error
+        }
+        runtimeSessions[profile.id] = RuntimeSession(
+            next,
+            profile.display,
+            profile.graphics.renderer,
+            profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
+        )
         displayedProfileId = profile.id
         session = next
     }
@@ -199,12 +216,16 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         if (runtimeSessions.values.none { usesVtestTransport(it.renderer) }) {
             VirglHostController.stop()
         }
+        if (runtimeSessions.values.none { it.pipewire }) {
+            PipeWireHostController.stop()
+        }
     }
 
     private data class RuntimeSession(
         val session: NativePtySession,
         val display: String,
         val renderer: String,
+        val pipewire: Boolean = false,
     )
 
     private fun usesVtestTransport(renderer: String): Boolean =

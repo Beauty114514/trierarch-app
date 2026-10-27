@@ -119,6 +119,7 @@ class NativePtySession private constructor(
         waylandRuntimeDirectory: String?,
         waylandImeBridge: String?,
         virglRuntimeDirectory: String?,
+        pipewireRuntimeDirectory: String?,
         udevCompatibilityLibrary: String,
         clipboard: TerminalClipboard,
     ) : this(
@@ -130,6 +131,7 @@ class NativePtySession private constructor(
                 waylandRuntimeDirectory.orEmpty(),
                 waylandImeBridge.orEmpty(),
                 virglRuntimeDirectory.orEmpty(),
+                pipewireRuntimeDirectory.orEmpty(),
                 udevCompatibilityLibrary,
                 droidspacesProfile.launchArgv.orEmpty().toTypedArray(),
                 droidspacesProfile.graphics.environment().toTypedArray(),

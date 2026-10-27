@@ -58,6 +58,15 @@ class ProfileStore(context: Context) {
         }
         val graphics = graphicsProfile(parsed, display)
         compatibilityProfile(parsed)
+        val audioBackend = audioBackend(parsed)
+        require(audioBackend == AUDIO_OFF || audioBackend == AUDIO_PIPEWIRE) {
+            "audio.backend must be '$AUDIO_OFF' or '$AUDIO_PIPEWIRE'"
+        }
+        if (audioBackend == AUDIO_PIPEWIRE) {
+            require(runtime == RUNTIME_DROIDSPACES) {
+                "audio.backend = '$AUDIO_PIPEWIRE' is currently supported only by DroidSpaces"
+            }
+        }
         if (graphics.renderer == GRAPHICS_VIRGL || graphics.renderer == GRAPHICS_VENUS) {
             require(runtime == RUNTIME_DROIDSPACES || runtime == RUNTIME_PROOT || runtime == RUNTIME_CHROOT) {
                 "graphics.renderer '${graphics.renderer}' is currently supported by droidspaces, proot, and chroot"
@@ -170,6 +179,7 @@ class ProfileStore(context: Context) {
             launchArgv = launchArgv(parsed),
             graphics = graphicsProfile(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             compatibility = compatibilityProfile(parsed),
+            audioBackend = audioBackend(parsed),
         )
     }
 
@@ -224,6 +234,9 @@ class ProfileStore(context: Context) {
         return CompatibilityProfile(udevMonitor)
     }
 
+    private fun audioBackend(parsed: TomlParseResult): String =
+        parsed.getString("audio.backend")?.trim().orEmpty().ifEmpty { AUDIO_OFF }
+
     /** Optional direct program invocation; absent keeps the runtime's interactive-shell default. */
     private fun launchArgv(parsed: TomlParseResult): List<String>? {
         if (!parsed.contains("launch.argv")) return null
@@ -268,6 +281,7 @@ class ProfileStore(context: Context) {
         val launchArgv: List<String>?,
         val graphics: GraphicsProfile,
         val compatibility: CompatibilityProfile,
+        val audioBackend: String,
     )
 
     data class GraphicsProfile(
@@ -317,6 +331,8 @@ class ProfileStore(context: Context) {
         const val GRAPHICS_VENUS = "venus"
         const val GRAPHICS_ADRENO = "adreno"
         const val QT_QUICK_SOFTWARE = "software"
+        const val AUDIO_OFF = "off"
+        const val AUDIO_PIPEWIRE = "pipewire"
         const val COMPAT_AUTO = "auto"
         const val COMPAT_OFF = "off"
         const val EXTRA_RUNTIME = "app.trierarch.config.RUNTIME"

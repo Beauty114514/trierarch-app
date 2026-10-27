@@ -59,6 +59,7 @@ object NativePtyBridge {
         waylandRuntimeDirectory: String,
         waylandImeBridge: String,
         virglRuntimeDirectory: String,
+        pipewireRuntimeDirectory: String,
         udevCompatibilityLibrary: String,
         launchArgv: Array<String>,
         graphicsEnvironment: Array<String>,
@@ -76,6 +77,15 @@ object NativePtyBridge {
     )
 
     external fun stopVirglHost()
+
+    /** Starts or stops the private PipeWire/AAudio playback host. */
+    external fun startPipeWireHost(
+        runtimeDirectory: String,
+        payloadDirectory: String,
+        nativeLibraryDirectory: String,
+    )
+
+    external fun stopPipeWireHost()
 
     /** Restores ownership of the private X11 socket directory after a legacy directory bind. */
     external fun repairX11SocketDirectory(directory: String, appUid: Int)

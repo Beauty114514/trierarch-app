@@ -27,6 +27,12 @@ val virglRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
     "trierarch-packages/virgl-host/dist/android/arm64-v8a",
 )
 val virglAssetsDirectory = layout.buildDirectory.dir("generated/virglAssets")
+// PipeWire's Android daemon, policy manager, and AAudio sink are built by the
+// companion package and consumed as private runtime assets.
+val pipewireRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/pipewire-host/dist/android/arm64-v8a",
+)
+val pipewireAssetsDirectory = layout.buildDirectory.dir("generated/pipewireAssets")
 val guestCompatibilityProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/compat")
 val guestCompatibilityAssetsDirectory = layout.buildDirectory.dir("generated/guestCompatibilityAssets")
 val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/wayland-ime-bridge")
@@ -179,6 +185,14 @@ val packageVirglAssets by tasks.registering(Sync::class) {
     }
 }
 
+val packagePipeWireAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Android PipeWire playback host runtime assets."
+    notCompatibleWithConfigurationCache("PipeWire artifacts are copied from an external package workspace")
+    from(pipewireRuntimeDirectory) { into("pipewire/arm64-v8a") }
+    into(pipewireAssetsDirectory)
+}
+
 val buildGuestCompatibilityArm64 by tasks.registering(Exec::class) {
     group = "build"
     description = "Builds Trierarch's Linux guest compatibility library for arm64."
@@ -320,6 +334,7 @@ android {
         getByName("main").assets.srcDirs(
             x11AssetsDirectory.get().asFile,
             virglAssetsDirectory.get().asFile,
+            pipewireAssetsDirectory.get().asFile,
             guestCompatibilityAssetsDirectory.get().asFile,
             waylandImeBridgeAssetsDirectory.get().asFile,
             sessionSupervisorAssetsDirectory.get().asFile,
@@ -342,6 +357,7 @@ tasks.named("preBuild").configure {
         packageX11Assets,
         packageWaylandArm64,
         packageVirglAssets,
+        packagePipeWireAssets,
         packageGuestCompatibilityAssets,
         packageWaylandImeBridgeAssets,
         packageSessionSupervisorAssets,
