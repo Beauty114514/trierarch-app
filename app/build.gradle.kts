@@ -34,6 +34,8 @@ val pipewireRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
 )
 val pipewireAssetsDirectory = layout.buildDirectory.dir("generated/pipewireAssets")
 val guestCompatibilityProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/compat")
+val gbmShimProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/gbm-shim")
+val gbmShimAssetsDirectory = layout.buildDirectory.dir("generated/gbmShimAssets")
 val guestCompatibilityAssetsDirectory = layout.buildDirectory.dir("generated/guestCompatibilityAssets")
 val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/wayland-ime-bridge")
 val waylandImeBridgeAssetsDirectory = layout.buildDirectory.dir("generated/waylandImeBridgeAssets")
@@ -204,6 +206,20 @@ val buildGuestCompatibilityArm64 by tasks.registering(Exec::class) {
     outputs.file(guestCompatibilityProjectDirectory.resolve("dist/linux/aarch64/libtrierarch-udev-compat.so"))
 }
 
+val packageGbmShimAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the guest GBM token shim used by the virgl dmabuf POC."
+    notCompatibleWithConfigurationCache("GBM shim artifacts are copied from an external package workspace")
+    val library = gbmShimProjectDirectory.resolve("dist/android/arm64-v8a/libgbm-shim.so")
+    from(library) { into("gbm-shim/arm64-v8a") }
+    into(gbmShimAssetsDirectory)
+    doFirst {
+        check(library.isFile) {
+            "Missing GBM shim. Build trierarch-packages/gbm-shim/scripts/build-android.sh first."
+        }
+    }
+}
+
 val packageGuestCompatibilityAssets by tasks.registering(Sync::class) {
     group = "build"
     description = "Packages the Linux guest compatibility library as an APK asset."
@@ -336,6 +352,7 @@ android {
             virglAssetsDirectory.get().asFile,
             pipewireAssetsDirectory.get().asFile,
             guestCompatibilityAssetsDirectory.get().asFile,
+            gbmShimAssetsDirectory.get().asFile,
             waylandImeBridgeAssetsDirectory.get().asFile,
             sessionSupervisorAssetsDirectory.get().asFile,
             dmabufDeviceReportAssetsDirectory.get().asFile,
@@ -359,6 +376,7 @@ tasks.named("preBuild").configure {
         packageVirglAssets,
         packagePipeWireAssets,
         packageGuestCompatibilityAssets,
+        packageGbmShimAssets,
         packageWaylandImeBridgeAssets,
         packageSessionSupervisorAssets,
         packageDmabufDeviceReportAssets,

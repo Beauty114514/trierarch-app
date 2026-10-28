@@ -4,6 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import app.trierarch.audio.PipeWireHostController
 import app.trierarch.config.ProfileStore
+import app.trierarch.compat.GbmShimRuntime
 import app.trierarch.compat.GuestCompatibilityRuntime
 import app.trierarch.runtime.InternalShellLaunchSpec
 import app.trierarch.x11.X11Runtime
@@ -57,6 +58,13 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         } else {
             ""
         }
+        val waylandRuntime = waylandRuntimeDirectory(profile.display)
+        if (waylandRuntime != null &&
+            profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL &&
+            profile.graphics.resolvedBuffer == ProfileStore.BUFFER_DMABUF
+        ) {
+            GbmShimRuntime.install(app, File(waylandRuntime))
+        }
         val next = try {
             NativePtySession(
                 rootfsDirectory = profile.rootfs,
@@ -64,7 +72,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
                 cacheDirectory = app.cacheDir,
                 x11SocketDirectory = x11SocketDirectory(profile.display),
-                waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+                waylandRuntimeDirectory = waylandRuntime,
                 waylandImeBridge = waylandImeBridge(profile.display),
                 virglRuntimeDirectory = virglRuntimeDirectory,
                 pipewireRuntimeDirectory = pipewireRuntimeDirectory,

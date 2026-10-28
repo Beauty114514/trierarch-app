@@ -57,6 +57,20 @@ class GraphicsProfileTest {
     }
 
     @Test
+    fun virglDmabufPocLoadsTheBufferShim() {
+        val profile = ProfileStore.GraphicsProfile(
+            renderer = ProfileStore.GRAPHICS_VIRGL,
+            qtQuickBackend = ProfileStore.GRAPHICS_AUTO,
+            buffer = ProfileStore.BUFFER_DMABUF,
+        )
+
+        assertEquals(ProfileStore.BUFFER_DMABUF, profile.resolvedBuffer)
+        assertTrue(profile.environment().contains(
+            "LD_PRELOAD=/tmp/trierarch-wayland/libgbm-shim.so"
+        ))
+    }
+
+    @Test
     fun vtestTransportsResolveToShmAndAskForSoftwareCompositors() {
         val virgl = ProfileStore.GraphicsProfile(
             renderer = ProfileStore.GRAPHICS_VIRGL,

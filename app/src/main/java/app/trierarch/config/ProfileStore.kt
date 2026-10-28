@@ -235,8 +235,12 @@ class ProfileStore(context: Context) {
         // is exactly the failure mode that made KWin abort before its first
         // buffer, so reject the combination instead of starting a black screen.
         val usesVtestTransport = renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_VENUS
-        require(!(buffer == BUFFER_DMABUF && usesVtestTransport)) {
-            "graphics.buffer '$BUFFER_DMABUF' is not supported by graphics.renderer '$renderer'"
+        val experimentalVirglDmabuf =
+            POC_ALLOW_VIRGL_DMABUF && renderer == GRAPHICS_VIRGL && buffer == BUFFER_DMABUF
+        if (!experimentalVirglDmabuf) {
+            require(!(buffer == BUFFER_DMABUF && usesVtestTransport)) {
+                "graphics.buffer '$BUFFER_DMABUF' is not supported by graphics.renderer '$renderer'"
+            }
         }
         return GraphicsProfile(renderer, qtQuickBackend, buffer)
     }
@@ -349,6 +353,11 @@ class ProfileStore(context: Context) {
                 // is the guest view of the Wayland runtime bind mount.
                 add("TRIERARCH_TVG_SOCKET=/tmp/trierarch-wayland/tvgd.sock")
             }
+            if (renderer == GRAPHICS_VIRGL && resolvedBuffer == BUFFER_DMABUF) {
+                // The shim turns compositor gbm_bo_create calls into host AHB
+                // token requests; Mesa's own GBM allocations stay real.
+                add("LD_PRELOAD=/tmp/trierarch-wayland/libgbm-shim.so")
+            }
             if (renderer == GRAPHICS_VENUS) {
                 add("VN_DEBUG=vtest")
             }
@@ -396,6 +405,10 @@ class ProfileStore(context: Context) {
         const val BUFFER_AUTO = "auto"
         const val BUFFER_SHM = "shm"
         const val BUFFER_DMABUF = "dmabuf"
+        /* POC only: virgl normally has no local device to back a dmabuf, but
+         * the buffer shim maps the guest allocations onto host AHardwareBuffers.
+         * Remove once the token/scanout path is validated. */
+        private const val POC_ALLOW_VIRGL_DMABUF = true
         const val QT_QUICK_SOFTWARE = "software"
         const val AUDIO_OFF = "off"
         const val AUDIO_PIPEWIRE = "pipewire"
