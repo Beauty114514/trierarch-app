@@ -41,6 +41,7 @@ val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve
 val waylandImeBridgeAssetsDirectory = layout.buildDirectory.dir("generated/waylandImeBridgeAssets")
 val sessionSupervisorProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/session-supervisor")
 val sessionSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/sessionSupervisorAssets")
+val droidspacesSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/droidspacesSupervisorAssets")
 val dmabufDeviceReportProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/dmabuf-device-report")
 val dmabufDeviceReportAssetsDirectory = layout.buildDirectory.dir("generated/dmabufDeviceReportAssets")
 
@@ -280,6 +281,28 @@ val packageSessionSupervisorAssets by tasks.registering(Sync::class) {
     }
 }
 
+val buildDroidspacesSupervisorArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds the Android-native DroidSpaces owner supervisor for arm64."
+    workingDir(sessionSupervisorProjectDirectory)
+    commandLine("bash", "scripts/build-android.sh")
+    inputs.dir(sessionSupervisorProjectDirectory.resolve("src"))
+    inputs.file(sessionSupervisorProjectDirectory.resolve("scripts/build-android.sh"))
+    outputs.file(sessionSupervisorProjectDirectory.resolve("dist/trierarch-droidspaces-supervisor"))
+}
+
+val packageDroidspacesSupervisorAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the DroidSpaces owner supervisor as an APK asset."
+    dependsOn(buildDroidspacesSupervisorArm64)
+    val binary = sessionSupervisorProjectDirectory.resolve("dist/trierarch-droidspaces-supervisor")
+    from(binary) { into("droidspaces-session/arm64-v8a") }
+    into(droidspacesSupervisorAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing DroidSpaces owner supervisor." }
+    }
+}
+
 val buildDmabufDeviceReportArm64 by tasks.registering(Exec::class) {
     group = "build"
     description = "Builds Trierarch's Linux guest dma-buf device reporter for arm64."
@@ -355,6 +378,7 @@ android {
             gbmShimAssetsDirectory.get().asFile,
             waylandImeBridgeAssetsDirectory.get().asFile,
             sessionSupervisorAssetsDirectory.get().asFile,
+            droidspacesSupervisorAssetsDirectory.get().asFile,
             dmabufDeviceReportAssetsDirectory.get().asFile,
         )
     }
@@ -379,6 +403,7 @@ tasks.named("preBuild").configure {
         packageGbmShimAssets,
         packageWaylandImeBridgeAssets,
         packageSessionSupervisorAssets,
+        packageDroidspacesSupervisorAssets,
         packageDmabufDeviceReportAssets,
     )
 }

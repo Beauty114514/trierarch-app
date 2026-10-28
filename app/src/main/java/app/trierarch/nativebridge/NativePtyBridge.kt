@@ -60,6 +60,7 @@ object NativePtyBridge {
         x11SocketDirectory: String,
         waylandRuntimeDirectory: String,
         waylandImeBridge: String,
+        droidspacesSupervisor: String,
         virglRuntimeDirectory: String,
         pipewireRuntimeDirectory: String,
         udevCompatibilityLibrary: String,

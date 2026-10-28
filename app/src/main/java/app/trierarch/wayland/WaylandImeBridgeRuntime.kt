@@ -9,6 +9,9 @@ object WaylandImeBridgeRuntime {
     private const val fileName = "trierarch-wayland-ime-bridge"
     private const val supervisorAssetPath = "wayland-session/arm64-v8a/trierarch-session-supervisor"
     private const val supervisorFileName = "trierarch-session-supervisor"
+    private const val droidspacesSupervisorAssetPath =
+        "droidspaces-session/arm64-v8a/trierarch-droidspaces-supervisor"
+    private const val droidspacesSupervisorFileName = "trierarch-droidspaces-supervisor"
     private const val dmabufDeviceReportAssetPath = "wayland-dmabuf/arm64-v8a/trierarch-dmabuf-device-report"
     private const val dmabufDeviceReportFileName = "trierarch-dmabuf-device-report"
 
@@ -19,6 +22,18 @@ object WaylandImeBridgeRuntime {
         install(context, directory, supervisorAssetPath, supervisorFileName)
         install(context, directory, dmabufDeviceReportAssetPath, dmabufDeviceReportFileName)
         return destination
+    }
+
+    /** Installs the Android-native owner watcher for DroidSpaces sessions. */
+    fun droidspacesSupervisor(context: Context): File {
+        val directory = File(context.filesDir, "wayland/runtime/ime")
+        prepareDirectory(directory)
+        return install(
+            context,
+            directory,
+            droidspacesSupervisorAssetPath,
+            droidspacesSupervisorFileName,
+        )
     }
 
     /** Installs only the lifecycle supervisor for chroot sessions. */

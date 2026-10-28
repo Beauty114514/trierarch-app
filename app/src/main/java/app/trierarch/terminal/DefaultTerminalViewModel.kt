@@ -180,6 +180,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 x11SocketDirectory = x11SocketDirectory(profile.display),
                 waylandRuntimeDirectory = waylandRuntime,
                 waylandImeBridge = waylandImeBridge(profile.display),
+                droidspacesSupervisor = WaylandImeBridgeRuntime.droidspacesSupervisor(app).absolutePath,
                 virglRuntimeDirectory = virglRuntimeDirectory,
                 pipewireRuntimeDirectory = pipewireRuntimeDirectory,
                 udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
