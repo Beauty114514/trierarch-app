@@ -173,6 +173,19 @@ Trierarch 建立在很多上游项目之上，并不拥有它们的代码、二�
 - 部分组件是 copyleft。重新分发二进制时请保留版权/许可证声明并遵守对应
   许可证；Trierarch 不会重新授权它们。
 
+## 许可证
+
+Trierarch 以 **GNU General Public License version 3** 发布，全文见
+[LICENSE](LICENSE)。
+
+上游组件保留各自的许可证；见「上游项目与版权」以及各包 `UPSTREAM.md` 里的
+精确 pin。Trierarch 不会重新授权它们。特别注意：
+
+- Termux 的 `terminal-emulator` 和 `terminal-view` 模块保留 Apache-2.0
+  exception；
+- Termux:X11 / Lorie 和 Local Desktop AAudio sink 是 GPL-3.0；
+- PRoot 是 GPL-2.0-only，作为独立可执行文件分发，不链接进 Trierarch App。
+
 ## 文档
 
 - [中文手册](docs/zh-CN/README.md) — 安装、配置、运行环境、显示、图形、音频、

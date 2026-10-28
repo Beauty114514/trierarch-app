@@ -203,6 +203,21 @@ Additional notes:
   their copyright/license notices and comply with their licenses; Trierarch
   does not relicense them.
 
+## License
+
+Trierarch is released under the **GNU General Public License, version 3**.
+The full text is in [LICENSE](LICENSE).
+
+Upstream components keep their own licenses; see
+[Built on other projects](#built-on-other-projects) and the exact pins in the
+package `UPSTREAM.md` files. Trierarch does not relicense them. In particular:
+
+- Termux's `terminal-emulator` and `terminal-view` modules retain their
+  Apache-2.0 exception;
+- Termux:X11 / Lorie and the Local Desktop AAudio sink are GPL-3.0;
+- PRoot is GPL-2.0-only and is distributed as a separate executable, not linked
+  into the Trierarch app.
+
 ## Documentation
 
 - [English manual](docs/en/README.md) — installation, profiles, runtimes,
