@@ -49,6 +49,9 @@ class GraphicsProfileTest {
         // makes eglInitialize() fail.
         assertTrue(environment.contains("LIBGL_ALWAYS_SOFTWARE=1"))
         assertTrue(environment.contains("GALLIUM_DRIVER=virpipe"))
+        assertTrue(environment.contains(
+            "TRIERARCH_TVG_SOCKET=/tmp/trierarch-wayland/tvgd.sock"
+        ))
         assertFalse(environment.contains("MESA_LOADER_DRIVER_OVERRIDE=virpipe"))
         assertFalse(environment.any { it.startsWith("MESA_LOADER_DRIVER_OVERRIDE=") })
     }

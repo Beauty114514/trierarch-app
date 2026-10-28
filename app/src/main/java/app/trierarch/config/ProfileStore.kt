@@ -344,6 +344,11 @@ class ProfileStore(context: Context) {
                 add("LIBGL_ALWAYS_SOFTWARE=1")
                 add("GALLIUM_DRIVER=virpipe")
             }
+            if (renderer == GRAPHICS_VIRGL || renderer == GRAPHICS_VENUS) {
+                // Host-side token service for the virgl buffer shim.  The path
+                // is the guest view of the Wayland runtime bind mount.
+                add("TRIERARCH_TVG_SOCKET=/tmp/trierarch-wayland/tvgd.sock")
+            }
             if (renderer == GRAPHICS_VENUS) {
                 add("VN_DEBUG=vtest")
             }
