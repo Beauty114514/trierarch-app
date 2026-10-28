@@ -1,6 +1,7 @@
 package app.trierarch.compat
 
 import android.content.Context
+import android.system.Os
 import java.io.File
 
 /** Extracts the guest-glibc GBM token shim from the APK.  It is not an Android JNI library. */
@@ -23,7 +24,9 @@ object GbmShimRuntime {
             temporary.outputStream().use(input::copyTo)
         }
         check(temporary.renameTo(destination)) { "Unable to install GBM shim" }
-        check(destination.setExecutable(true, false)) { "Unable to make GBM shim executable" }
+        // KWin runs as the container user, not the app uid.  It needs both read
+        // and execute permission to preload the library through the bind mount.
+        Os.chmod(destination.absolutePath, 0x1ED) // 0755
         return destination
     }
 }

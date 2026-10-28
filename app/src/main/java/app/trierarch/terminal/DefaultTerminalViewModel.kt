@@ -167,11 +167,18 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         } else {
             ""
         }
+        val waylandRuntime = waylandRuntimeDirectory(profile.display)
+        if (waylandRuntime != null &&
+            profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL &&
+            profile.graphics.resolvedBuffer == ProfileStore.BUFFER_DMABUF
+        ) {
+            GbmShimRuntime.install(app, File(waylandRuntime))
+        }
         val next = try {
             NativePtySession(
                 droidspacesProfile = profile,
                 x11SocketDirectory = x11SocketDirectory(profile.display),
-                waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
+                waylandRuntimeDirectory = waylandRuntime,
                 waylandImeBridge = waylandImeBridge(profile.display),
                 virglRuntimeDirectory = virglRuntimeDirectory,
                 pipewireRuntimeDirectory = pipewireRuntimeDirectory,
