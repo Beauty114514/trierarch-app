@@ -219,7 +219,7 @@ qt_quick_backend = "auto"
 说明：
 
 - `virgl`/`venus` 需要 X11 或 Wayland；
-- `adreno` 仅支持 DroidSpaces/chroot + Wayland；
+- `adreno` 支持 DroidSpaces、chroot 和 PRoot，但仅限 Wayland；
 - `virgl` 当前主要加速**合成器**；普通应用的 OpenGL 是否走硬件取决于 guest
   Mesa 和显示栈，不能保证所有应用都加速；
 - `buffer` 默认 `auto`：`virgl`/`venus` 默认 `shm`，其他默认 `dmabuf`；

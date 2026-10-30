@@ -3,6 +3,7 @@ local.properties
 
 # Gradle and Android build output
 .gradle/
+.kotlin/
 gradle/gradle-daemon-jvm.properties
 **/build/
 **/.cxx/

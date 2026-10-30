@@ -234,7 +234,7 @@ qt_quick_backend = "auto"
 Notes:
 
 - `virgl`/`venus` require X11 or Wayland;
-- `adreno` supports only DroidSpaces/chroot + Wayland;
+- `adreno` supports DroidSpaces, chroot and PRoot, with Wayland only;
 - `virgl` currently accelerates mainly the **compositor**. Whether a normal
   application gets hardware OpenGL depends on the guest Mesa and display stack;
   it is not guaranteed for every app;
