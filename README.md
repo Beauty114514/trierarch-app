@@ -224,6 +224,8 @@ package `UPSTREAM.md` files. Trierarch does not relicense them. In particular:
   displays, graphics, audio, lifecycle, troubleshooting.
 - [中文手册](docs/zh-CN/README.md) — 安装、配置、运行环境、显示、图形、音频、
   生命周期和故障排查。
+- [Compatibility matrix](docs/compatibility.en.md) — tested runtime, desktop
+  and renderer combinations.
 - [Documentation index](docs/README.md)
 - [Known issues](docs/known-issues/README.md) — common problems, workarounds and
   current status.

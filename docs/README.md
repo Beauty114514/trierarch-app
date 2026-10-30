@@ -4,6 +4,8 @@
   graphics, audio, lifecycle, troubleshooting and development notes.
 - [中文手册](zh-CN/README.md) — 安装、配置、运行环境、显示、图形、音频、生命周期、
   故障排查和开发说明。
+- [Compatibility matrix (English)](compatibility.en.md) / [兼容性矩阵（中文）](compatibility.zh-CN.md)
+  — tested runtime/desktop/renderer combinations on Adreno 740.
 - [Known issues](known-issues/README.md) — common problems, workarounds and the current
   status of unresolved items. / 常见问题、workaround 和未解决项。
 
