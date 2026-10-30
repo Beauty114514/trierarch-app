@@ -42,9 +42,9 @@ Hyprland 这类桌面/窗口管理器，保留原生特效、动画和窗口管�
 
 | 运行环境 | Root | 适合 |
 | --- | --- | --- |
-| **PRoot** | 不需要 | 不需要 root 的 Linux 用户空间，放在 App 私有存储里 |
-| **chroot** | 需要 | 设备上的完整 rootfs，带会话 supervisor，App 消失时收尾 |
 | **DroidSpaces** | 需要 | 带独立 init/systemd 的容器，由 Trierarch 启动并管理生命周期 |
+| **chroot** | 需要 | 设备上的完整 rootfs，带会话 supervisor，App 消失时收尾 |
+| **PRoot** | 不需要 | 不需要 root 的 Linux 用户空间，放在 App 私有存储里 |
 
 Trierarch 只提供外壳，不提供发行版。rootfs 或 DroidSpaces 容器由你准备；
 Trierarch 负责启动、显示和管理它的生命周期。
@@ -63,9 +63,9 @@ Trierarch 的会话模型并不绑定这三种运行环境，理论上也可以�
 ## 桌面和图形
 
 - **终端**：真实 TTY，支持触摸滚动、软键盘和硬件键盘；
-- **X11**：通过 Trierarch 内置的 X 服务器运行 XFCE、KDE 等 X11 桌面；
 - **Wayland**：通过 Trierarch 的 Wayland 宿主运行 KDE Plasma、Hyprland
   等嵌套合成器；
+- **X11**：通过 Trierarch 内置的 X 服务器运行 XFCE、KDE 等 X11 桌面；
 - **图形路径**：llvmpipe 软件渲染、VirGL、Venus 或 Qualcomm Adreno 直通，
   取决于设备和 profile。
 
@@ -81,10 +81,21 @@ Adreno GPU 的手机和平板。freedreno/Turnip/Adreno 图形栈在这些设备
 其他 SoC 可以运行终端、PRoot、chroot 和 DroidSpaces，但 GPU 驱动相对不完善，
 功能缺失会更多，更容易回退到软件渲染，也更容易遇到设备相关的兼容问题。
 
-桌面方面，**X11 目前是更稳定的目标**，VirGL 之类的图形方案在 X11 下仍可稳定
-使用。Wayland 窗口管理器和桌面本身在快速更新，很多 X11 下稳定的方案所依赖的
-技术栈在新版本里被删除或修改；嵌套 Wayland 的环节也更多。我们会继续支持
-Wayland，但它确实是更容易出问题的部分。
+桌面方面，**Wayland 是 Trierarch 最大的差异点**：它能运行 Plasma、Hyprland
+等嵌套合成器并保留原生特效。Wayland 也是整个栈里变化最快的部分，旧方案依赖的
+技术栈经常在新版合成器里被删除或修改。**X11 仍是更稳的 fallback**，适合
+VirGL 类图形和长期稳定的桌面，但它不是这个项目存在的理由。
+
+### Root 与非 root 设备
+
+**已 root 的设备能更完整地使用 Trierarch**：DroidSpaces 和 chroot 可以让 guest
+直接使用 Adreno，Plasma/Hyprland 的 Wayland 特效和完整 GPU 桌面路径都可用。
+
+**未 root 的设备只能用 PRoot** 提供无 root 的 Linux 用户空间。终端、软件渲染
+的 Wayland/Sway，以及宿主侧 VirGL 加速的 X11 可用。PRoot Wayland 无法
+初始化 GPU 合成器，因为 Android SELinux 拒绝 App 访问 `/dev/dri`；当前测试的
+Wayland session 里，桌面和应用都回退到软件渲染。具体测试情况见
+[兼容性矩阵](docs/compatibility.zh-CN.md)。
 
 ## 输入、音频和存储
 

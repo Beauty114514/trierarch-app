@@ -49,9 +49,9 @@ already carry — not a remote desktop and not a toy terminal.
 
 | Runtime | Root | Best for |
 | --- | --- | --- |
-| **PRoot** | No | A Linux userspace without root, kept inside the app's private storage |
-| **chroot** | Yes | A full rootfs on the device, with a session supervisor that cleans up after the app |
 | **DroidSpaces** | Yes | Containers with their own init/systemd, started and stopped by Trierarch when it owns them |
+| **chroot** | Yes | A full rootfs on the device, with a session supervisor that cleans up after the app |
+| **PRoot** | No | A Linux userspace without root, kept inside the app's private storage |
 
 Trierarch is the shell, not the distribution. You provide a rootfs or a
 DroidSpaces container; Trierarch starts it, displays it, and manages its
@@ -74,10 +74,10 @@ development takes time. Please be patient.
 
 - **Terminal** — a real TTY with touch scrolling, soft keyboard and hardware
   keyboard support.
-- **X11** — XFCE, KDE and other X11 desktops through Trierarch's built-in X
-  server.
 - **Wayland** — KDE Plasma, Hyprland and other nested compositors through
   Trierarch's Wayland host.
+- **X11** — XFCE, KDE and other X11 desktops through Trierarch's built-in X
+  server.
 - **Graphics paths** — llvmpipe software rendering, VirGL, Venus, or direct
   Qualcomm Adreno, depending on the device and profile.
 
@@ -97,11 +97,25 @@ Other SoCs can run the terminal, PRoot, chroot and DroidSpaces paths, but their
 GPU drivers are less complete. Expect more missing graphics features, more
 fallbacks to software rendering, and more device-specific problems.
 
-For desktops, **X11 is currently the more stable target** for VirGL-style
-graphics paths. Wayland window managers and desktops are themselves moving
-fast: the technology stack a stable X11 setup relied on is often removed or
-changed in newer versions, and nested Wayland has more moving parts. Wayland is
-supported and improving, but it is the area where breakage is more likely.
+For desktops, **Wayland is Trierarch's main differentiator**: it is what lets
+you run Plasma, Hyprland and other nested compositors with their native
+effects. It is also the fastest-moving part of the stack; technology that a
+stable setup relied on is often removed or changed in newer compositor
+versions. **X11 remains the safer fallback** for VirGL-style graphics and
+long-lived desktops, but it is not the reason this project exists.
+
+### Rooted and unrooted devices
+
+A **rooted device can use Trierarch more completely**: DroidSpaces and chroot
+can give the guest direct Adreno access, so Plasma/Hyprland Wayland effects and
+the full GPU desktop path are available.
+
+An **unrooted device is limited to PRoot** for a rootless Linux userspace.
+Terminal, software Wayland/Sway, and X11 with host-side VirGL hardware
+acceleration work. PRoot Wayland cannot initialize a GPU compositor because
+Android SELinux denies the app access to `/dev/dri`; in the tested Wayland
+sessions the desktop and applications fall back to software rendering. See the
+[compatibility matrix](docs/compatibility.en.md) for the exact tested cases.
 
 ## Input, audio and storage
 
