@@ -191,6 +191,7 @@ Trierarch 以 **GNU General Public License version 3** 发布，全文见
 - [中文手册](docs/zh-CN/README.md) — 安装、配置、运行环境、显示、图形、音频、
   生命周期和故障排查；
 - [English manual](docs/en/README.md)；
+- [架构说明](docs/architecture.zh-CN.md) — 会话生命周期和组件边界；
 - [兼容性矩阵](docs/compatibility.zh-CN.md) — 已测试的运行环境、桌面和
   renderer 组合；
 - [文档索引](docs/README.md)；
