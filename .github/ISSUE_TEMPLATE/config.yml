@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Documentation and known issues
+    url: https://github.com/Beauty114514/trierarch-app/blob/main/docs/README.md
+    about: Read the manuals and the one-file-per-issue known-issues tree before filing.
+  - name: Compatibility matrix
+    url: https://github.com/Beauty114514/trierarch-app/blob/main/docs/compatibility.en.md
+    about: Check which runtime, desktop and renderer combinations have been tested.
+  - name: Security policy
+    url: https://github.com/Beauty114514/trierarch-app/blob/main/SECURITY.md
+    about: Report security issues privately; do not open a public issue.

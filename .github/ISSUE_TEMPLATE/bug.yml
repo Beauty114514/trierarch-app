@@ -1,0 +1,166 @@
+name: Bug report
+description: Report a reproducible Trierarch problem. English or Chinese is welcome.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. Trierarch is an early-stage project, so
+        please include enough information to reproduce the problem.
+
+        Before filing, search existing issues and the known-issues pages:
+        https://github.com/Beauty114514/trierarch-app/tree/main/docs/known-issues
+
+        Do not include passwords, tokens, SSH keys or personal files in logs.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong, in one or two sentences?
+      placeholder: The desktop starts but the screen is black...
+    validations:
+      required: true
+
+  - type: input
+    id: device
+    attributes:
+      label: Device model
+      placeholder: OPPO CPH2449 / Pixel 8 / ...
+    validations:
+      required: true
+
+  - type: input
+    id: soc_gpu
+    attributes:
+      label: SoC and GPU
+      placeholder: Snapdragon 8 Gen 2 / Adreno 740
+    validations:
+      required: true
+
+  - type: input
+    id: android
+    attributes:
+      label: Android version and build
+      placeholder: Android 16 / CPH2449_...
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: Trierarch build
+      description: APK version, commit hash or the date you built it.
+      placeholder: commit c1297e7 / debug APK 2026-10-30
+    validations:
+      required: true
+
+  - type: dropdown
+    id: runtime
+    attributes:
+      label: Runtime
+      options:
+        - DroidSpaces
+        - chroot
+        - PRoot
+        - internal shell
+        - not applicable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: display
+    attributes:
+      label: Display
+      options:
+        - Terminal (none)
+        - X11
+        - Wayland
+        - not applicable
+    validations:
+      required: true
+
+  - type: dropdown
+    id: renderer
+    attributes:
+      label: Graphics renderer
+      options:
+        - llvmpipe
+        - VirGL
+        - Adreno
+        - not applicable
+        - unknown
+    validations:
+      required: true
+
+  - type: input
+    id: desktop
+    attributes:
+      label: Desktop or window manager
+      description: For example KDE Plasma Wayland, KDE Plasma X11, Hyprland, XFCE.
+      placeholder: KDE Plasma Wayland
+
+  - type: textarea
+    id: profile
+    attributes:
+      label: Profile and launch command
+      description: Paste the relevant profile; remove any private paths or secrets.
+      placeholder: |
+        id = "arch-wayland"
+        runtime = "droidspaces"
+        container = "Arch"
+        ...
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Exact steps, including whether the container/rootfs was already running.
+      placeholder: |
+        1. Start DroidSpaces Arch
+        2. Run ...
+        3. ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs
+      description: |
+        Paste relevant logs or attach a zip. Remove secrets first.
+        Useful commands:
+          adb logcat -d -s TrierarchTvg TrierarchRenderer TrierarchWayland
+          adb shell run-as app.trierarch cat files/virgl-run/virgl_host.log
+      render: shell
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and the known-issues pages.
+          required: true
+        - label: I can reproduce this on the build I reported.
+          required: true
+        - label: I removed passwords, tokens, keys and personal data from the logs.
+          required: true
+        - label: I understand Trierarch is an early-stage project and this may take time to fix.
+          required: true
