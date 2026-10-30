@@ -148,7 +148,7 @@ Trierarch 建立在很多上游项目之上，并不拥有它们的代码、二�
 | **Termux:X11 / Lorie** | termux/termux-x11，commit `9471ad9...` | `libXlorie.so` 和 XKB 资源 | GPL-3.0-or-later |
 | **PRoot** | termux/proot，commit `a89b373...` | `proot` / `loader` | GPL-2.0-only |
 | **virglrenderer** | `1.3.0` | Android vtest/Venus 主机 | MIT |
-| **Mesa 3D** | guest Mesa | virpipe 等 guest 路径 | MIT |
+| **Mesa 3D / lfdevs Freedreno** | Mesa 上游；lfdevs Mesa fork tag `mesa-27.0.0-devel-20261025-r1`；lfdevs packaging commit `8a29bd2e...` | Guest virpipe/Adreno 路径；Trierarch `mesa-adreno` 配方 | Mesa 文件级许可证（MIT / BSD-3-Clause / SGI-B-2.0）；Trierarch 补丁/配方 GPL-3.0，除非文件另有说明 |
 | **ANGLE** | Termux 包 `2.1.24923...` | VirGL 主机的 Vulkan/GL 后端 | BSD-3-Clause |
 | **libepoxy** | `1.5.10` | EGL/GL dispatch | MIT |
 | **PipeWire** | `1.4.9-1` | Android 音频服务 | MIT |
@@ -165,6 +165,10 @@ Trierarch 建立在很多上游项目之上，并不拥有它们的代码、二�
 - PRoot 构建还使用 **talloc**（LGPL-3.0-or-later）和
   **libandroid-shmem**（BSD-3-Clause）；见 packages 仓库的
   `trierarch-packages/proot/UPSTREAM.md`。
+- Mesa 是一条派生链（Mesa → lfdevs fork → lfdevs packaging → Trierarch
+  `mesa-adreno`），不能写成单一 MIT 组件。Arch 配方默认固定 ifdevs packaging
+  commit；见 `trierarch-packages/mesa-adreno/UPSTREAM.md`，每个 release 仍需
+  记录实际 revision。
 - KDE Plasma/KWin、Hyprland/aquamarine、XFCE 和各 Linux 发行版属于 guest
   环境，由用户提供的 rootfs 或容器提供，Trierarch 不打包它们。
 - 精确 pin、补丁和来源说明见各包的 `UPSTREAM.md` 以及
@@ -185,6 +189,9 @@ Trierarch 以 **GNU General Public License version 3** 发布，全文见
   exception；
 - Termux:X11 / Lorie 和 Local Desktop AAudio sink 是 GPL-3.0；
 - PRoot 是 GPL-2.0-only，作为独立可执行文件分发，不链接进 Trierarch App。
+
+完整的组件归属、固定版本和源码位置见 [THIRD_PARTY.md](THIRD_PARTY.md)；
+简短的分发声明见 [NOTICE](NOTICE)。
 
 ## 文档
 

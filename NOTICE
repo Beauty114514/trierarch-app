@@ -1,0 +1,43 @@
+Trierarch
+Copyright (C) Trierarch contributors
+
+Trierarch is free software under the GNU General Public License, version 3.
+See LICENSE for the full text.
+
+This product includes, links against, or distributes software and data from
+other projects. The complete attribution, pinned revisions, patch series and
+source locations are in THIRD_PARTY.md.
+
+Notable components:
+
+- Termux terminal modules (com.termux.terminal, com.termux.view), originally
+  from the Termux project. The Termux repository is GPL-3.0; its
+  terminal-emulator and terminal-view modules retain their documented
+  Apache-2.0 exception and copyright notices.
+- Termux:X11 / Lorie, GPL-3.0-or-later.
+- PRoot, GPL-2.0-only, distributed as a separate executable and not linked into
+  the Trierarch app.
+- virglrenderer and libepoxy, MIT.
+- Mesa 3D, the lfdevs/mesa-for-android-container Freedreno fork and the
+  lfdevs/archlinuxarm-PKGBUILDs packaging, under Mesa's per-file licenses
+  (including MIT, BSD-3-Clause and SGI-B-2.0); Trierarch's mesa-adreno
+  patches/recipes are GPL-3.0 unless a file says otherwise.
+- ANGLE, BSD-3-Clause.
+- PipeWire and WirePlumber, MIT.
+- Local Desktop AAudio sink, GPL-3.0.
+- Wayland and wayland-protocols, MIT.
+- libffi, MIT.
+- X.Org XKB data, X11-style license.
+- DroidSpaces is an optional external runtime, GPL-3.0; it is not bundled by
+  Trierarch.
+- AndroidX and Kotlin, Apache-2.0.
+
+KDE Plasma/KWin, Hyprland/aquamarine, XFCE and the Linux distributions are guest
+environments provided by the user's rootfs or container. They keep their own
+licenses and are not relicensed by Trierarch.
+
+Source for Trierarch and its patches is available in this repository and the
+companion trierarch-packages repository. Upstream source is available from the
+projects listed in THIRD_PARTY.md at the pinned revisions. Redistributors must
+preserve all upstream copyright, license and NOTICE material and comply with
+the applicable licenses.

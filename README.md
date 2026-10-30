@@ -175,7 +175,7 @@ claimed as Trierarch's own work.
 | **Termux:X11 / Lorie** | [termux/termux-x11](https://github.com/termux/termux-x11), commit `9471ad977d21b7c7bec45117008f74f330d45983` | `libXlorie.so` and XKB runtime asset | GPL-3.0-or-later |
 | **PRoot** | [termux/proot](https://github.com/termux/proot), commit `a89b3732ec6ae1db674510f0843b2f3db54d0a2f` | `proot` and `loader` Android binaries | GPL-2.0-only |
 | **virglrenderer** | [virgl/virglrenderer](https://gitlab.freedesktop.org/virgl/virglrenderer), `1.3.0` | Android vtest/Venus host server | MIT |
-| **Mesa 3D** | [mesa/mesa](https://gitlab.freedesktop.org/mesa/mesa) | Guest-side virpipe/Mesa paths, supplied by the container | MIT |
+| **Mesa 3D / lfdevs Freedreno** | Mesa upstream; [lfdevs Mesa fork](https://github.com/lfdevs/mesa-for-android-container) tag `mesa-27.0.0-devel-20261025-r1`; [lfdevs packaging](https://github.com/lfdevs/archlinuxarm-PKGBUILDs) commit `8a29bd2e...` | Guest virpipe/Adreno paths; Trierarch `mesa-adreno` recipe | Mesa per-file licenses (MIT / BSD-3-Clause / SGI-B-2.0); Trierarch patches/recipes GPL-3.0 unless a file says otherwise |
 | **ANGLE** | [google/angle](https://chromium.googlesource.com/angle/angle), Termux package `2.1.24923-f09a19ce-2` | Vulkan/GL backends used by the VirGL host | BSD-3-Clause |
 | **libepoxy** | [anholt/libepoxy](https://github.com/anholt/libepoxy), `1.5.10` | EGL/GL function dispatch | MIT |
 | **PipeWire** | [pipewire/pipewire](https://gitlab.freedesktop.org/pipewire/pipewire), `1.4.9-1` | Android audio server | MIT |
@@ -192,6 +192,10 @@ Additional notes:
 - PRoot's build also uses **talloc** (LGPL-3.0-or-later) and
   **libandroid-shmem** (BSD-3-Clause); see `trierarch-packages/proot/UPSTREAM.md`
   in the packages repository.
+- Mesa is a derivative chain (Mesa → lfdevs fork → lfdevs packaging → Trierarch
+  `mesa-adreno`), not a single MIT component. The Arch recipe pins the ifdevs
+  packaging commit by default; see `trierarch-packages/mesa-adreno/UPSTREAM.md`
+  and record the exact revision for each release.
 - The guest environments themselves — KDE Plasma/KWin, Hyprland/aquamarine,
   XFCE and the Linux distributions — are external projects supplied by the
   user's rootfs or container. Trierarch supports them but does not bundle them.
@@ -217,6 +221,10 @@ package `UPSTREAM.md` files. Trierarch does not relicense them. In particular:
 - Termux:X11 / Lorie and the Local Desktop AAudio sink are GPL-3.0;
 - PRoot is GPL-2.0-only and is distributed as a separate executable, not linked
   into the Trierarch app.
+
+The formal component-by-component attribution, pinned revisions and source
+locations are in [THIRD_PARTY.md](THIRD_PARTY.md). The short redistribution
+notice is [NOTICE](NOTICE).
 
 ## Documentation
 

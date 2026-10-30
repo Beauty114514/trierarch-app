@@ -10,6 +10,9 @@
   — tested runtime/desktop/renderer combinations on Adreno 740.
 - [Known issues](known-issues/README.md) — common problems, workarounds and the current
   status of unresolved items. / 常见问题、workaround 和未解决项。
+- [Third-party attribution](../THIRD_PARTY.md) / [第三方归属](../THIRD_PARTY.md)
+  — components, pinned revisions and licenses; short notice in
+  [NOTICE](../NOTICE).
 
 Developer references inherited from the terminal and X11 components:
 
