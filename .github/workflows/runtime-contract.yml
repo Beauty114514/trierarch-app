@@ -1,0 +1,31 @@
+name: runtime contract
+
+on:
+  push:
+    paths:
+      - "app/src/main/java/app/trierarch/config/ProfileStore.kt"
+      - ".github/workflows/runtime-contract.yml"
+  pull_request:
+    paths:
+      - "app/src/main/java/app/trierarch/config/ProfileStore.kt"
+      - ".github/workflows/runtime-contract.yml"
+  workflow_dispatch:
+
+jobs:
+  contract:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: trierarch-app
+
+      # Keep this ref aligned with the app branch until the runtime contract is
+      # merged into the packages default branch.
+      - uses: actions/checkout@v4
+        with:
+          repository: Beauty114514/trierarch-packages
+          path: trierarch-packages
+          ref: ${{ github.head_ref || github.ref_name }}
+
+      - name: Check runtime path contract
+        run: python3 trierarch-packages/scripts/check-runtime-contract.py
