@@ -55,19 +55,16 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
                 installGbmShim = true,
             ),
         ) { resources ->
-            NativePtySession(
-                rootfsDirectory = profile.rootfs,
-                shell = profile.shell,
-                nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
-                cacheDirectory = app.cacheDir,
-                x11SocketDirectory = resources.x11SocketDirectory,
-                waylandRuntimeDirectory = resources.waylandRuntimeDirectory,
-                waylandImeBridge = resources.waylandImeBridge,
-                virglRuntimeDirectory = resources.virglRuntimeDirectory,
-                pipewireRuntimeDirectory = resources.pipewireRuntimeDirectory,
-                udevCompatibilityLibrary = resources.udevCompatibilityLibrary,
-                launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
-                graphicsEnvironment = profile.graphics.environment().toTypedArray(),
+            NativePtySession.proot(
+                ProotSessionConfig(
+                    rootfs = profile.rootfs,
+                    shell = profile.shell,
+                    nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
+                    cacheDirectory = app.cacheDir,
+                    environment = resources.toSessionEnvironment(),
+                    launchArgv = profile.launchArgv.orEmpty(),
+                    graphicsEnvironment = profile.graphics.environment(),
+                ),
                 clipboard = AndroidTerminalClipboard(app),
             )
         }
@@ -85,19 +82,16 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
                 installGbmShim = false,
             ),
         ) { resources ->
-            NativePtySession(
-                chrootRootfs = profile.rootfs,
-                shell = profile.shell,
-                x11SocketDirectory = resources.x11SocketDirectory,
-                waylandRuntimeDirectory = resources.waylandRuntimeDirectory,
-                waylandImeBridge = resources.waylandImeBridge,
-                chrootSupervisor = WaylandImeBridgeRuntime.supervisor(app).absolutePath,
-                virglRuntimeDirectory = resources.virglRuntimeDirectory,
-                pipewireRuntimeDirectory = resources.pipewireRuntimeDirectory,
-                launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
-                graphicsEnvironment = profile.graphics.environment().toTypedArray(),
-                udevCompatibilityLibrary = resources.udevCompatibilityLibrary,
-                diagnosticLog = sessionDiagnosticLog(profile.id),
+            NativePtySession.chroot(
+                ChrootSessionConfig(
+                    rootfs = File(profile.rootfs),
+                    shell = profile.shell,
+                    environment = resources.toSessionEnvironment(),
+                    chrootSupervisor = WaylandImeBridgeRuntime.supervisor(app),
+                    launchArgv = profile.launchArgv.orEmpty(),
+                    graphicsEnvironment = profile.graphics.environment(),
+                    diagnosticLog = sessionDiagnosticLog(profile.id),
+                ),
                 clipboard = AndroidTerminalClipboard(app),
             )
         }
@@ -115,15 +109,12 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
                 installGbmShim = true,
             ),
         ) { resources ->
-            NativePtySession(
-                droidspacesProfile = profile,
-                x11SocketDirectory = resources.x11SocketDirectory,
-                waylandRuntimeDirectory = resources.waylandRuntimeDirectory,
-                waylandImeBridge = resources.waylandImeBridge,
-                droidspacesSupervisor = WaylandImeBridgeRuntime.droidspacesSupervisor(app).absolutePath,
-                virglRuntimeDirectory = resources.virglRuntimeDirectory,
-                pipewireRuntimeDirectory = resources.pipewireRuntimeDirectory,
-                udevCompatibilityLibrary = resources.udevCompatibilityLibrary,
+            NativePtySession.droidspaces(
+                DroidspacesSessionConfig(
+                    profile = profile,
+                    environment = resources.toSessionEnvironment(),
+                    droidspacesSupervisor = WaylandImeBridgeRuntime.droidspacesSupervisor(app),
+                ),
                 clipboard = AndroidTerminalClipboard(app),
             )
         }
@@ -164,11 +155,13 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
         internalSession.close()
     }
 
-    private fun createInternalShell() = NativePtySession(
-        launchSpec = InternalShellLaunchSpec.create(
-            filesDirectory = app.filesDir,
-            cacheDirectory = app.cacheDir,
-            nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
+    private fun createInternalShell() = NativePtySession.command(
+        CommandSessionConfig(
+            launchSpec = InternalShellLaunchSpec.create(
+                filesDirectory = app.filesDir,
+                cacheDirectory = app.cacheDir,
+                nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
+            ),
         ),
         clipboard = AndroidTerminalClipboard(app),
     )

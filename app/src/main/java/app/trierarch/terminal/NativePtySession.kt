@@ -1,10 +1,8 @@
 package app.trierarch.terminal
 
 import android.util.Log
-import app.trierarch.config.ProfileStore
 import app.trierarch.nativebridge.NativePtyBridge
 import app.trierarch.nativebridge.SessionCallback
-import app.trierarch.runtime.TerminalLaunchSpec
 import com.termux.terminal.TerminalEmulator
 import com.termux.terminal.TerminalOutput
 import com.termux.terminal.TerminalSession
@@ -22,132 +20,104 @@ class NativePtySession private constructor(
     private val clipboard: TerminalClipboard,
     diagnosticLog: File? = null,
 ) : TerminalOutput(), SessionCallback, DisplayableTermSession {
-    constructor(
-        launchSpec: TerminalLaunchSpec,
-        clipboard: TerminalClipboard,
-    ) : this(
-        openNativeSession = { rows, columns, callback ->
-            NativePtyBridge.openSession(
-                launchSpec.command,
-                launchSpec.arguments,
-                launchSpec.workingDirectory.absolutePath,
-                launchSpec.environment,
-                rows,
-                columns,
-                callback,
-            )
-        },
-        clipboard = clipboard,
-    )
+    companion object {
+        private const val INITIAL_COLUMNS = 80
+        private const val INITIAL_ROWS = 24
+        private const val INITIAL_CELL_WIDTH_PIXELS = 1
+        private const val INITIAL_CELL_HEIGHT_PIXELS = 1
 
-    /** The PRoot runtime has its own native launch contract. */
-    constructor(
-        rootfsDirectory: File,
-        shell: String,
-        nativeLibraryDirectory: File,
-        cacheDirectory: File,
-        x11SocketDirectory: String?,
-        waylandRuntimeDirectory: String?,
-        waylandImeBridge: String?,
-        virglRuntimeDirectory: String?,
-        pipewireRuntimeDirectory: String?,
-        udevCompatibilityLibrary: String,
-        launchArgv: Array<String>,
-        graphicsEnvironment: Array<String>,
-        clipboard: TerminalClipboard,
-    ) : this(
-        openNativeSession = { rows, columns, callback ->
-            NativePtyBridge.openProotSession(
-                rootfsDirectory.absolutePath,
-                shell,
-                nativeLibraryDirectory.absolutePath,
-                cacheDirectory.absolutePath,
-                x11SocketDirectory.orEmpty(),
-                waylandRuntimeDirectory.orEmpty(),
-                waylandImeBridge.orEmpty(),
-                virglRuntimeDirectory.orEmpty(),
-                pipewireRuntimeDirectory.orEmpty(),
-                udevCompatibilityLibrary,
-                launchArgv,
-                graphicsEnvironment,
-                rows,
-                columns,
-                callback,
+        fun command(config: CommandSessionConfig, clipboard: TerminalClipboard): NativePtySession =
+            NativePtySession(
+                openNativeSession = { rows, columns, callback ->
+                    NativePtyBridge.openSession(
+                        command = config.launchSpec.command,
+                        arguments = config.launchSpec.arguments,
+                        workingDirectory = config.launchSpec.workingDirectory.absolutePath,
+                        environment = config.launchSpec.environment,
+                        rows = rows,
+                        columns = columns,
+                        callback = callback,
+                    )
+                },
+                clipboard = clipboard,
             )
-        },
-        clipboard = clipboard,
-    )
 
-    /** A shell in a rootfs the user has already deployed and mounted as needed. */
-    constructor(
-        chrootRootfs: String,
-        shell: String,
-        x11SocketDirectory: String?,
-        waylandRuntimeDirectory: String?,
-        waylandImeBridge: String?,
-        chrootSupervisor: String?,
-        virglRuntimeDirectory: String?,
-        pipewireRuntimeDirectory: String?,
-        launchArgv: Array<String>,
-        graphicsEnvironment: Array<String>,
-        udevCompatibilityLibrary: String,
-        diagnosticLog: File?,
-        clipboard: TerminalClipboard,
-    ) : this(
-        openNativeSession = { rows, columns, callback ->
-            NativePtyBridge.openChrootSession(
-                chrootRootfs,
-                shell,
-                x11SocketDirectory.orEmpty(),
-                waylandRuntimeDirectory.orEmpty(),
-                waylandImeBridge.orEmpty(),
-                chrootSupervisor.orEmpty(),
-                virglRuntimeDirectory.orEmpty(),
-                pipewireRuntimeDirectory.orEmpty(),
-                launchArgv,
-                graphicsEnvironment,
-                udevCompatibilityLibrary,
-                rows,
-                columns,
-                callback,
+        fun proot(config: ProotSessionConfig, clipboard: TerminalClipboard): NativePtySession =
+            NativePtySession(
+                openNativeSession = { rows, columns, callback ->
+                    val environment = config.environment
+                    NativePtyBridge.openProotSession(
+                        rootfsDirectory = config.rootfs.absolutePath,
+                        shell = config.shell,
+                        nativeLibraryDirectory = config.nativeLibraryDirectory.absolutePath,
+                        cacheDirectory = config.cacheDirectory.absolutePath,
+                        x11SocketDirectory = environment.x11SocketDirectory.pathOrEmpty(),
+                        waylandRuntimeDirectory = environment.waylandRuntimeDirectory.pathOrEmpty(),
+                        waylandImeBridge = environment.waylandImeBridge.pathOrEmpty(),
+                        virglRuntimeDirectory = environment.virglRuntimeDirectory.pathOrEmpty(),
+                        pipewireRuntimeDirectory = environment.pipewireRuntimeDirectory.pathOrEmpty(),
+                        udevCompatibilityLibrary = environment.udevCompatibilityLibrary.pathOrEmpty(),
+                        launchArgv = config.launchArgv.toTypedArray(),
+                        graphicsEnvironment = config.graphicsEnvironment.toTypedArray(),
+                        rows = rows,
+                        columns = columns,
+                        callback = callback,
+                    )
+                },
+                clipboard = clipboard,
             )
-        },
-        clipboard = clipboard,
-        diagnosticLog = diagnosticLog,
-    )
 
-    /** Trierarch owns the DroidSpaces session lifecycle. */
-    constructor(
-        droidspacesProfile: ProfileStore.DroidspacesProfile,
-        x11SocketDirectory: String?,
-        waylandRuntimeDirectory: String?,
-        waylandImeBridge: String?,
-        droidspacesSupervisor: String?,
-        virglRuntimeDirectory: String?,
-        pipewireRuntimeDirectory: String?,
-        udevCompatibilityLibrary: String,
-        clipboard: TerminalClipboard,
-    ) : this(
-        openNativeSession = { rows, columns, callback ->
-            NativePtyBridge.openDroidspacesSession(
-                droidspacesProfile.container,
-                droidspacesProfile.user,
-                x11SocketDirectory.orEmpty(),
-                waylandRuntimeDirectory.orEmpty(),
-                waylandImeBridge.orEmpty(),
-                droidspacesSupervisor.orEmpty(),
-                virglRuntimeDirectory.orEmpty(),
-                pipewireRuntimeDirectory.orEmpty(),
-                udevCompatibilityLibrary,
-                droidspacesProfile.launchArgv.orEmpty().toTypedArray(),
-                droidspacesProfile.graphics.environment().toTypedArray(),
-                rows,
-                columns,
-                callback,
+        fun chroot(config: ChrootSessionConfig, clipboard: TerminalClipboard): NativePtySession =
+            NativePtySession(
+                openNativeSession = { rows, columns, callback ->
+                    val environment = config.environment
+                    NativePtyBridge.openChrootSession(
+                        rootfsDirectory = config.rootfs.path,
+                        shell = config.shell,
+                        x11SocketDirectory = environment.x11SocketDirectory.pathOrEmpty(),
+                        waylandRuntimeDirectory = environment.waylandRuntimeDirectory.pathOrEmpty(),
+                        waylandImeBridge = environment.waylandImeBridge.pathOrEmpty(),
+                        chrootSupervisor = config.chrootSupervisor.absolutePath,
+                        virglRuntimeDirectory = environment.virglRuntimeDirectory.pathOrEmpty(),
+                        pipewireRuntimeDirectory = environment.pipewireRuntimeDirectory.pathOrEmpty(),
+                        launchArgv = config.launchArgv.toTypedArray(),
+                        graphicsEnvironment = config.graphicsEnvironment.toTypedArray(),
+                        udevCompatibilityLibrary = environment.udevCompatibilityLibrary.pathOrEmpty(),
+                        rows = rows,
+                        columns = columns,
+                        callback = callback,
+                    )
+                },
+                clipboard = clipboard,
+                diagnosticLog = config.diagnosticLog,
             )
-        },
-        clipboard = clipboard,
-    )
+
+        fun droidspaces(
+            config: DroidspacesSessionConfig,
+            clipboard: TerminalClipboard,
+        ): NativePtySession = NativePtySession(
+            openNativeSession = { rows, columns, callback ->
+                val environment = config.environment
+                NativePtyBridge.openDroidspacesSession(
+                    container = config.profile.container,
+                    user = config.profile.user,
+                    x11SocketDirectory = environment.x11SocketDirectory.pathOrEmpty(),
+                    waylandRuntimeDirectory = environment.waylandRuntimeDirectory.pathOrEmpty(),
+                    waylandImeBridge = environment.waylandImeBridge.pathOrEmpty(),
+                    droidspacesSupervisor = config.droidspacesSupervisor.absolutePath,
+                    virglRuntimeDirectory = environment.virglRuntimeDirectory.pathOrEmpty(),
+                    pipewireRuntimeDirectory = environment.pipewireRuntimeDirectory.pathOrEmpty(),
+                    udevCompatibilityLibrary = environment.udevCompatibilityLibrary.pathOrEmpty(),
+                    launchArgv = config.profile.launchArgv.orEmpty().toTypedArray(),
+                    graphicsEnvironment = config.profile.graphics.environment().toTypedArray(),
+                    rows = rows,
+                    columns = columns,
+                    callback = callback,
+                )
+            },
+            clipboard = clipboard,
+        )
+    }
 
     private var sessionId = 0L
     private var closed = false
@@ -341,12 +311,5 @@ class NativePtySession private constructor(
         override fun logVerbose(tag: String, message: String) { Log.v(tag, message) }
         override fun logStackTraceWithMessage(tag: String, message: String, exception: Exception) { Log.e(tag, message, exception) }
         override fun logStackTrace(tag: String, exception: Exception) { Log.e(tag, Log.getStackTraceString(exception)) }
-    }
-
-    private companion object {
-        const val INITIAL_COLUMNS = 80
-        const val INITIAL_ROWS = 24
-        const val INITIAL_CELL_WIDTH_PIXELS = 1
-        const val INITIAL_CELL_HEIGHT_PIXELS = 1
     }
 }
