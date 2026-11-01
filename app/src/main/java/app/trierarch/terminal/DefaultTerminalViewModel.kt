@@ -44,166 +44,89 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
     }
 
     fun restartProot(profile: ProfileStore.ProotProfile) {
-        closeRuntime(profile.id)
-        val virglRuntimeDirectory = if (usesVtestTransport(profile.graphics.renderer)) {
-            VirglHostController.start(app, profile.graphics.renderer == ProfileStore.GRAPHICS_VENUS).absolutePath
-        } else {
-            ""
-        }
-        if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost(profile.graphics.resolvedBuffer)
-        }
-        val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
-            PipeWireHostController.start(app).absolutePath
-        } else {
-            ""
-        }
-        val waylandRuntime = waylandRuntimeDirectory(profile.display)
-        if (waylandRuntime != null &&
-            profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL &&
-            profile.graphics.resolvedBuffer == ProfileStore.BUFFER_DMABUF
-        ) {
-            GbmShimRuntime.install(app, File(waylandRuntime))
-        }
-        val next = try {
+        launchRuntime(
+            RuntimeLaunchSpec(
+                profileId = profile.id,
+                display = profile.display,
+                renderer = profile.graphics.renderer,
+                bufferMode = profile.graphics.resolvedBuffer,
+                audioBackend = profile.audioBackend,
+                enablesUdevMonitorShim = profile.compatibility.enablesUdevMonitorShim,
+                installGbmShim = true,
+            ),
+        ) { resources ->
             NativePtySession(
                 rootfsDirectory = profile.rootfs,
                 shell = profile.shell,
                 nativeLibraryDirectory = File(app.applicationInfo.nativeLibraryDir),
                 cacheDirectory = app.cacheDir,
-                x11SocketDirectory = x11SocketDirectory(profile.display),
-                waylandRuntimeDirectory = waylandRuntime,
-                waylandImeBridge = waylandImeBridge(profile.display),
-                virglRuntimeDirectory = virglRuntimeDirectory,
-                pipewireRuntimeDirectory = pipewireRuntimeDirectory,
-                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
-                    app, profile.compatibility.enablesUdevMonitorShim,
-                )?.absolutePath.orEmpty(),
+                x11SocketDirectory = resources.x11SocketDirectory,
+                waylandRuntimeDirectory = resources.waylandRuntimeDirectory,
+                waylandImeBridge = resources.waylandImeBridge,
+                virglRuntimeDirectory = resources.virglRuntimeDirectory,
+                pipewireRuntimeDirectory = resources.pipewireRuntimeDirectory,
+                udevCompatibilityLibrary = resources.udevCompatibilityLibrary,
                 launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
                 graphicsEnvironment = profile.graphics.environment().toTypedArray(),
                 clipboard = AndroidTerminalClipboard(app),
-            ).also { next ->
-                if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
-                    next.start()
-                }
-            }
-        } catch (error: Throwable) {
-            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
-            throw error
+            )
         }
-        runtimeSessions[profile.id] = RuntimeSession(
-            next,
-            profile.display,
-            profile.graphics.renderer,
-            profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
-        )
-        displayedProfileId = profile.id
-        session = next
     }
 
     fun restartChroot(profile: ProfileStore.ChrootProfile) {
-        closeRuntime(profile.id)
-        val virglRuntimeDirectory = if (usesVtestTransport(profile.graphics.renderer)) {
-            VirglHostController.start(app, profile.graphics.renderer == ProfileStore.GRAPHICS_VENUS).absolutePath
-        } else {
-            ""
-        }
-        if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost(profile.graphics.resolvedBuffer)
-        }
-        val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
-            PipeWireHostController.start(app).absolutePath
-        } else {
-            ""
-        }
-        val next = try {
+        launchRuntime(
+            RuntimeLaunchSpec(
+                profileId = profile.id,
+                display = profile.display,
+                renderer = profile.graphics.renderer,
+                bufferMode = profile.graphics.resolvedBuffer,
+                audioBackend = profile.audioBackend,
+                enablesUdevMonitorShim = profile.compatibility.enablesUdevMonitorShim,
+                installGbmShim = false,
+            ),
+        ) { resources ->
             NativePtySession(
                 chrootRootfs = profile.rootfs,
                 shell = profile.shell,
-                x11SocketDirectory = x11SocketDirectory(profile.display),
-                waylandRuntimeDirectory = waylandRuntimeDirectory(profile.display),
-                waylandImeBridge = waylandImeBridge(profile.display),
+                x11SocketDirectory = resources.x11SocketDirectory,
+                waylandRuntimeDirectory = resources.waylandRuntimeDirectory,
+                waylandImeBridge = resources.waylandImeBridge,
                 chrootSupervisor = WaylandImeBridgeRuntime.supervisor(app).absolutePath,
-                virglRuntimeDirectory = virglRuntimeDirectory,
-                pipewireRuntimeDirectory = pipewireRuntimeDirectory,
+                virglRuntimeDirectory = resources.virglRuntimeDirectory,
+                pipewireRuntimeDirectory = resources.pipewireRuntimeDirectory,
                 launchArgv = profile.launchArgv.orEmpty().toTypedArray(),
                 graphicsEnvironment = profile.graphics.environment().toTypedArray(),
-                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
-                    app, profile.compatibility.enablesUdevMonitorShim,
-                )?.absolutePath.orEmpty(),
+                udevCompatibilityLibrary = resources.udevCompatibilityLibrary,
                 diagnosticLog = sessionDiagnosticLog(profile.id),
                 clipboard = AndroidTerminalClipboard(app),
-            ).also { next ->
-                if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
-                    next.start()
-                }
-            }
-        } catch (error: Throwable) {
-            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
-            throw error
+            )
         }
-        runtimeSessions[profile.id] = RuntimeSession(
-            next,
-            profile.display,
-            profile.graphics.renderer,
-            profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
-        )
-        displayedProfileId = profile.id
-        session = next
     }
 
     fun restartDroidspaces(profile: ProfileStore.DroidspacesProfile) {
-        closeRuntime(profile.id)
-        val virglRuntimeDirectory = if (usesVtestTransport(profile.graphics.renderer)) {
-            VirglHostController.start(app, profile.graphics.renderer == ProfileStore.GRAPHICS_VENUS).absolutePath
-        } else {
-            ""
-        }
-        if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost(profile.graphics.resolvedBuffer)
-        }
-        val pipewireRuntimeDirectory = if (profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
-            PipeWireHostController.start(app).absolutePath
-        } else {
-            ""
-        }
-        val waylandRuntime = waylandRuntimeDirectory(profile.display)
-        if (waylandRuntime != null &&
-            profile.graphics.renderer == ProfileStore.GRAPHICS_VIRGL &&
-            profile.graphics.resolvedBuffer == ProfileStore.BUFFER_DMABUF
-        ) {
-            GbmShimRuntime.install(app, File(waylandRuntime))
-        }
-        val next = try {
+        launchRuntime(
+            RuntimeLaunchSpec(
+                profileId = profile.id,
+                display = profile.display,
+                renderer = profile.graphics.renderer,
+                bufferMode = profile.graphics.resolvedBuffer,
+                audioBackend = profile.audioBackend,
+                enablesUdevMonitorShim = profile.compatibility.enablesUdevMonitorShim,
+                installGbmShim = true,
+            ),
+        ) { resources ->
             NativePtySession(
                 droidspacesProfile = profile,
-                x11SocketDirectory = x11SocketDirectory(profile.display),
-                waylandRuntimeDirectory = waylandRuntime,
-                waylandImeBridge = waylandImeBridge(profile.display),
+                x11SocketDirectory = resources.x11SocketDirectory,
+                waylandRuntimeDirectory = resources.waylandRuntimeDirectory,
+                waylandImeBridge = resources.waylandImeBridge,
                 droidspacesSupervisor = WaylandImeBridgeRuntime.droidspacesSupervisor(app).absolutePath,
-                virglRuntimeDirectory = virglRuntimeDirectory,
-                pipewireRuntimeDirectory = pipewireRuntimeDirectory,
-                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
-                    app, profile.compatibility.enablesUdevMonitorShim,
-                )?.absolutePath.orEmpty(),
+                virglRuntimeDirectory = resources.virglRuntimeDirectory,
+                pipewireRuntimeDirectory = resources.pipewireRuntimeDirectory,
+                udevCompatibilityLibrary = resources.udevCompatibilityLibrary,
                 clipboard = AndroidTerminalClipboard(app),
-            ).also { next ->
-                if (profile.display == ProfileStore.DISPLAY_X11 || profile.display == ProfileStore.DISPLAY_WAYLAND) {
-                    next.start()
-                }
-            }
-        } catch (error: Throwable) {
-            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
-            throw error
+            )
         }
-        runtimeSessions[profile.id] = RuntimeSession(
-            next,
-            profile.display,
-            profile.graphics.renderer,
-            profile.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
-        )
-        displayedProfileId = profile.id
-        session = next
     }
 
     fun isRuntimeRunning(): Boolean = runningProfileIds().isNotEmpty()
@@ -268,6 +191,93 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
             PipeWireHostController.stop()
         }
     }
+
+    private fun launchRuntime(
+        spec: RuntimeLaunchSpec,
+        createSession: (RuntimeResources) -> NativePtySession,
+    ) {
+        closeRuntime(spec.profileId)
+        val resources = prepareRuntime(spec)
+        val next = try {
+            val sessionResources = resources.copy(
+                x11SocketDirectory = x11SocketDirectory(spec.display),
+                waylandImeBridge = waylandImeBridge(spec.display),
+                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
+                    app,
+                    spec.enablesUdevMonitorShim,
+                )?.absolutePath.orEmpty(),
+            )
+            createSession(sessionResources).also { session ->
+                if (spec.display == ProfileStore.DISPLAY_X11 ||
+                    spec.display == ProfileStore.DISPLAY_WAYLAND
+                ) {
+                    session.start()
+                }
+            }
+        } catch (error: Throwable) {
+            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
+            throw error
+        }
+        runtimeSessions[spec.profileId] = RuntimeSession(
+            next,
+            spec.display,
+            spec.renderer,
+            spec.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
+        )
+        displayedProfileId = spec.profileId
+        session = next
+    }
+
+    private fun prepareRuntime(spec: RuntimeLaunchSpec): RuntimeResources {
+        val virglRuntimeDirectory = if (usesVtestTransport(spec.renderer)) {
+            VirglHostController.start(
+                app,
+                spec.renderer == ProfileStore.GRAPHICS_VENUS,
+            ).absolutePath
+        } else {
+            ""
+        }
+        if (spec.display == ProfileStore.DISPLAY_WAYLAND) {
+            startWaylandHost(spec.bufferMode)
+        }
+        val pipewireRuntimeDirectory = if (spec.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
+            PipeWireHostController.start(app).absolutePath
+        } else {
+            ""
+        }
+        val waylandRuntime = waylandRuntimeDirectory(spec.display)
+        if (spec.installGbmShim &&
+            waylandRuntime != null &&
+            spec.renderer == ProfileStore.GRAPHICS_VIRGL &&
+            spec.bufferMode == ProfileStore.BUFFER_DMABUF
+        ) {
+            GbmShimRuntime.install(app, File(waylandRuntime))
+        }
+        return RuntimeResources(
+            waylandRuntimeDirectory = waylandRuntime,
+            virglRuntimeDirectory = virglRuntimeDirectory,
+            pipewireRuntimeDirectory = pipewireRuntimeDirectory,
+        )
+    }
+
+    private data class RuntimeLaunchSpec(
+        val profileId: String,
+        val display: String,
+        val renderer: String,
+        val bufferMode: String,
+        val audioBackend: String,
+        val enablesUdevMonitorShim: Boolean,
+        val installGbmShim: Boolean,
+    )
+
+    private data class RuntimeResources(
+        val waylandRuntimeDirectory: String?,
+        val virglRuntimeDirectory: String,
+        val pipewireRuntimeDirectory: String,
+        val x11SocketDirectory: String? = null,
+        val waylandImeBridge: String? = null,
+        val udevCompatibilityLibrary: String = "",
+    )
 
     private data class RuntimeSession(
         val session: NativePtySession,
