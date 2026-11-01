@@ -2,19 +2,19 @@ package app.trierarch.terminal
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import app.trierarch.audio.PipeWireHostController
 import app.trierarch.config.ProfileStore
-import app.trierarch.compat.GbmShimRuntime
-import app.trierarch.compat.GuestCompatibilityRuntime
 import app.trierarch.runtime.InternalShellLaunchSpec
-import app.trierarch.x11.X11Runtime
-import app.trierarch.wayland.WaylandBridge
 import app.trierarch.wayland.WaylandImeBridgeRuntime
-import app.trierarch.virgl.VirglHostController
 import java.io.File
 
 /** Owns the built-in app-internal shell independently of a terminal view instance. */
-class DefaultTerminalViewModel(application: Application) : AndroidViewModel(application) {
+class DefaultTerminalViewModel @JvmOverloads constructor(
+    application: Application,
+    private val runtimeBootstrap: RuntimeBootstrap = RuntimeBootstrap(
+        AndroidRuntimeHosts(application),
+        AndroidRuntimePaths(application),
+    ),
+) : AndroidViewModel(application) {
     private val app = application
     private var internalSession: NativePtySession = createInternalShell()
     private val runtimeSessions = linkedMapOf<String, RuntimeSession>()
@@ -182,13 +182,13 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         runtimeSessions.remove(id)?.session?.close()
         if (displayedProfileId == id) displayedProfileId = null
         if (runtimeSessions.values.none { it.display == ProfileStore.DISPLAY_WAYLAND }) {
-            WaylandBridge.stop()
+            runtimeBootstrap.stopWayland()
         }
         if (runtimeSessions.values.none { usesVtestTransport(it.renderer) }) {
-            VirglHostController.stop()
+            runtimeBootstrap.stopVirgl()
         }
         if (runtimeSessions.values.none { it.pipewire }) {
-            PipeWireHostController.stop()
+            runtimeBootstrap.stopPipeWire()
         }
     }
 
@@ -197,16 +197,9 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         createSession: (RuntimeResources) -> NativePtySession,
     ) {
         closeRuntime(spec.profileId)
-        val resources = prepareRuntime(spec)
+        val resources = runtimeBootstrap.prepareHosts(spec)
         val next = try {
-            val sessionResources = resources.copy(
-                x11SocketDirectory = x11SocketDirectory(spec.display),
-                waylandImeBridge = waylandImeBridge(spec.display),
-                udevCompatibilityLibrary = GuestCompatibilityRuntime.udevMonitorLibrary(
-                    app,
-                    spec.enablesUdevMonitorShim,
-                )?.absolutePath.orEmpty(),
-            )
+            val sessionResources = runtimeBootstrap.finishResources(spec, resources)
             createSession(sessionResources).also { session ->
                 if (spec.display == ProfileStore.DISPLAY_X11 ||
                     spec.display == ProfileStore.DISPLAY_WAYLAND
@@ -215,7 +208,7 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
                 }
             }
         } catch (error: Throwable) {
-            if (runtimeSessions.values.none { it.pipewire }) PipeWireHostController.stop()
+            if (runtimeSessions.values.none { it.pipewire }) runtimeBootstrap.stopPipeWire()
             throw error
         }
         runtimeSessions[spec.profileId] = RuntimeSession(
@@ -228,57 +221,6 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
         session = next
     }
 
-    private fun prepareRuntime(spec: RuntimeLaunchSpec): RuntimeResources {
-        val virglRuntimeDirectory = if (usesVtestTransport(spec.renderer)) {
-            VirglHostController.start(
-                app,
-                spec.renderer == ProfileStore.GRAPHICS_VENUS,
-            ).absolutePath
-        } else {
-            ""
-        }
-        if (spec.display == ProfileStore.DISPLAY_WAYLAND) {
-            startWaylandHost(spec.bufferMode)
-        }
-        val pipewireRuntimeDirectory = if (spec.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
-            PipeWireHostController.start(app).absolutePath
-        } else {
-            ""
-        }
-        val waylandRuntime = waylandRuntimeDirectory(spec.display)
-        if (spec.installGbmShim &&
-            waylandRuntime != null &&
-            spec.renderer == ProfileStore.GRAPHICS_VIRGL &&
-            spec.bufferMode == ProfileStore.BUFFER_DMABUF
-        ) {
-            GbmShimRuntime.install(app, File(waylandRuntime))
-        }
-        return RuntimeResources(
-            waylandRuntimeDirectory = waylandRuntime,
-            virglRuntimeDirectory = virglRuntimeDirectory,
-            pipewireRuntimeDirectory = pipewireRuntimeDirectory,
-        )
-    }
-
-    private data class RuntimeLaunchSpec(
-        val profileId: String,
-        val display: String,
-        val renderer: String,
-        val bufferMode: String,
-        val audioBackend: String,
-        val enablesUdevMonitorShim: Boolean,
-        val installGbmShim: Boolean,
-    )
-
-    private data class RuntimeResources(
-        val waylandRuntimeDirectory: String?,
-        val virglRuntimeDirectory: String,
-        val pipewireRuntimeDirectory: String,
-        val x11SocketDirectory: String? = null,
-        val waylandImeBridge: String? = null,
-        val udevCompatibilityLibrary: String = "",
-    )
-
     private data class RuntimeSession(
         val session: NativePtySession,
         val display: String,
@@ -288,27 +230,6 @@ class DefaultTerminalViewModel(application: Application) : AndroidViewModel(appl
 
     private fun usesVtestTransport(renderer: String): Boolean =
         renderer == ProfileStore.GRAPHICS_VIRGL || renderer == ProfileStore.GRAPHICS_VENUS
-
-    private fun startWaylandHost(bufferMode: String) {
-        check(WaylandBridge.start(app, bufferMode)) { "Unable to start Wayland host" }
-    }
-
-    private fun x11SocketDirectory(display: String): String? =
-        X11Runtime.socketDirectory(app).absolutePath.takeIf {
-            display == ProfileStore.DISPLAY_X11
-        }
-
-    private fun waylandRuntimeDirectory(display: String): String? =
-        File(app.filesDir, "wayland/runtime").also { it.mkdirs() }.absolutePath.takeIf {
-            display == ProfileStore.DISPLAY_WAYLAND
-        }
-
-    private fun waylandImeBridge(display: String): String? =
-        if (display == ProfileStore.DISPLAY_WAYLAND) {
-            WaylandImeBridgeRuntime.executable(app).absolutePath
-        } else {
-            null
-        }
 
     private fun sessionDiagnosticLog(profileId: String): File =
         File(app.filesDir, "logs/sessions/$profileId.log")
