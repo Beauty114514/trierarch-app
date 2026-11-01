@@ -57,3 +57,66 @@ internal fun RuntimeResources.toSessionEnvironment(): SessionEnvironment = Sessi
     pipewireRuntimeDirectory = pipewireRuntimeDirectory.toFileOrNull(),
     udevCompatibilityLibrary = udevCompatibilityLibrary.toFileOrNull(),
 )
+
+/**
+ * One ordered key/value config array for the JNI open calls.  Keys are parsed
+ * by native code, so the bridge no longer depends on positional arguments.
+ */
+internal class JniSessionConfig {
+    private val fields = linkedMapOf<String, String>()
+
+    fun put(key: String, value: String) {
+        check(fields.put(key, value) == null) { "duplicate JNI session key: $key" }
+    }
+
+    fun putList(prefix: String, values: List<String>) {
+        put("$prefix.count", values.size.toString())
+        values.forEachIndexed { index, value -> put("$prefix.$index", value) }
+    }
+
+    fun toArray(): Array<String> = fields.map { (key, value) -> "$key=$value" }.toTypedArray()
+}
+
+internal fun CommandSessionConfig.toJniConfig(): Array<String> = JniSessionConfig().apply {
+    put("command", launchSpec.command)
+    putList("arguments", launchSpec.arguments.toList())
+    put("working_directory", launchSpec.workingDirectory.absolutePath)
+    putList("environment", launchSpec.environment.toList())
+}.toArray()
+
+internal fun SessionEnvironment.addTo(config: JniSessionConfig) {
+    config.put("x11_socket_directory", x11SocketDirectory.pathOrEmpty())
+    config.put("wayland_runtime_directory", waylandRuntimeDirectory.pathOrEmpty())
+    config.put("wayland_ime_bridge", waylandImeBridge.pathOrEmpty())
+    config.put("virgl_runtime_directory", virglRuntimeDirectory.pathOrEmpty())
+    config.put("pipewire_runtime_directory", pipewireRuntimeDirectory.pathOrEmpty())
+    config.put("udev_compatibility_library", udevCompatibilityLibrary.pathOrEmpty())
+}
+
+internal fun ProotSessionConfig.toJniConfig(): Array<String> = JniSessionConfig().apply {
+    put("rootfs", rootfs.absolutePath)
+    put("shell", shell)
+    put("native_library_directory", nativeLibraryDirectory.absolutePath)
+    put("cache_directory", cacheDirectory.absolutePath)
+    environment.addTo(this)
+    putList("launch_argv", launchArgv)
+    putList("graphics_environment", graphicsEnvironment)
+}.toArray()
+
+internal fun ChrootSessionConfig.toJniConfig(): Array<String> = JniSessionConfig().apply {
+    put("rootfs", rootfs.path)
+    put("shell", shell)
+    environment.addTo(this)
+    put("chroot_supervisor", chrootSupervisor.absolutePath)
+    putList("launch_argv", launchArgv)
+    putList("graphics_environment", graphicsEnvironment)
+}.toArray()
+
+internal fun DroidspacesSessionConfig.toJniConfig(): Array<String> = JniSessionConfig().apply {
+    put("container", profile.container)
+    put("user", profile.user)
+    environment.addTo(this)
+    put("droidspaces_supervisor", droidspacesSupervisor.absolutePath)
+    putList("launch_argv", profile.launchArgv.orEmpty())
+    putList("graphics_environment", profile.graphics.environment())
+}.toArray()

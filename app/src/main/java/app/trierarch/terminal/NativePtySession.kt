@@ -30,10 +30,7 @@ class NativePtySession private constructor(
             NativePtySession(
                 openNativeSession = { rows, columns, callback ->
                     NativePtyBridge.openSession(
-                        command = config.launchSpec.command,
-                        arguments = config.launchSpec.arguments,
-                        workingDirectory = config.launchSpec.workingDirectory.absolutePath,
-                        environment = config.launchSpec.environment,
+                        config = config.toJniConfig(),
                         rows = rows,
                         columns = columns,
                         callback = callback,
@@ -45,20 +42,8 @@ class NativePtySession private constructor(
         fun proot(config: ProotSessionConfig, clipboard: TerminalClipboard): NativePtySession =
             NativePtySession(
                 openNativeSession = { rows, columns, callback ->
-                    val environment = config.environment
                     NativePtyBridge.openProotSession(
-                        rootfsDirectory = config.rootfs.absolutePath,
-                        shell = config.shell,
-                        nativeLibraryDirectory = config.nativeLibraryDirectory.absolutePath,
-                        cacheDirectory = config.cacheDirectory.absolutePath,
-                        x11SocketDirectory = environment.x11SocketDirectory.pathOrEmpty(),
-                        waylandRuntimeDirectory = environment.waylandRuntimeDirectory.pathOrEmpty(),
-                        waylandImeBridge = environment.waylandImeBridge.pathOrEmpty(),
-                        virglRuntimeDirectory = environment.virglRuntimeDirectory.pathOrEmpty(),
-                        pipewireRuntimeDirectory = environment.pipewireRuntimeDirectory.pathOrEmpty(),
-                        udevCompatibilityLibrary = environment.udevCompatibilityLibrary.pathOrEmpty(),
-                        launchArgv = config.launchArgv.toTypedArray(),
-                        graphicsEnvironment = config.graphicsEnvironment.toTypedArray(),
+                        config = config.toJniConfig(),
                         rows = rows,
                         columns = columns,
                         callback = callback,
@@ -70,19 +55,8 @@ class NativePtySession private constructor(
         fun chroot(config: ChrootSessionConfig, clipboard: TerminalClipboard): NativePtySession =
             NativePtySession(
                 openNativeSession = { rows, columns, callback ->
-                    val environment = config.environment
                     NativePtyBridge.openChrootSession(
-                        rootfsDirectory = config.rootfs.path,
-                        shell = config.shell,
-                        x11SocketDirectory = environment.x11SocketDirectory.pathOrEmpty(),
-                        waylandRuntimeDirectory = environment.waylandRuntimeDirectory.pathOrEmpty(),
-                        waylandImeBridge = environment.waylandImeBridge.pathOrEmpty(),
-                        chrootSupervisor = config.chrootSupervisor.absolutePath,
-                        virglRuntimeDirectory = environment.virglRuntimeDirectory.pathOrEmpty(),
-                        pipewireRuntimeDirectory = environment.pipewireRuntimeDirectory.pathOrEmpty(),
-                        launchArgv = config.launchArgv.toTypedArray(),
-                        graphicsEnvironment = config.graphicsEnvironment.toTypedArray(),
-                        udevCompatibilityLibrary = environment.udevCompatibilityLibrary.pathOrEmpty(),
+                        config = config.toJniConfig(),
                         rows = rows,
                         columns = columns,
                         callback = callback,
@@ -97,19 +71,8 @@ class NativePtySession private constructor(
             clipboard: TerminalClipboard,
         ): NativePtySession = NativePtySession(
             openNativeSession = { rows, columns, callback ->
-                val environment = config.environment
                 NativePtyBridge.openDroidspacesSession(
-                    container = config.profile.container,
-                    user = config.profile.user,
-                    x11SocketDirectory = environment.x11SocketDirectory.pathOrEmpty(),
-                    waylandRuntimeDirectory = environment.waylandRuntimeDirectory.pathOrEmpty(),
-                    waylandImeBridge = environment.waylandImeBridge.pathOrEmpty(),
-                    droidspacesSupervisor = config.droidspacesSupervisor.absolutePath,
-                    virglRuntimeDirectory = environment.virglRuntimeDirectory.pathOrEmpty(),
-                    pipewireRuntimeDirectory = environment.pipewireRuntimeDirectory.pathOrEmpty(),
-                    udevCompatibilityLibrary = environment.udevCompatibilityLibrary.pathOrEmpty(),
-                    launchArgv = config.profile.launchArgv.orEmpty().toTypedArray(),
-                    graphicsEnvironment = config.profile.graphics.environment().toTypedArray(),
+                    config = config.toJniConfig(),
                     rows = rows,
                     columns = columns,
                     callback = callback,

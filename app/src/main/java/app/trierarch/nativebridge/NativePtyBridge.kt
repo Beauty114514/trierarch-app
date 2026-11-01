@@ -7,10 +7,7 @@ object NativePtyBridge {
     }
 
     external fun openSession(
-        command: String,
-        arguments: Array<String>,
-        workingDirectory: String,
-        environment: Array<String>,
+        config: Array<String>,
         rows: Int,
         columns: Int,
         callback: SessionCallback,
@@ -18,18 +15,7 @@ object NativePtyBridge {
 
     /** Opens PRoot through the native runtime backend, not the generic command path. */
     external fun openProotSession(
-        rootfsDirectory: String,
-        shell: String,
-        nativeLibraryDirectory: String,
-        cacheDirectory: String,
-        x11SocketDirectory: String,
-        waylandRuntimeDirectory: String,
-        waylandImeBridge: String,
-        virglRuntimeDirectory: String,
-        pipewireRuntimeDirectory: String,
-        udevCompatibilityLibrary: String,
-        launchArgv: Array<String>,
-        graphicsEnvironment: Array<String>,
+        config: Array<String>,
         rows: Int,
         columns: Int,
         callback: SessionCallback,
@@ -37,17 +23,7 @@ object NativePtyBridge {
 
     /** Opens an already deployed rootfs through the device's existing `su` provider. */
     external fun openChrootSession(
-        rootfsDirectory: String,
-        shell: String,
-        x11SocketDirectory: String,
-        waylandRuntimeDirectory: String,
-        waylandImeBridge: String,
-        chrootSupervisor: String,
-        virglRuntimeDirectory: String,
-        pipewireRuntimeDirectory: String,
-        launchArgv: Array<String>,
-        graphicsEnvironment: Array<String>,
-        udevCompatibilityLibrary: String,
+        config: Array<String>,
         rows: Int,
         columns: Int,
         callback: SessionCallback,
@@ -55,17 +31,7 @@ object NativePtyBridge {
 
     /** Starts a stopped DroidSpaces container, or attaches to a running one. */
     external fun openDroidspacesSession(
-        container: String,
-        user: String,
-        x11SocketDirectory: String,
-        waylandRuntimeDirectory: String,
-        waylandImeBridge: String,
-        droidspacesSupervisor: String,
-        virglRuntimeDirectory: String,
-        pipewireRuntimeDirectory: String,
-        udevCompatibilityLibrary: String,
-        launchArgv: Array<String>,
-        graphicsEnvironment: Array<String>,
+        config: Array<String>,
         rows: Int,
         columns: Int,
         callback: SessionCallback,
