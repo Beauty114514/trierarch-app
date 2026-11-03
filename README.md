@@ -120,6 +120,8 @@ sessions the desktop and applications fall back to software rendering. See the
 ## Input, audio and storage
 
 - Touch, physical keyboard, mouse and virtual keyboard input;
+- rooted builds capture external physical keyboards through a root evdev
+  helper, so system-reserved Super/Meta shortcuts reach Wayland;
 - an IME bridge for desktop sessions;
 - PipeWire audio for PRoot, chroot and DroidSpaces sessions;
 - app-private storage for profiles and rootfs images;

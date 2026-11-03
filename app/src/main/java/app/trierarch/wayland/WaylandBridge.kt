@@ -76,6 +76,13 @@ object WaylandBridge {
         timeMillis: Int,
     ): Boolean = nativeSetKeyboardKey(keyCode, scanCode, pressed, timeMillis)
 
+    /** Sends a raw Linux evdev key, used by the root input reader. */
+    @JvmStatic fun setKeyboardEvdevKey(
+        evdevKey: Int,
+        pressed: Boolean,
+        timeMillis: Int,
+    ): Boolean = nativeSetKeyboardEvdevKey(evdevKey, pressed, timeMillis)
+
     @JvmStatic fun setCursorVisible(visible: Boolean) = nativeSetCursorVisible(visible)
 
 
@@ -91,6 +98,12 @@ object WaylandBridge {
     private external fun nativeSetKeyboardKey(
         keyCode: Int,
         scanCode: Int,
+        pressed: Boolean,
+        timeMillis: Int,
+    ): Boolean
+
+    private external fun nativeSetKeyboardEvdevKey(
+        evdevKey: Int,
         pressed: Boolean,
         timeMillis: Int,
     ): Boolean

@@ -15,6 +15,7 @@ import app.trierarch.runtime.RuntimeController
 import app.trierarch.input.InputModeController
 import app.trierarch.input.InputMode
 import app.trierarch.input.KeyboardPanelController
+import app.trierarch.input.RootKeyboardCapture
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
 import app.trierarch.ui.FloatingMenuAction
@@ -36,6 +37,7 @@ class MainActivity : AppCompatActivity() {
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
     private lateinit var floatingMenu: FloatingActionMenuView
+    private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
 
@@ -138,6 +140,7 @@ class MainActivity : AppCompatActivity() {
         }
         terminalView?.visibility = android.view.View.INVISIBLE
         setDisplayedSurface(DisplaySurface.WAYLAND)
+        rootKeyboard.start()
     }
 
     private fun showX11Display(onReady: () -> Unit, onFailure: (String) -> Unit) {
@@ -160,6 +163,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun showTerminal(surface: DisplaySurface) {
         x11Starting = false
+        rootKeyboard.stop()
         x11Host.hide()
         hideWaylandSurface()
         terminalView?.apply {
@@ -240,7 +244,18 @@ class MainActivity : AppCompatActivity() {
         setDisplayedSurface(displayedSurface)
     }
 
+    override fun onPause() {
+        rootKeyboard.stop()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (displayedSurface == DisplaySurface.WAYLAND) rootKeyboard.start()
+    }
+
     override fun onDestroy() {
+        rootKeyboard.stop()
         runtimeControlServer?.close()
         runtimeControlServer = null
         super.onDestroy()

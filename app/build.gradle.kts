@@ -44,6 +44,8 @@ val sessionSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/sess
 val droidspacesSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/droidspacesSupervisorAssets")
 val dmabufDeviceReportProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/dmabuf-device-report")
 val dmabufDeviceReportAssetsDirectory = layout.buildDirectory.dir("generated/dmabufDeviceReportAssets")
+val inputReaderProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/input-reader")
+val inputReaderAssetsDirectory = layout.buildDirectory.dir("generated/inputReaderAssets")
 
 val prepareWaylandImeBridgeSysroot by tasks.registering(Exec::class) {
     group = "build"
@@ -303,6 +305,28 @@ val packageDroidspacesSupervisorAssets by tasks.registering(Sync::class) {
     }
 }
 
+val buildInputReaderArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's root physical keyboard reader for arm64."
+    workingDir(inputReaderProjectDirectory)
+    commandLine("bash", "scripts/build-android.sh")
+    inputs.dir(inputReaderProjectDirectory.resolve("src"))
+    inputs.file(inputReaderProjectDirectory.resolve("scripts/build-android.sh"))
+    outputs.file(inputReaderProjectDirectory.resolve("dist/android/arm64-v8a/trierarch-input-reader"))
+}
+
+val packageInputReaderAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the root physical keyboard reader as an APK asset."
+    dependsOn(buildInputReaderArm64)
+    val binary = inputReaderProjectDirectory.resolve("dist/android/arm64-v8a/trierarch-input-reader")
+    from(binary) { into("input-reader/arm64-v8a") }
+    into(inputReaderAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing root physical keyboard reader." }
+    }
+}
+
 val buildDmabufDeviceReportArm64 by tasks.registering(Exec::class) {
     group = "build"
     description = "Builds Trierarch's Linux guest dma-buf device reporter for arm64."
@@ -380,6 +404,7 @@ android {
             sessionSupervisorAssetsDirectory.get().asFile,
             droidspacesSupervisorAssetsDirectory.get().asFile,
             dmabufDeviceReportAssetsDirectory.get().asFile,
+            inputReaderAssetsDirectory.get().asFile,
         )
     }
     packaging {
@@ -405,6 +430,7 @@ tasks.named("preBuild").configure {
         packageSessionSupervisorAssets,
         packageDroidspacesSupervisorAssets,
         packageDmabufDeviceReportAssets,
+        packageInputReaderAssets,
     )
 }
 
