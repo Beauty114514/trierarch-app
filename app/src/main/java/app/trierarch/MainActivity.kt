@@ -1,6 +1,7 @@
 package app.trierarch
 
 import android.os.Bundle
+import android.util.Log
 import android.util.TypedValue
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -122,6 +123,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showWaylandSurface() {
+        Log.i(TAG, "showWaylandSurface current=$displayedSurface wayland=${waylandSurface != null}")
         if (waylandSurface == null) {
             waylandSurface = WaylandSurfaceView(this, inputMode)
             terminalContainer.addView(
@@ -162,6 +164,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun showTerminal(surface: DisplaySurface) {
+        Log.i(TAG, "showTerminal target=$surface current=$displayedSurface")
         x11Starting = false
         rootKeyboard.stop()
         x11Host.hide()
@@ -245,12 +248,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onPause() {
+        Log.i(TAG, "onPause display=$displayedSurface")
         rootKeyboard.stop()
         super.onPause()
     }
 
     override fun onResume() {
         super.onResume()
+        Log.i(TAG, "onResume display=$displayedSurface")
         if (displayedSurface == DisplaySurface.WAYLAND) rootKeyboard.start()
     }
 
@@ -259,6 +264,10 @@ class MainActivity : AppCompatActivity() {
         runtimeControlServer?.close()
         runtimeControlServer = null
         super.onDestroy()
+    }
+
+    private companion object {
+        const val TAG = "TrierarchSurface"
     }
 
     private enum class DisplaySurface {

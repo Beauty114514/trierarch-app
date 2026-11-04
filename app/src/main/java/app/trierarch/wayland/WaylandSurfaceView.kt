@@ -7,6 +7,7 @@ import android.view.MotionEvent
 import android.view.KeyEvent
 import android.os.SystemClock
 import android.graphics.PixelFormat
+import android.util.Log
 import app.trierarch.input.PointerInputRouter
 import app.trierarch.input.PhysicalKeyEvent
 import app.trierarch.input.PhysicalKeyboardRouter
@@ -47,14 +48,18 @@ class WaylandSurfaceView(
     }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
+        Log.i(TAG, "surfaceCreated surface=${holder.surface.hashCode()} valid=${holder.surface.isValid}")
         attachHostSurface()
     }
 
     override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int) {
+        Log.i(TAG, "surfaceChanged surface=${holder.surface.hashCode()} ${width}x$height format=$format valid=${holder.surface.isValid}")
         updateOutputSize(width, height)
     }
 
-    override fun surfaceDestroyed(holder: SurfaceHolder) = Unit
+    override fun surfaceDestroyed(holder: SurfaceHolder) {
+        Log.i(TAG, "surfaceDestroyed surface=${holder.surface.hashCode()} valid=${holder.surface.isValid}")
+    }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         return inputRouter.onTouchEvent(this, event)
@@ -93,6 +98,7 @@ class WaylandSurfaceView(
     fun attachHostSurface() {
         val surface = holder.surface
         if (!surface.isValid) return
+        Log.i(TAG, "attachHostSurface surface=${surface.hashCode()} frame=${holder.surfaceFrame.width()}x${holder.surfaceFrame.height()}")
         WaylandBridge.attachSurface(surface)
         updateOutputSize(holder.surfaceFrame.width(), holder.surfaceFrame.height())
     }
@@ -122,4 +128,8 @@ class WaylandSurfaceView(
     }
 
     private fun Long.toWaylandTime(): Int = (this and 0x7fff_ffffL).toInt()
+
+    private companion object {
+        const val TAG = "TrierarchSurface"
+    }
 }
