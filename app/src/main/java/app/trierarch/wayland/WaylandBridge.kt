@@ -85,6 +85,14 @@ object WaylandBridge {
 
     @JvmStatic fun setCursorVisible(visible: Boolean) = nativeSetCursorVisible(visible)
 
+    /** Configure the production host Vulkan presenter. */
+    @JvmStatic fun configureVulkan(
+        adrenotoolsLibrary: String,
+        driverDir: String,
+        hookDir: String,
+        tmpDir: String,
+    ) = nativeConfigureVulkanProbe(adrenotoolsLibrary, driverDir, hookDir, tmpDir)
+
     /** Configure a one-shot import probe for the first real Wayland dma-buf. */
     @JvmStatic fun configureVulkanProbe(
         adrenotoolsLibrary: String,
