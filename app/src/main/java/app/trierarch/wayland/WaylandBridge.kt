@@ -85,6 +85,15 @@ object WaylandBridge {
 
     @JvmStatic fun setCursorVisible(visible: Boolean) = nativeSetCursorVisible(visible)
 
+    /** Development-only Vulkan presenter smoke test. */
+    @JvmStatic fun vulkanSelfTest(
+        surface: Surface,
+        adrenotoolsLibrary: String,
+        driverDir: String,
+        hookDir: String,
+        tmpDir: String,
+    ): Boolean = nativeVulkanSelfTest(surface, adrenotoolsLibrary, driverDir, hookDir, tmpDir)
+
 
     private external fun nativeStart(runtimeDirectory: String, bufferMode: String): Boolean
     private external fun nativeStop()
@@ -108,4 +117,12 @@ object WaylandBridge {
         timeMillis: Int,
     ): Boolean
     private external fun nativeSetCursorVisible(visible: Boolean)
+
+    private external fun nativeVulkanSelfTest(
+        surface: Surface,
+        adrenotoolsLibrary: String,
+        driverDir: String,
+        hookDir: String,
+        tmpDir: String,
+    ): Boolean
 }

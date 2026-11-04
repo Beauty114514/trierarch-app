@@ -99,6 +99,7 @@ class WaylandSurfaceView(
         val surface = holder.surface
         if (!surface.isValid) return
         Log.i(TAG, "attachHostSurface surface=${surface.hashCode()} frame=${holder.surfaceFrame.width()}x${holder.surfaceFrame.height()}")
+        VulkanSelfTest.runIfRequested(context, surface)
         WaylandBridge.attachSurface(surface)
         updateOutputSize(holder.surfaceFrame.width(), holder.surfaceFrame.height())
     }
