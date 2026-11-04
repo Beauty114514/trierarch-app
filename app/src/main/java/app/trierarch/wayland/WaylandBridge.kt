@@ -85,6 +85,14 @@ object WaylandBridge {
 
     @JvmStatic fun setCursorVisible(visible: Boolean) = nativeSetCursorVisible(visible)
 
+    /** Configure a one-shot import probe for the first real Wayland dma-buf. */
+    @JvmStatic fun configureVulkanProbe(
+        adrenotoolsLibrary: String,
+        driverDir: String,
+        hookDir: String,
+        tmpDir: String,
+    ) = nativeConfigureVulkanProbe(adrenotoolsLibrary, driverDir, hookDir, tmpDir)
+
     /** Development-only Vulkan presenter smoke test. */
     @JvmStatic fun vulkanSelfTest(
         surface: Surface,
@@ -117,6 +125,13 @@ object WaylandBridge {
         timeMillis: Int,
     ): Boolean
     private external fun nativeSetCursorVisible(visible: Boolean)
+
+    private external fun nativeConfigureVulkanProbe(
+        adrenotoolsLibrary: String,
+        driverDir: String,
+        hookDir: String,
+        tmpDir: String,
+    )
 
     private external fun nativeVulkanSelfTest(
         surface: Surface,

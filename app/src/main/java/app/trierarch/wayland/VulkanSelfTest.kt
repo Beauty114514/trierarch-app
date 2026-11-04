@@ -40,6 +40,14 @@ object VulkanSelfTest {
             )
         }.onFailure { Log.e(TAG, "Vulkan self-test threw", it) }.getOrDefault(false)
         Log.i(TAG, "Vulkan self-test result=$ok")
+        if (ok) {
+            WaylandBridge.configureVulkanProbe(
+                adrenotoolsLibrary = adrenotools.absolutePath,
+                driverDir = driverDir.absolutePath + "/",
+                hookDir = hookDir.absolutePath + "/",
+                tmpDir = tmpDir.absolutePath + "/",
+            )
+        }
         File(context.filesDir, TRIGGER).delete()
     }
 }
