@@ -12,6 +12,7 @@ Trierarch 仍处于早期阶段。每个问题单独一篇，并提供英文和�
 | Hyprland black screen in nested Wayland | [English](en/hyprland-aquamarine.md) | [中文](zh-CN/hyprland-aquamarine.md) |
 | Firefox crashes under PRoot | [English](en/firefox-proot.md) | [中文](zh-CN/firefox-proot.md) |
 | KDE Baloo / `tags:/` pop-ups | [English](en/baloo-tags.md) | [中文](zh-CN/baloo-tags.md) |
+| Plasma black screen from PipeWire and the realtime portal | [English](en/pipewire-rtkit.md) | [中文](zh-CN/pipewire-rtkit.md) |
 
 ## Language indexes
 

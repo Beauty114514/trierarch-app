@@ -6,5 +6,6 @@ page.
 - [Hyprland black screen in nested Wayland](hyprland-aquamarine.md)
 - [Firefox crashes under PRoot](firefox-proot.md)
 - [KDE Baloo / `tags:/` pop-ups](baloo-tags.md)
+- [Plasma black screen from PipeWire and the realtime portal](pipewire-rtkit.md)
 
 See the [bilingual issue index](../README.md) for the full list.
