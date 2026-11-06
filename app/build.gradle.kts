@@ -21,6 +21,10 @@ val waylandRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
     "trierarch-packages/wayland-host/dist/android/arm64-v8a",
 )
 val waylandJniLibsDirectory = layout.buildDirectory.dir("generated/waylandJniLibs")
+val adrenotoolsRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/adrenotools/dist/android/arm64-v8a",
+)
+val adrenotoolsJniLibsDirectory = layout.buildDirectory.dir("generated/adrenotoolsJniLibs")
 // VirGL is an executable host plus private shared libraries, so it is packaged
 // as APK assets and extracted to the app's private files directory at runtime.
 val virglRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
@@ -156,6 +160,22 @@ val packageWaylandArm64 by tasks.registering(Sync::class) {
         }
         check(waylandRuntimeDirectory.resolve("libffi.so").isFile) {
             "Missing libffi. Build trierarch-packages/wayland-host first."
+        }
+    }
+}
+
+val packageAdrenotoolsArm64 by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the AdrenoTools Turnip runtime for arm64."
+    notCompatibleWithConfigurationCache("AdrenoTools artifacts are copied from an external package workspace")
+    from(adrenotoolsRuntimeDirectory) {
+        include("*.so")
+        into("arm64-v8a")
+    }
+    into(adrenotoolsJniLibsDirectory)
+    doFirst {
+        check(adrenotoolsRuntimeDirectory.resolve("libadrenotools.so").isFile) {
+            "Missing AdrenoTools runtime. Populate trierarch-packages/adrenotools/dist/android/arm64-v8a."
         }
     }
 }
@@ -391,6 +411,7 @@ android {
             prootJniLibsDirectory.get().asFile,
             x11JniLibsDirectory.get().asFile,
             waylandJniLibsDirectory.get().asFile,
+            adrenotoolsJniLibsDirectory.get().asFile,
         )
         // SourceSet accepts a concrete directory, not Gradle's Provider wrapper.
         // `preBuild` explicitly depends on packageX11Assets below.
@@ -422,6 +443,7 @@ tasks.named("preBuild").configure {
         packageX11LibraryArm64,
         packageX11Assets,
         packageWaylandArm64,
+        packageAdrenotoolsArm64,
         packageVirglAssets,
         packagePipeWireAssets,
         packageGuestCompatibilityAssets,
