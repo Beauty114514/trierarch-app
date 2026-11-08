@@ -456,7 +456,8 @@ devices fail to start or show a black screen.
 - In X11/Wayland, the floating menu lets you:
   - return to the Trierarch shell;
   - show or hide the soft keyboard;
-  - switch the virtual keyboard between text and key-event modes.
+  - switch the virtual keyboard between text and key-event modes;
+  - choose whether the soft keyboard resizes the desktop or overlays it.
 - External mice, keyboards and touch input are forwarded to the visible session.
 - IME input on the desktop is handled by Trierarch's IME bridge.
 

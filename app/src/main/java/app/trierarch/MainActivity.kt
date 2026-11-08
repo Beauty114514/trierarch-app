@@ -4,7 +4,9 @@ import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
@@ -41,9 +43,16 @@ class MainActivity : AppCompatActivity() {
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
+    private val uiPreferences by lazy {
+        getSharedPreferences("trierarch-ui", MODE_PRIVATE)
+    }
+    private var desktopImeMode = DesktopImeMode.OVERLAY
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        desktopImeMode = DesktopImeMode.from(
+            uiPreferences.getString(KEY_DESKTOP_IME_MODE, null),
+        )
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             hide(WindowInsetsCompat.Type.statusBars())
@@ -109,6 +118,7 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         setContentView(terminalContainer)
+        applyImeMode(displayedSurface)
         ViewCompat.requestApplyInsets(terminalContainer)
 
         attachTerminalSession()
@@ -185,6 +195,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setDisplayedSurface(surface: DisplaySurface) {
         displayedSurface = surface
+        applyImeMode(surface)
         floatingMenu.setActions(actionsFor(surface))
     }
 
@@ -193,7 +204,12 @@ class MainActivity : AppCompatActivity() {
         DisplaySurface.RUNTIME_SHELL -> listOf(returnToShellAction())
         DisplaySurface.X11,
         DisplaySurface.WAYLAND
-        -> listOf(returnToShellAction(), keyboardAction(), virtualKeyboardModeAction())
+        -> listOf(
+            returnToShellAction(),
+            keyboardAction(),
+            virtualKeyboardModeAction(),
+            desktopImeModeAction(),
+        )
     }
 
     private fun returnToShellAction() = FloatingMenuAction(
@@ -237,6 +253,60 @@ class MainActivity : AppCompatActivity() {
         ) { switchVirtualKeyboardMode() }
     }
 
+    private fun desktopImeModeAction() = FloatingMenuAction(
+        id = "desktop-ime-mode",
+        icon = if (desktopImeMode == DesktopImeMode.OVERLAY) {
+            R.drawable.ic_floating_action_ime_overlay
+        } else {
+            R.drawable.ic_floating_action_ime_resize
+        },
+        contentDescription = if (desktopImeMode == DesktopImeMode.OVERLAY) {
+            "Keyboard overlays the desktop; switch to resizing it"
+        } else {
+            "Keyboard resizes the desktop; switch to overlaying it"
+        },
+    ) {
+        toggleDesktopImeMode()
+    }
+
+    private fun toggleDesktopImeMode() {
+        desktopImeMode = when (desktopImeMode) {
+            DesktopImeMode.OVERLAY -> DesktopImeMode.RESIZE
+            DesktopImeMode.RESIZE -> DesktopImeMode.OVERLAY
+        }
+        uiPreferences.edit()
+            .putString(KEY_DESKTOP_IME_MODE, desktopImeMode.value)
+            .apply()
+        setDisplayedSurface(displayedSurface)
+        Toast.makeText(
+            this,
+            if (desktopImeMode == DesktopImeMode.OVERLAY) {
+                "Keyboard now overlays the desktop"
+            } else {
+                "Keyboard now resizes the desktop"
+            },
+            Toast.LENGTH_SHORT,
+        ).show()
+    }
+
+    private fun applyImeMode(surface: DisplaySurface) {
+        val mode = when (surface) {
+            DisplaySurface.X11,
+            DisplaySurface.WAYLAND -> desktopImeMode
+            else -> DesktopImeMode.RESIZE
+        }
+        window.setSoftInputMode(
+            when (mode) {
+                DesktopImeMode.OVERLAY -> WindowManager.LayoutParams.SOFT_INPUT_ADJUST_NOTHING
+                DesktopImeMode.RESIZE -> WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE
+            },
+        )
+        window.decorView.post {
+            ViewCompat.requestApplyInsets(window.decorView)
+            window.decorView.requestLayout()
+        }
+    }
+
     private fun switchVirtualKeyboardMode() {
         when (displayedSurface) {
             DisplaySurface.X11 -> x11Host.resetInputModeState()
@@ -266,8 +336,19 @@ class MainActivity : AppCompatActivity() {
         super.onDestroy()
     }
 
+    private enum class DesktopImeMode(val value: String) {
+        OVERLAY("overlay"),
+        RESIZE("resize");
+
+        companion object {
+            fun from(value: String?): DesktopImeMode =
+                values().firstOrNull { it.value == value } ?: OVERLAY
+        }
+    }
+
     private companion object {
         const val TAG = "TrierarchSurface"
+        const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
     }
 
     private enum class DisplaySurface {
