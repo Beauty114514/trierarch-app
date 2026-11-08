@@ -17,7 +17,7 @@ flowchart TB
         RC["RuntimeController + RuntimeControlServer"]
         VM["DefaultTerminalViewModel"]
         PTY["NativePtySession (JNI)"]
-        WH["wayland-host<br/>Wayland server + AHB scanout"]
+        WH["wayland-host<br/>Wayland server + Vulkan/EGL presenter"]
         X11["X11 service (:x11)<br/>Lorie / libXlorie.so"]
         VH["virgl-host<br/>vtest server 进程"]
         PH["pipewire-host<br/>PipeWire + AAudio sink"]
@@ -123,16 +123,27 @@ Binder 把每个客户端的 Unix socket fd 传回主进程。Guest 应用连接
 Guest 启动 KWin 或 Hyprland 等嵌套合成器，通过 Unix socket 连到 host。Host
 显示 guest 合成器的 buffer，并转发输入。
 
-### 图形
+### 渲染与图形
+
+Guest 应用通常走三种 GPU 路径之一：
 
 - **llvmpipe**：guest 软件渲染，兼容路径；
 - **VirGL**：host 运行 VirGL/vtest server，guest Mesa 使用 virpipe；
-  Wayland 路径下，合成器输出通过 host 的 token/AHB 路径承载；
 - **Adreno**：支持的 Qualcomm 设备上，guest 使用 freedreno/kgsl 直接走设备
   GPU，仅 Wayland。
 
-GPU 栈跨越 App、host native 进程和 guest Mesa；任何一层失败都可能表现成黑屏或
-软件回退。
+Wayland host 自己还有一条独立的显示路径：
+
+- Android `SurfaceView` → Vulkan swapchain（主路径）或 EGL fallback；
+- Vulkan presenter 按真实 pitch、offset 和 modifier 导入 guest 合成器的
+  dma-buf，并缓存导入的 `VkImage`；
+- 按 stacking order 合成 mapped surface tree（包括 subsurface），并按 hotspot
+  绘制客户端的 cursor surface；
+- Android 尺寸和方向变化由 fit/letterbox transform 和 Vulkan pre-rotation 处理；
+- guest buffer 只有在 host GPU fence 完成后才释放。
+
+旧的 tvg/AHB scanout 路径保留为 fallback，不再是主渲染路径。GPU 栈跨越 App、
+host native 进程和 guest Mesa；任何一层失败都可能表现成黑屏或软件回退。
 
 ### 音频
 
@@ -226,6 +237,10 @@ droidspaces --name=<name> stop
 先确认显示 host 有没有产帧。如果 host renderer 的 `commits` 是 0，说明 guest
 合成器没有提交；如果有 commits 但画面不对，问题在 buffer/合成路径，不在 PTY。
 
+如果静态桌面正常，只有移动中的窗口撕裂或闪烁，可能是 guest 合成器提交了
+buffer，但没有向 host 暴露可用的 acquire fence。这是同步限制，不是 PTY 或输入
+问题；见[兼容性矩阵](compatibility.zh-CN.md)和[已知问题](known-issues/README.md)。
+
 ## 6. 设计边界
 
 - Trierarch 不打包 guest 发行版；rootfs 或 DroidSpaces 容器由用户提供；
@@ -243,3 +258,8 @@ droidspaces --name=<name> stop
 - [已知问题](known-issues/README.md)
 - [中文手册](zh-CN/README.md)
 - [English manual](en/README.md)
+
+---
+
+最后核对：`trierarch-app` `506bbf0`、`trierarch-packages` `44ea463`
+（2026-11-08）。

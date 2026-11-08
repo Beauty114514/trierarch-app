@@ -18,7 +18,7 @@ flowchart TB
         RC["RuntimeController + RuntimeControlServer"]
         VM["DefaultTerminalViewModel"]
         PTY["NativePtySession (JNI)"]
-        WH["wayland-host<br/>Wayland server + AHB scanout"]
+        WH["wayland-host<br/>Wayland server + Vulkan/EGL presenter"]
         X11["X11 service (:x11)<br/>Lorie / libXlorie.so"]
         VH["virgl-host<br/>vtest server process"]
         PH["pipewire-host<br/>PipeWire + AAudio sink"]
@@ -133,18 +133,31 @@ carries the final surface. The guest starts a nested compositor such as KWin or
 Hyprland, which connects to the host over a Unix socket. The host displays the
 guest compositor's buffers and forwards input.
 
-### Graphics
+### Rendering and graphics
+
+Guest applications usually use one of three GPU paths:
 
 - **llvmpipe** — guest software rendering. It is the compatibility path.
 - **VirGL** — the host runs the VirGL/vtest server; the guest Mesa uses the
-  virpipe driver. On the Wayland path, the compositor's output is carried
-  through the host token/AHB path.
+  virpipe driver.
 - **Adreno** — on supported Qualcomm devices, the guest uses freedreno/kgsl and
   renders directly through the device GPU. This path is Wayland-only.
 
-The GPU stack is split across the app, the host native process and the guest
-Mesa. A failure at any one layer can look like a black screen or a software
-fallback.
+The Wayland host has a separate display path:
+
+- Android `SurfaceView` → Vulkan swapchain (primary) or EGL fallback;
+- the Vulkan presenter imports the guest compositor's dma-bufs with their real
+  pitch, offset and modifier, and caches the imported `VkImage`s;
+- it composes the mapped surface tree, including subsurfaces, in stacking
+  order, and renders client cursor surfaces with their hotspot;
+- Android size and orientation changes are handled by a fit/letterbox transform
+  and Vulkan pre-rotation;
+- guest buffers are released only after the host GPU fence completes.
+
+The older tvg/AHB scanout path remains as a fallback; it is not the primary
+renderer. The GPU stack is split across the app, the host native process and the
+guest Mesa. A failure at any one layer can look like a black screen or a
+software fallback.
 
 ### Audio
 
@@ -244,6 +257,12 @@ host renderer shows zero `commits`, the guest compositor is not presenting; if
 it shows commits but the screen is wrong, the problem is in the buffer or
 composition path, not in the PTY.
 
+If the static desktop looks correct but only a moving window tears or flickers,
+the guest compositor may be presenting that buffer without exposing a usable
+acquire fence to the host. That is a synchronization limitation, not a PTY or
+input problem; see [compatibility](compatibility.en.md) and
+[known issues](known-issues/README.md).
+
 ## 6. Design boundaries
 
 - Trierarch does not bundle the guest distribution. The user provides a rootfs
@@ -264,3 +283,8 @@ composition path, not in the PTY.
 - [Known issues](known-issues/README.md)
 - [English manual](en/README.md)
 - [中文手册](zh-CN/README.md)
+
+---
+
+Last verified against `trierarch-app` `506bbf0` and `trierarch-packages`
+`44ea463` (2026-11-08).
