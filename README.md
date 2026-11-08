@@ -45,6 +45,16 @@ variables and half-configured desktops into a managed session:
 It is built for people who want a small, local Linux machine on a device they
 already carry — not a remote desktop and not a toy terminal.
 
+## Screenshots
+
+Phone screenshots from the current build, landscape:
+
+![Arch Linux KDE Plasma Wayland desktop on Trierarch](docs/screenshots/arch-droidspace-plasma-wayland-phone.jpg)
+
+| Arch Linux + Hyprland | Kali Linux + Plasma |
+| --- | --- |
+| ![Arch Linux Hyprland on Trierarch](docs/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Kali Linux Plasma on Trierarch](docs/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
+
 ## What you can run
 
 | Runtime | Root | Best for |

@@ -38,6 +38,16 @@ Hyprland 这类桌面/窗口管理器，保留原生特效、动画和窗口管�
 
 它面向的是想要一台随身、本地 Linux 机器的人，而不是远程桌面或玩具终端。
 
+## 截图
+
+当前构建的手机横屏截图：
+
+![Trierarch 上的 Arch Linux KDE Plasma Wayland 桌面](docs/screenshots/arch-droidspace-plasma-wayland-phone.jpg)
+
+| Arch Linux + Hyprland | Kali Linux + Plasma |
+| --- | --- |
+| ![Trierarch 上的 Arch Linux Hyprland](docs/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Trierarch 上的 Kali Linux Plasma](docs/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
+
 ## 可以运行什么
 
 | 运行环境 | Root | 适合 |
