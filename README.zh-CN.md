@@ -12,6 +12,23 @@ X11 和 Wayland 桌面，并通过 PRoot、chroot、DroidSpaces 三种方式运�
 设备上；Trierarch 负责显示、输入、音频、GPU 路径和会话生命周期这些容易出问题
 的部分。
 
+## 从这里开始
+
+第一次使用 Trierarch？按顺序阅读教程：
+
+1. [Trierarch CLI](docs/zh-CN/tutorials/01-cli.md)
+2. [部署运行环境](docs/zh-CN/tutorials/02-deploy.md)
+3. [Profile 字段](docs/zh-CN/tutorials/03-profile-fields.md)
+4. [硬件加速资产](docs/zh-CN/tutorials/04-hardware-acceleration.md)
+5. [桌面](docs/zh-CN/tutorials/05-desktops.md)
+6. [运行和选择样例](docs/zh-CN/tutorials/06-run.md)
+
+参考：[文档索引](docs/zh-CN/README.md) ·
+[兼容性矩阵](docs/zh-CN/matrices.md) ·
+[English documentation](docs/en/README.md)。
+
+---
+
 ## Trierarch 的重制版
 
 这是 **Trierarch 的重制版**。早期 Trierarch 的代码和早期优化笔记已经被重写，
@@ -42,11 +59,11 @@ Hyprland 这类桌面/窗口管理器，保留原生特效、动画和窗口管�
 
 当前构建的手机横屏截图：
 
-![Trierarch 上的 Arch Linux KDE Plasma Wayland 桌面](docs/screenshots/arch-droidspace-plasma-wayland-phone.jpg)
+![Trierarch 上的 Arch Linux KDE Plasma Wayland 桌面](docs/assets/screenshots/arch-droidspace-plasma-wayland-phone.jpg)
 
 | Arch Linux + Hyprland | Kali Linux + Plasma |
 | --- | --- |
-| ![Trierarch 上的 Arch Linux Hyprland](docs/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Trierarch 上的 Kali Linux Plasma](docs/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
+| ![Trierarch 上的 Arch Linux Hyprland](docs/assets/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Trierarch 上的 Kali Linux Plasma](docs/assets/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
 
 ## 可以运行什么
 
@@ -101,11 +118,12 @@ VirGL 类图形和长期稳定的桌面，但它不是这个项目存在的理�
 **已 root 的设备能更完整地使用 Trierarch**：DroidSpaces 和 chroot 可以让 guest
 直接使用 Adreno，Plasma/Hyprland 的 Wayland 特效和完整 GPU 桌面路径都可用。
 
-**未 root 的设备只能用 PRoot** 提供无 root 的 Linux 用户空间。终端、软件渲染
-的 Wayland/Sway，以及宿主侧 VirGL 加速的 X11 可用。PRoot Wayland 无法
-初始化 GPU 合成器，因为 Android SELinux 拒绝 App 访问 `/dev/dri`；当前测试的
-Wayland session 里，桌面和应用都回退到软件渲染。具体测试情况见
-[兼容性矩阵](docs/compatibility.zh-CN.md)。
+**未 root 的设备只能用 PRoot** 提供无 root 的 Linux 用户空间。PRoot 的 Linux
+环境并不完整，运行完整桌面或窗口管理器会有很多限制，往往需要额外的兼容 patch，
+目前仍在推进中。现阶段终端、软件渲染的 Wayland/Sway、宿主侧 VirGL 加速的 X11
+等路径可用；KDE Plasma Wayland 是带额外组件的开发者预览。具体哪些组合已经测试、
+哪些仍有限制，见[兼容性矩阵](docs/zh-CN/matrices.md)；以矩阵为准，不要简单假定
+某个桌面一定能用或一定不能用。
 
 ## 输入、音频和存储
 
@@ -125,27 +143,6 @@ Wayland session 里，桌面和应用都回退到软件渲染。具体测试情�
   会被停止。
 
 Trierarch 不会停止在它附着之前就已经运行的容器，只清理自己启动的东西。
-
-## 快速开始
-
-1. 安装 Trierarch APK；
-2. 打开 App，进入内置 shell；
-3. 运行 `trierarch --help`；
-4. `trierarch --create my-profile` 创建 profile；
-5. `trierarch --config my-profile` 编辑；
-6. `trierarch --run my-profile` 启动。
-
-第一个 profile 可以是 PRoot 环境、chroot rootfs，或已有的 DroidSpaces 容器。
-
-## 系统要求
-
-- Android 7.0 或更新；
-- **推荐硬件：Qualcomm Snapdragon + Adreno 图形**。其他 SoC 可以跑核心路径，
-  但 GPU 驱动相对不完善；
-- PRoot：不需要 root；
-- chroot：可用的 `su`；
-- DroidSpaces：root、DroidSpaces 运行时和兼容的内核；
-- 一个可用的 rootfs 或 DroidSpaces 容器。
 
 ## 项目状态
 
@@ -193,8 +190,8 @@ Trierarch 建立在很多上游项目之上，并不拥有它们的代码、二�
 - KDE Plasma/KWin、Hyprland/aquamarine、XFCE 和各 Linux 发行版属于 guest
   环境，由用户提供的 rootfs 或容器提供，Trierarch 不打包它们。
 - 精确 pin、补丁和来源说明见各包的 `UPSTREAM.md` 以及
-  [Termux 跟踪](docs/upstream-termux-terminal.md) 和
-  [Termux:X11 跟踪](docs/upstream-termux-x11.md)。
+  [Termux 跟踪](docs/zh-CN/upstream/termux-terminal.md) 和
+  [Termux:X11 跟踪](docs/zh-CN/upstream/termux-x11.md)。
 - 部分组件是 copyleft。重新分发二进制时请保留版权/许可证声明并遵守对应
   许可证；Trierarch 不会重新授权它们。
 
@@ -213,14 +210,3 @@ Trierarch 以 **GNU General Public License version 3** 发布，全文见
 
 完整的组件归属、固定版本和源码位置见 [THIRD_PARTY.md](THIRD_PARTY.md)；
 简短的分发声明见 [NOTICE](NOTICE)。
-
-## 文档
-
-- [中文手册](docs/zh-CN/README.md) — 安装、配置、运行环境、显示、图形、音频、
-  生命周期和故障排查；
-- [English manual](docs/en/README.md)；
-- [架构说明](docs/architecture.zh-CN.md) — 会话生命周期和组件边界；
-- [兼容性矩阵](docs/compatibility.zh-CN.md) — 已测试的运行环境、桌面和
-  renderer 组合；
-- [文档索引](docs/README.md)；
-- [已知问题](docs/known-issues/README.md) — 每个问题单独一篇，中英文都有。

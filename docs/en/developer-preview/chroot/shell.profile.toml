@@ -1,0 +1,7 @@
+id = "arch-chroot-terminal"
+runtime = "chroot"
+rootfs = "/data/local/my-rootfs"
+shell = "/bin/bash"
+
+[display]
+type = "none"

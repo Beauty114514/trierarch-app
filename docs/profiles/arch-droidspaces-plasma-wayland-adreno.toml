@@ -1,0 +1,19 @@
+# Sample only: replace id/container/user with your device values.
+id = "arch-droidspaces-plasma-wayland-adreno"
+name = "Arch DroidSpaces Plasma Wayland (Adreno)"
+runtime = "droidspaces"
+container = "Arch"
+user = "beauty"
+
+[display]
+type = "wayland"
+
+[launch]
+argv = ["env", "DISABLE_RTKIT=1", "dbus-run-session", "--", "startplasma-wayland"]
+
+[graphics]
+renderer = "adreno"
+qt_quick_backend = "auto"
+
+[compat]
+udev_monitor = "auto"

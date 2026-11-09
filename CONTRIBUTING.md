@@ -6,8 +6,8 @@ documentation and comments are welcome where they help users.
 
 ## Before you start
 
-- Read the [documentation index](docs/README.md) and
-  [known issues](docs/known-issues/README.md).
+- Read the [documentation index](docs/en/README.md) and
+  [known issues](docs/en/README.md#known-issues).
 - Search existing issues before opening a new one.
 - For a bug, use the **Bug report** form; it asks for the device, runtime,
   display, renderer and logs needed to reproduce the problem.
@@ -73,8 +73,8 @@ renderer, record what you tested:
 - whether effects were enabled;
 - the relevant logs or a short result.
 
-Update [docs/compatibility.en.md](docs/compatibility.en.md) and
-[docs/compatibility.zh-CN.md](docs/compatibility.zh-CN.md) when you have a
+Update [docs/en/matrices.md](docs/en/matrices.md) and
+[docs/zh-CN/matrices.md](docs/zh-CN/matrices.md) when you have a
 result worth recording. Mark untested combinations as untested; do not turn a
 missing result into a failure.
 
@@ -97,11 +97,13 @@ missing result into a failure.
 Product documentation is bilingual:
 
 - English: `README.md`, `docs/en/`,
-  `docs/compatibility.en.md`;
+  `docs/en/matrices.md`;
 - Chinese: `README.zh-CN.md`, `docs/zh-CN/`,
-  `docs/compatibility.zh-CN.md`.
+  `docs/zh-CN/matrices.md`.
 
-Known issues are one file per problem, with separate `en/` and `zh-CN/` trees.
+Known issues are one file per runtime and problem, with separate `en/` and
+`zh-CN/` trees. Documentation for unverified or preview functionality belongs
+under `developer-preview/`, not under `tutorials/` or `known-issues/`.
 If you add a product-level behavior, update both languages or clearly mark the
 translation as pending.
 

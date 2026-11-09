@@ -1,0 +1,13 @@
+id = "arch-chroot-x11"
+runtime = "chroot"
+rootfs = "/data/local/my-rootfs"
+shell = "/bin/bash"
+
+[display]
+type = "x11"
+
+[launch]
+argv = ["startxfce4"]
+
+[graphics]
+renderer = "llvmpipe"

@@ -13,6 +13,23 @@ runs on the device you are already holding, and Trierarch handles the parts
 that normally make that experience painful: display surfaces, input, audio,
 GPU paths, and session cleanup.
 
+## Start here
+
+New to Trierarch? Read the tutorial in order:
+
+1. [Trierarch CLI](docs/en/tutorials/01-cli.md)
+2. [Deploy a runtime](docs/en/tutorials/02-deploy.md)
+3. [Profile fields](docs/en/tutorials/03-profile-fields.md)
+4. [Hardware acceleration](docs/en/tutorials/04-hardware-acceleration.md)
+5. [Desktops](docs/en/tutorials/05-desktops.md)
+6. [Run and choose a sample](docs/en/tutorials/06-run.md)
+
+Reference: [Documentation index](docs/en/README.md) ·
+[Compatibility matrix](docs/en/matrices.md) ·
+[中文文档](docs/zh-CN/README.md).
+
+---
+
 ## A Trierarch remake
 
 This repository is the **current, rewritten Trierarch**. The earlier Trierarch
@@ -49,11 +66,11 @@ already carry — not a remote desktop and not a toy terminal.
 
 Phone screenshots from the current build, landscape:
 
-![Arch Linux KDE Plasma Wayland desktop on Trierarch](docs/screenshots/arch-droidspace-plasma-wayland-phone.jpg)
+![Arch Linux KDE Plasma Wayland desktop on Trierarch](docs/assets/screenshots/arch-droidspace-plasma-wayland-phone.jpg)
 
 | Arch Linux + Hyprland | Kali Linux + Plasma |
 | --- | --- |
-| ![Arch Linux Hyprland on Trierarch](docs/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Kali Linux Plasma on Trierarch](docs/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
+| ![Arch Linux Hyprland on Trierarch](docs/assets/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Kali Linux Plasma on Trierarch](docs/assets/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
 
 ## What you can run
 
@@ -121,11 +138,13 @@ can give the guest direct Adreno access, so Plasma/Hyprland Wayland effects and
 the full GPU desktop path are available.
 
 An **unrooted device is limited to PRoot** for a rootless Linux userspace.
-Terminal, software Wayland/Sway, and X11 with host-side VirGL hardware
-acceleration work. PRoot Wayland cannot initialize a GPU compositor because
-Android SELinux denies the app access to `/dev/dri`; in the tested Wayland
-sessions the desktop and applications fall back to software rendering. See the
-[compatibility matrix](docs/compatibility.en.md) for the exact tested cases.
+PRoot's Linux environment is not complete: running a full desktop or window
+manager has substantial limitations and often needs extra compatibility patches,
+and development is still in progress. Some terminal, software Wayland/Sway and
+host-side VirGL X11 paths work today; KDE Plasma Wayland is a developer preview
+with additional components. The exact tested combinations are listed in the
+[compatibility matrix](docs/en/matrices.md); treat the matrix as the source of
+truth rather than assuming every desktop works or fails.
 
 ## Input, audio and storage
 
@@ -150,28 +169,6 @@ orphaned container behind is not.
 
 Containers that were already running before Trierarch are left alone. Trierarch
 only cleans up what it started.
-
-## Quick start
-
-1. Install the Trierarch APK.
-2. Open the app; it starts in the built-in shell.
-3. Run `trierarch --help`.
-4. Create a profile with `trierarch --create my-profile`.
-5. Edit it with `trierarch --config my-profile`.
-6. Start it with `trierarch --run my-profile`.
-
-The first profile can be a PRoot environment, a chroot rootfs, or an existing
-DroidSpaces container.
-
-## Requirements
-
-- Android 7.0 or newer.
-- **Recommended hardware:** Qualcomm Snapdragon with Adreno graphics. Other
-  SoCs work for the core paths, but have less complete GPU drivers.
-- PRoot: no root required.
-- chroot: a supported `su` provider.
-- DroidSpaces: root, the DroidSpaces runtime, and a compatible kernel.
-- A rootfs or DroidSpaces container of your choice.
 
 ## Project status
 
@@ -227,8 +224,8 @@ Additional notes:
   user's rootfs or container. Trierarch supports them but does not bundle them.
 - Exact pins, patch series and provenance notes live in the package
   `UPSTREAM.md` files and in
-  [Termux terminal tracking](docs/upstream-termux-terminal.md) and
-  [Termux:X11 tracking](docs/upstream-termux-x11.md).
+  [Termux terminal tracking](docs/en/upstream/termux-terminal.md) and
+  [Termux:X11 tracking](docs/en/upstream/termux-x11.md).
 - Some of these components are copyleft. If you redistribute binaries, keep
   their copyright/license notices and comply with their licenses; Trierarch
   does not relicense them.
@@ -251,17 +248,3 @@ package `UPSTREAM.md` files. Trierarch does not relicense them. In particular:
 The formal component-by-component attribution, pinned revisions and source
 locations are in [THIRD_PARTY.md](THIRD_PARTY.md). The short redistribution
 notice is [NOTICE](NOTICE).
-
-## Documentation
-
-- [English manual](docs/en/README.md) — installation, profiles, runtimes,
-  displays, graphics, audio, lifecycle, troubleshooting.
-- [中文手册](docs/zh-CN/README.md) — 安装、配置、运行环境、显示、图形、音频、
-  生命周期和故障排查。
-- [Architecture](docs/architecture.en.md) — session lifecycle and component
-  boundaries.
-- [Compatibility matrix](docs/compatibility.en.md) — tested runtime, desktop
-  and renderer combinations.
-- [Documentation index](docs/README.md)
-- [Known issues](docs/known-issues/README.md) — common problems, workarounds and
-  current status.

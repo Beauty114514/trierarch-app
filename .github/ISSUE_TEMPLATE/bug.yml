@@ -10,7 +10,7 @@ body:
         please include enough information to reproduce the problem.
 
         Before filing, search existing issues and the known-issues pages:
-        https://github.com/Beauty114514/trierarch-app/tree/main/docs/known-issues
+        https://github.com/Beauty114514/trierarch-app/blob/main/docs/en/README.md#known-issues
 
         Do not include passwords, tokens, SSH keys or personal files in logs.
 

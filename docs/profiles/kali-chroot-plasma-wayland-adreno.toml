@@ -1,0 +1,19 @@
+# Sample only: replace the chroot rootfs with your own path.
+id = "kali-chroot-plasma-wayland-adreno"
+name = "Kali chroot Plasma Wayland (Adreno)"
+runtime = "chroot"
+rootfs = "/data/local/nhsystem/kalifs"
+shell = "/usr/bin/zsh"
+
+[display]
+type = "wayland"
+
+[launch]
+argv = ["env", "DISABLE_RTKIT=1", "KWIN_COMPOSE=O2", "KWIN_RENDER_NODES=/dev/dri/renderD128", "dbus-run-session", "--", "startplasma-wayland"]
+
+[graphics]
+renderer = "adreno"
+qt_quick_backend = "auto"
+
+[compat]
+udev_monitor = "auto"

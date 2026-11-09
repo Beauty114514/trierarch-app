@@ -1,0 +1,18 @@
+# Sample only: replace id/container/user with your device values.
+id = "arch-droidspaces-hyprland-wayland-adreno"
+name = "Arch DroidSpaces Hyprland Wayland (Adreno)"
+runtime = "droidspaces"
+container = "Arch"
+user = "beauty"
+
+[display]
+type = "wayland"
+
+[launch]
+argv = ["start-hyprland"]
+
+[graphics]
+renderer = "adreno"
+
+[compat]
+udev_monitor = "auto"
