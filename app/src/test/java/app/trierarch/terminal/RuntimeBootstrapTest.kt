@@ -14,8 +14,8 @@ class RuntimeBootstrapTest {
             return "/virgl"
         }
 
-        override fun startWayland(bufferMode: String) {
-            calls += "wayland:$bufferMode"
+        override fun startWayland(bufferMode: String, desktopScalePercent: Int) {
+            calls += "wayland:$bufferMode:$desktopScalePercent"
         }
 
         override fun startPipeWire(): String {
@@ -60,11 +60,13 @@ class RuntimeBootstrapTest {
         bufferMode: String = ProfileStore.BUFFER_DMABUF,
         audioBackend: String = ProfileStore.AUDIO_PIPEWIRE,
         installGbmShim: Boolean = true,
+        desktopScalePercent: Int = 100,
     ) = RuntimeLaunchSpec(
         profileId = "profile",
         display = display,
         renderer = renderer,
         bufferMode = bufferMode,
+        desktopScalePercent = desktopScalePercent,
         audioBackend = audioBackend,
         enablesUdevMonitorShim = true,
         installGbmShim = installGbmShim,
@@ -78,7 +80,7 @@ class RuntimeBootstrapTest {
         val resources = bootstrap.prepareHosts(spec())
 
         assertEquals(
-            listOf("virgl:false", "wayland:dmabuf", "pipewire", "gbm:/wayland"),
+            listOf("virgl:false", "wayland:dmabuf:100", "pipewire", "gbm:/wayland"),
             hosts.calls,
         )
         assertEquals("/virgl", resources.virglRuntimeDirectory)
@@ -93,7 +95,7 @@ class RuntimeBootstrapTest {
 
         bootstrap.prepareHosts(spec(installGbmShim = false))
 
-        assertEquals(listOf("virgl:false", "wayland:dmabuf", "pipewire"), hosts.calls)
+        assertEquals(listOf("virgl:false", "wayland:dmabuf:100", "pipewire"), hosts.calls)
     }
 
     @Test

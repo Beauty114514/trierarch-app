@@ -56,6 +56,7 @@ class ProfileStore(context: Context) {
         require(display == DISPLAY_NONE || display == DISPLAY_X11 || display == DISPLAY_WAYLAND) {
             "display.type must be '$DISPLAY_NONE', '$DISPLAY_X11', or '$DISPLAY_WAYLAND'"
         }
+        desktopScale(parsed, display)
         val graphics = graphicsProfile(parsed, display)
         compatibilityProfile(parsed)
         val audioBackend = audioBackend(parsed)
@@ -137,6 +138,7 @@ class ProfileStore(context: Context) {
             rootfs = rootfs,
             shell = shell,
             display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE },
+            desktopScale = desktopScale(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             launchArgv = launchArgv(parsed),
             graphics = graphicsProfile(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             compatibility = compatibilityProfile(parsed),
@@ -164,6 +166,7 @@ class ProfileStore(context: Context) {
             rootfs = rootfs,
             shell = shell,
             display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE },
+            desktopScale = desktopScale(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             launchArgv = launchArgv(parsed),
             graphics = graphicsProfile(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             compatibility = compatibilityProfile(parsed),
@@ -182,6 +185,7 @@ class ProfileStore(context: Context) {
             container = required(parsed.getString("container"), "container"),
             user = parsed.getString("user")?.trim().takeUnless { it.isNullOrEmpty() } ?: "root",
             display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE },
+            desktopScale = desktopScale(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             launchArgv = launchArgv(parsed),
             graphics = graphicsProfile(parsed, parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE }),
             compatibility = compatibilityProfile(parsed),
@@ -197,6 +201,26 @@ class ProfileStore(context: Context) {
 
     private fun required(value: String?, key: String): String = value?.trim().takeUnless { it.isNullOrEmpty() }
         ?: throw IllegalArgumentException("$key is required")
+
+    /**
+     * A fixed guest-side desktop scale.  It is intentionally independent of
+     * the host presentation transform: the Android surface and output mode
+     * stay untouched, while the guest compositor sees a smaller logical
+     * output and scales its own UI.
+     */
+    private fun desktopScale(parsed: TomlParseResult, display: String): Int {
+        if (!parsed.contains("display.desktop_scale")) return DESKTOP_SCALE_DEFAULT
+        require(display == DISPLAY_WAYLAND) {
+            "display.desktop_scale is only supported when display.type is '$DISPLAY_WAYLAND'"
+        }
+        val value = parsed.getLong("display.desktop_scale")
+            ?: throw IllegalArgumentException("display.desktop_scale must be an integer percent")
+        val percent = value.toInt()
+        require(value == percent.toLong() && percent in DESKTOP_SCALES) {
+            "display.desktop_scale must be one of ${DESKTOP_SCALES.joinToString()}"
+        }
+        return percent
+    }
 
     /**
      * Rendering policy is deliberately small for now.  The app resolves it to
@@ -286,6 +310,7 @@ class ProfileStore(context: Context) {
         val rootfs: File,
         val shell: String,
         val display: String,
+        val desktopScale: Int,
         val launchArgv: List<String>?,
         val graphics: GraphicsProfile,
         val compatibility: CompatibilityProfile,
@@ -297,6 +322,7 @@ class ProfileStore(context: Context) {
         val rootfs: String,
         val shell: String,
         val display: String,
+        val desktopScale: Int,
         val launchArgv: List<String>?,
         val graphics: GraphicsProfile,
         val compatibility: CompatibilityProfile,
@@ -308,6 +334,7 @@ class ProfileStore(context: Context) {
         val container: String,
         val user: String,
         val display: String,
+        val desktopScale: Int,
         val launchArgv: List<String>?,
         val graphics: GraphicsProfile,
         val compatibility: CompatibilityProfile,
@@ -401,6 +428,22 @@ class ProfileStore(context: Context) {
         const val DISPLAY_NONE = "none"
         const val DISPLAY_X11 = "x11"
         const val DISPLAY_WAYLAND = "wayland"
+        const val DESKTOP_SCALE_DEFAULT = 100
+        const val DESKTOP_SCALE_125 = 125
+        const val DESKTOP_SCALE_150 = 150
+        const val DESKTOP_SCALE_200 = 200
+        const val DESKTOP_SCALE_250 = 250
+        const val DESKTOP_SCALE_300 = 300
+        const val DESKTOP_SCALE_400 = 400
+        val DESKTOP_SCALES = setOf(
+            DESKTOP_SCALE_DEFAULT,
+            DESKTOP_SCALE_125,
+            DESKTOP_SCALE_150,
+            DESKTOP_SCALE_200,
+            DESKTOP_SCALE_250,
+            DESKTOP_SCALE_300,
+            DESKTOP_SCALE_400,
+        )
         const val GRAPHICS_AUTO = "auto"
         const val GRAPHICS_LLVMPIPE = "llvmpipe"
         const val GRAPHICS_VIRGL = "virgl"

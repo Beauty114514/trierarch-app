@@ -20,7 +20,7 @@ object WaylandBridge {
     private var activeBufferMode: String? = null
 
     @JvmStatic
-    fun start(context: Context, bufferMode: String): Boolean {
+    fun start(context: Context, bufferMode: String, desktopScalePercent: Int): Boolean {
         val runtime = File(context.filesDir, "wayland/runtime")
         check(runtime.isDirectory || runtime.mkdirs()) { "Unable to create Wayland runtime directory" }
         val mode = if (bufferMode == BUFFER_SHM) BUFFER_SHM else BUFFER_DMABUF
@@ -36,7 +36,7 @@ object WaylandBridge {
             )
             return false
         }
-        val started = nativeStart(runtime.absolutePath, mode)
+        val started = nativeStart(runtime.absolutePath, mode, desktopScalePercent)
         activeBufferMode = if (started) mode else null
         return started
     }
@@ -111,7 +111,11 @@ object WaylandBridge {
     ): Boolean = nativeVulkanSelfTest(surface, adrenotoolsLibrary, driverDir, hookDir, tmpDir)
 
 
-    private external fun nativeStart(runtimeDirectory: String, bufferMode: String): Boolean
+    private external fun nativeStart(
+        runtimeDirectory: String,
+        bufferMode: String,
+        desktopScalePercent: Int,
+    ): Boolean
     private external fun nativeStop()
     private external fun nativeAttachSurface(surface: Surface)
     private external fun nativeSetOutputSize(width: Int, height: Int)

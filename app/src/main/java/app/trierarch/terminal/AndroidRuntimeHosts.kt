@@ -15,8 +15,10 @@ internal class AndroidRuntimeHosts(private val app: Application) : RuntimeHosts 
     override fun startVirgl(venus: Boolean): String =
         VirglHostController.start(app, venus).absolutePath
 
-    override fun startWayland(bufferMode: String) {
-        check(WaylandBridge.start(app, bufferMode)) { "Unable to start Wayland host" }
+    override fun startWayland(bufferMode: String, desktopScalePercent: Int) {
+        check(WaylandBridge.start(app, bufferMode, desktopScalePercent)) {
+            "Unable to start Wayland host"
+        }
     }
 
     override fun startPipeWire(): String = PipeWireHostController.start(app).absolutePath

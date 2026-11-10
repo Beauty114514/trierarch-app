@@ -69,6 +69,7 @@ class JniSessionConfigTest {
             container = "trierarch",
             user = "root",
             display = ProfileStore.DISPLAY_WAYLAND,
+            desktopScale = ProfileStore.DESKTOP_SCALE_DEFAULT,
             launchArgv = listOf("startplasma-wayland"),
             graphics = ProfileStore.GraphicsProfile(
                 renderer = ProfileStore.GRAPHICS_ADRENO,

@@ -10,7 +10,7 @@ import app.trierarch.config.ProfileStore
  */
 interface RuntimeHosts {
     fun startVirgl(venus: Boolean): String
-    fun startWayland(bufferMode: String)
+    fun startWayland(bufferMode: String, desktopScalePercent: Int)
     fun startPipeWire(): String
     fun stopWayland()
     fun stopVirgl()
@@ -31,6 +31,7 @@ internal data class RuntimeLaunchSpec(
     val display: String,
     val renderer: String,
     val bufferMode: String,
+    val desktopScalePercent: Int,
     val audioBackend: String,
     val enablesUdevMonitorShim: Boolean,
     val installGbmShim: Boolean,
@@ -61,7 +62,7 @@ class RuntimeBootstrap(
             ""
         }
         if (spec.display == ProfileStore.DISPLAY_WAYLAND) {
-            hosts.startWayland(spec.bufferMode)
+            hosts.startWayland(spec.bufferMode, spec.desktopScalePercent)
         }
         val pipewireRuntimeDirectory = if (spec.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
             hosts.startPipeWire()
