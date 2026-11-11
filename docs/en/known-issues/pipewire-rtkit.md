@@ -1,6 +1,6 @@
 # Plasma black screen from PipeWire and the realtime portal
 
-English | [中文](../../../zh-CN/known-issues/proot/pipewire-rtkit.md)
+English | [中文](../../zh-CN/known-issues/pipewire-rtkit.md)
 
 ## Symptoms
 

@@ -1,6 +1,6 @@
 # PipeWire 与实时 portal 导致 Plasma 黑屏
 
-[English](../../../en/known-issues/proot/pipewire-rtkit.md) | 中文
+[English](../../en/known-issues/pipewire-rtkit.md) | 中文
 
 ## 症状
 

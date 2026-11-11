@@ -25,7 +25,7 @@
 
 - [PRoot 下的 Firefox](known-issues/proot/firefox.md)
 - [PRoot 下的 KDE Baloo](known-issues/proot/baloo-tags.md)
-- [PRoot 下的 PipeWire/RTKit](known-issues/proot/pipewire-rtkit.md)
+- [PipeWire/RTKit](known-issues/pipewire-rtkit.md)
 
 ## 开发者预览
 

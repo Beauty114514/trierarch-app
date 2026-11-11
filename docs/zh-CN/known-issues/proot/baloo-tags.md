@@ -11,21 +11,32 @@ KDE 反复提示 “Could not enter folder tags:/” 或 Baloo 警告。
 Baloo 结合了 KDE 索引器和文件系统监视。PRoot 的命名空间、bind 布局、`/proc`
 视图和 inotify 行为与普通桌面不同，容易导致索引异常或虚拟 `tags:/` 访问失败。
 
-## 处理
-
-在 PRoot shell 中执行（Plasma 6 使用 `balooctl6`，Plasma 5 可尝试
-`balooctl`）：
+## 修复：把下面整块复制到 PRoot shell
 
 ```bash
-balooctl6 status
-balooctl6 purge
-balooctl6 suspend
-balooctl6 disable
+mkdir -p "$HOME/.config"
+printf '%s\n' '[Basic Settings]' 'Indexing-Enabled=false' > "$HOME/.config/baloofilerc"
+if command -v balooctl6 >/dev/null 2>&1; then
+    balooctl6 disable
+    balooctl6 purge
+elif command -v balooctl >/dev/null 2>&1; then
+    balooctl disable
+    balooctl purge
+fi
 ```
 
-在手机上关闭 Baloo 通常划算：减少无意义的后台索引和 `tags:/` 报错。
+然后退出 Plasma 再重新登录，`tags:/` 报错应该消失。
 
-## 早期版本说明
+## 系统级替代方案
 
-这条来自早期 `trierarch-optimize` 笔记。对旧 KDE/rootfs 环境仍有参考价值；
-较新的版本可能显示不同的提示。
+如果 PRoot 以 root 运行，并且希望所有用户都生效：
+
+```bash
+mkdir -p /etc/xdg
+printf '%s\n' '[Basic Settings]' 'Indexing-Enabled=false' > /etc/xdg/baloofilerc
+```
+
+## 说明
+
+关闭 Baloo 后，Dolphin 侧边栏仍可能显示 `tags:/` 入口，但错误弹窗应停止。
+`tags:/` 这个虚拟位置本身不是 PRoot 提供的。

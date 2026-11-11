@@ -26,7 +26,7 @@ profile fields, GPU assets, desktops, and finally running a sample.
 
 - [Firefox under PRoot](known-issues/proot/firefox.md)
 - [KDE Baloo under PRoot](known-issues/proot/baloo-tags.md)
-- [PipeWire/RTKit under PRoot](known-issues/proot/pipewire-rtkit.md)
+- [PipeWire/RTKit](known-issues/pipewire-rtkit.md)
 
 ## Developer preview
 
