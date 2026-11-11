@@ -23,6 +23,10 @@ not linked into the app.
 | **libandroid-shmem** | `0.7`, see `trierarch-packages/proot/UPSTREAM.md` | PRoot build dependency | BSD-3-Clause |
 | **virglrenderer** | [virgl/virglrenderer](https://gitlab.freedesktop.org/virgl/virglrenderer), `1.3.0` | Android vtest/VirGL host server | MIT |
 | **libepoxy** | [anholt/libepoxy](https://github.com/anholt/libepoxy), `1.5.10` | EGL/GL function dispatch | MIT |
+| **AdrenoTools** | [bylaws/libadrenotools](https://github.com/bylaws/libadrenotools), vendored prebuilt `libadrenotools` and hook libraries | Loads the host Vulkan presenter driver | BSD-2-Clause |
+| **Host Turnip v32** | [whitebelyash/AdrenoToolsDrivers](https://github.com/whitebelyash/AdrenoToolsDrivers), release `tu_v32` / `mainline-turnip-V32.zip`; built from Mesa's Turnip/gen8 source | Host Vulkan presenter driver for Adreno 6xx/7xx/8xx | Mesa per-file licenses (MIT, BSD-3-Clause, SGI-B-2.0 and others where marked) |
+| **LLVM 21.1** | [llvm/llvm-project](https://github.com/llvm/llvm-project), runtime `libLLVM.so.21.1` from the Mesa 26 noroot component | Mesa/LLVM runtime dependency | Apache-2.0 WITH LLVM-exception |
+| **KWin compatibility library** | KDE KWin `6.8.2-2`, [KDE/kwin](https://invent.kde.org/plasma/kwin); Trierarch patch series `trierarch-packages/kwin-compat/patches/` | Host-side KWin library with the Wayland render-node fallback | GPL-2.0-or-later / LGPL-2.1-or-later where applicable; retain upstream notices |
 | **ANGLE** | [google/angle](https://chromium.googlesource.com/angle/angle), Termux package `2.1.24923-f09a19ce-2` | Vulkan/GL backends used by the VirGL host | BSD-3-Clause |
 | **PipeWire** | [pipewire/pipewire](https://gitlab.freedesktop.org/pipewire/pipewire), `1.4.9-1` | Android audio server | MIT |
 | **WirePlumber** | [pipewire/wireplumber](https://gitlab.freedesktop.org/pipewire/wireplumber), `0.5.13` | Session and policy manager | MIT |
@@ -85,7 +89,8 @@ and patches are kept in `trierarch-packages`:
 - Termux:X11/Lorie patches: `trierarch-packages/x11-host/patches/`;
 - PRoot patches: `trierarch-packages/proot/patches/`;
 - virglrenderer and libepoxy patches: `trierarch-packages/virgl-host/patches/`;
-- guest Mesa build recipe: `trierarch-packages/mesa-adreno/`.
+- guest Mesa build recipe: `trierarch-packages/mesa-adreno/`;
+- KWin compatibility patch: `trierarch-packages/kwin-compat/patches/`.
 
 Each package's `UPSTREAM.md` or README records its pinned revision and patch
 series. The Android app source is in this repository.

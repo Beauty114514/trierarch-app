@@ -18,10 +18,17 @@ Notable components:
 - PRoot, GPL-2.0-only, distributed as a separate executable and not linked into
   the Trierarch app.
 - virglrenderer and libepoxy, MIT.
+- AdrenoTools (libadrenotools and hook libraries), BSD-2-Clause.
+- Host Turnip v32, built from Mesa's Turnip/gen8 source and distributed as the
+  Vulkan presenter driver for Adreno 6xx/7xx/8xx; Mesa per-file licenses
+  (including MIT, BSD-3-Clause and SGI-B-2.0).
 - Mesa 3D, the lfdevs/mesa-for-android-container Freedreno fork and the
   lfdevs/archlinuxarm-PKGBUILDs packaging, under Mesa's per-file licenses
   (including MIT, BSD-3-Clause and SGI-B-2.0); Trierarch's mesa-adreno
   patches/recipes are GPL-3.0 unless a file says otherwise.
+- LLVM 21.1 runtime libraries, Apache-2.0 WITH LLVM-exception.
+- KWin compatibility library built from KDE KWin 6.8.2 with Trierarch's
+  render-node patch, GPL-2.0-or-later / LGPL-2.1-or-later where applicable.
 - ANGLE, BSD-3-Clause.
 - PipeWire and WirePlumber, MIT.
 - Local Desktop AAudio sink, GPL-3.0.
