@@ -76,11 +76,17 @@ user = "beauty"
 ```toml
 [display]
 type = "wayland"   # none / x11 / wayland
+desktop_scale = 125
 ```
 
 - `none`: terminal;
 - `x11`: Trierarch's X11 surface;
 - `wayland`: Trierarch's Wayland host and a nested compositor.
+
+`desktop_scale` is optional and only valid with `type = "wayland"`. It scales
+the guest desktop output, not the Android app UI or terminal. Supported values
+are `100`, `125`, `150`, `200`, `250`, `300` and `400`; the default is `100`.
+Restart the profile after changing it.
 
 ## Launch command
 

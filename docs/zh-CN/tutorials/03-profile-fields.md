@@ -74,11 +74,16 @@ user = "beauty"
 ```toml
 [display]
 type = "wayland"   # none / x11 / wayland
+desktop_scale = 125
 ```
 
 - `none`：终端；
 - `x11`：Trierarch 的 X11 surface；
 - `wayland`：Trierarch 的 Wayland host + 嵌套 compositor。
+
+`desktop_scale` 是可选字段，只在 `type = "wayland"` 时有效。它缩放 guest 桌面
+输出，不缩放 Android App 界面或终端。支持 `100`、`125`、`150`、`200`、`250`、
+`300`、`400`，默认 `100`。修改后需要重新启动 profile。
 
 ## 启动命令
 

@@ -7,6 +7,8 @@ shell = "/usr/bin/zsh"
 
 [display]
 type = "wayland"
+# Wayland only: 100 / 125 / 150 / 200 / 250 / 300 / 400
+desktop_scale = 100
 
 [launch]
 argv = ["env", "DISABLE_RTKIT=1", "KWIN_COMPOSE=O2", "KWIN_RENDER_NODES=/dev/dri/renderD128", "dbus-run-session", "--", "startplasma-wayland"]
