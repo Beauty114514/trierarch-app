@@ -18,3 +18,11 @@ captures/
 
 # OS-generated files
 .DS_Store
+
+# Release signing secrets
+keystore.properties
+*.jks
+*.keystore
+
+# Bundled GPU driver binaries are release assets, not source
+app/src/main/assets/turnip/**/*.so

@@ -1,5 +1,13 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use(keystoreProperties::load)
 }
 
 val nativeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/native")
@@ -383,18 +391,36 @@ android {
         applicationId = "app.trierarch"
         minSdk = 24
         targetSdk = 28
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 9
+        versionName = "0.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
+            val releaseSigning = signingConfigs.findByName("release")
+                ?: error("release signing requires trierarch-app/keystore.properties")
+            signingConfig = releaseSigning
             optimization {
                 enable = false
             }
         }
+    }
+    lint {
+        // 0.5.0 is a direct APK release for rooted devices, not a Play upload.
+        disable += "ExpiredTargetSdkVersion"
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
@@ -416,6 +442,7 @@ android {
         // SourceSet accepts a concrete directory, not Gradle's Provider wrapper.
         // `preBuild` explicitly depends on packageX11Assets below.
         getByName("main").assets.srcDirs(
+            file("src/main/assets"),
             x11AssetsDirectory.get().asFile,
             virglAssetsDirectory.get().asFile,
             pipewireAssetsDirectory.get().asFile,

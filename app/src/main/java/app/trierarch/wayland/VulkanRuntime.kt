@@ -14,7 +14,13 @@ import java.io.FileOutputStream
  */
 object VulkanRuntime {
     private const val TAG = "TrierarchVulkan"
-    private const val DRIVER_ASSET = "turnip/vulkan.ad07xx.so"
+    /*
+     * One mainline Turnip build covers the Adreno 6xx, 7xx and 8xx KGSL
+     * families.  Keeping it bundled removes the previous requirement for a
+     * user to install a matching library by hand.
+     */
+    private const val DRIVER_ASSET = "turnip/mainline-v32/libvulkan_freedreno.so"
+    private const val DRIVER_FILE = "libvulkan_freedreno.so"
 
     private val lock = Any()
     private var attempted = false
@@ -27,11 +33,9 @@ object VulkanRuntime {
             val nativeDir = File(context.applicationInfo.nativeLibraryDir)
             val adrenotools = File(nativeDir, "libadrenotools.so")
             val driverDir = File(context.filesDir, "vulkan/driver")
-            val driver = File(driverDir, "vulkan.ad07xx.so")
-            if (!driver.isFile) {
-                driverDir.mkdirs()
-                extractDriver(context, driver)
-            }
+            val driver = File(driverDir, DRIVER_FILE)
+            driverDir.mkdirs()
+            extractDriver(context, driver)
             if (!adrenotools.isFile || !driver.isFile) {
                 Log.w(TAG, "Vulkan runtime unavailable: adrenotools=${adrenotools.isFile} driver=${driver.isFile}")
                 return false
