@@ -27,7 +27,7 @@ profiles in this tutorial and is the focus of the product examples.
 
 The KWin patch is not a GPU driver. It is a Wayland render-node compatibility
 change for the PRoot fake-DRM path; it is covered in
-[Chapter 5](05-desktops.md).
+[Chapter 5A](05-desktops-proot.md).
 
 ## Adreno guest GPU userspace stack
 
@@ -104,6 +104,6 @@ different directory, update every path.
 
 PRoot Plasma Wayland also needs the KWin compatibility library. Its build,
 installation and profile environment are described in
-[Chapter 5](05-desktops.md#kde-plasma-on-proot).
+[Chapter 5A](05-desktops-proot.md).
 
 Next: [Chapter 5 — Desktops](05-desktops.md).

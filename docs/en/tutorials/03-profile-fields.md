@@ -42,7 +42,7 @@ shell = "/bin/bash"
 - no root required;
 - no `container` or `user`;
 - the PRoot KDE Wayland path has an extra KWin compatibility requirement, described
-  in [Chapter 5](05-desktops.md).
+  in [Chapter 5A](05-desktops-proot.md).
 
 ### chroot
 

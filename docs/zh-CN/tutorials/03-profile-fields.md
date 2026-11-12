@@ -41,7 +41,7 @@ shell = "/bin/bash"
 - rootfs 在 App 私有目录；
 - 不需要 root；
 - 没有 `container`、`user`；
-- PRoot 的 KDE Wayland 额外需要 KWin compatibility，见[第五章](05-desktops.md)。
+- PRoot 的 KDE Wayland 额外需要 KWin compatibility，见[第五章 A](05-desktops-proot.md)。
 
 ### chroot
 

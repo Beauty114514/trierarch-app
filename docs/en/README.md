@@ -12,7 +12,11 @@ profile fields, GPU assets, desktops, and finally running a sample.
 3. [Profile fields](tutorials/03-profile-fields.md)
 4. [Hardware acceleration assets](tutorials/04-hardware-acceleration.md)
 5. [Desktops](tutorials/05-desktops.md)
+   - [PRoot](tutorials/05-desktops-proot.md)
+   - [chroot](tutorials/05-desktops-chroot.md)
+   - [DroidSpaces](tutorials/05-desktops-droidspaces.md)
 6. [Run and choose a sample](tutorials/06-run.md)
+
 
 ## Reference
 
@@ -30,5 +34,4 @@ profile fields, GPU assets, desktops, and finally running a sample.
 
 ## Developer preview
 
-- [PRoot + Adreno + Plasma Wayland](developer-preview/proot/wayland-adreno.md)
 - [Hyprland / Aquamarine](developer-preview/proot/hyprland-aquamarine.md)

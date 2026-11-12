@@ -25,7 +25,7 @@
 | DroidSpaces | 容器内访问真实 `/dev/dri` | 不需要 |
 
 KWin patch 不是 GPU 驱动，而是 PRoot fake-DRM 路径的 Wayland render-node 兼容修改；
-见[第五章](05-desktops.md)。
+见[第五章 A](05-desktops-proot.md)。
 
 ## Adreno guest GPU userspace stack
 
@@ -96,6 +96,6 @@ export VK_DRIVER_FILES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json
 ## PRoot Plasma 兼容
 
 PRoot Plasma Wayland 还需要 KWin compatibility library。构建、安装和 profile 环境
-见[第五章](05-desktops.md#kde-plasma-on-proot)。
+见[第五章 A](05-desktops-proot.md)。
 
 下一步：[第五章 — 桌面](05-desktops.md)。

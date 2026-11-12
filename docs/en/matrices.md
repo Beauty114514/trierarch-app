@@ -2,7 +2,7 @@
 
 English | [中文](../zh-CN/matrices.md)
 
-Last updated: 2026-11-09
+Last updated: 2026-11-12
 
 Test device: Adreno 740 (Qualcomm).
 
@@ -27,7 +27,7 @@ This round covers:
 | --- | --- | --- | --- |
 | **DroidSpaces** | Yes | Adreno direct; effects usable | Adreno direct; VirGL also available |
 | **chroot** | Yes | Adreno direct; effects usable | Adreno direct; VirGL also available |
-| **PRoot** | No | Depends on the compositor and required patches; not a complete Linux environment. KDE Plasma Wayland is a **Developer Preview** with compatibility components | Host **VirGL** via `virpipe`; no `/dev/dri` required |
+| **PRoot** | No | Depends on the compositor and required patches; not a complete Linux environment. KDE Plasma Wayland is supported with compatibility components | Host **VirGL** via `virpipe`; no `/dev/dri` required |
 
 ### Wayland hardware acceleration
 
@@ -38,7 +38,7 @@ Its GPU path depends on the runtime:
 | --- | --- | --- |
 | **DroidSpaces** | Adreno direct (freedreno/kgsl) | ✅ tested; effects usable |
 | **chroot** | Adreno direct (freedreno/kgsl) | ✅ tested; effects usable |
-| **PRoot** | Depends on the compositor and patches; Plasma Adreno is a Developer Preview | ⚠️ configuration-dependent; see the tested rows below |
+| **PRoot** | Depends on the compositor and patches; Plasma Adreno is supported with compatibility components | ⚠️ configuration-dependent; see the tested rows below |
 
 PRoot is not a complete Linux environment. Running a desktop or window manager
 inside it has significant limitations, and many paths need extra compatibility
@@ -92,13 +92,13 @@ work.
 | --- | --- | --- |
 | **Sway** (Wayland) | llvmpipe / SHM / `pixman` | ✅ tested; software rendering |
 | **Sway** (Wayland) | virgl profile with `buffer = "shm"` and `pixman` | ✅ tested; software rendering |
-| **KDE Plasma Wayland** | adreno with compat components | 🧪 Developer Preview; frame output verified with matching KWin + guest GPU userspace stack |
+| **KDE Plasma Wayland** | adreno with compat components | ✅ tested; requires matching KWin + guest GPU userspace stack |
 | **KDE Plasma Wayland** | llvmpipe / software | ⚠️ legacy configuration; GPU path not used |
 | **Hyprland** | adreno | ❌ failed in the tested configuration; see the preview notes |
 | **KDE Plasma X11** | llvmpipe / VirGL | ❌ tested profile failed on the current KWin/Plasma ABI; a matching X11 session is required |
 
-The preview procedure and current limits are in
-[PRoot + Adreno + Plasma Wayland](developer-preview/proot/wayland-adreno.md).
+The setup procedure and current limits are in
+[PRoot + Adreno + Plasma Wayland](tutorials/05-desktops-proot.md).
 
 The Plasma X11 result is a package/ABI mismatch (`kwin_x11` 6.7.5 with Plasma
 6.8.2), not proof that X11 or VirGL can never work; a matching X11 session or
@@ -124,7 +124,7 @@ Tested examples:
 - **Sway** can run with `WLR_RENDERER=pixman` and SHM; software rendering.
   `WLR_RENDERER=gles2` can fail with
   `Cannot create GLES2 renderer: no DRM FD available`.
-- **KDE Plasma Wayland** is a developer preview with the compatibility assets;
+- **KDE Plasma Wayland** uses the compatibility assets;
   without them, the tested KWin version reports:
   ```text
   kwin_core: Configured compositor not supported by Platform. Falling back to defaults
@@ -137,8 +137,7 @@ Tested examples:
   host may not publish the dmabuf path a GPU compositor needs.
 
 These are current limitations, not a universal compatibility list. Use the
-matrix as the tested record and the developer-preview documents for work in
-progress.
+matrix as the tested record and the guide documents for setup details.
 
 ## Notes
 
