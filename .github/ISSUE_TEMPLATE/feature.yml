@@ -1,0 +1,86 @@
+name: Feature request
+description: Suggest a feature, runtime, desktop or compatibility improvement.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Trierarch is an early-stage project. Feature requests are welcome, but
+        new runtimes and desktop integrations take design, implementation and
+        testing time. Please describe the use case, not only the desired UI.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or use case
+      description: What are you trying to do, and what blocks you today?
+      placeholder: I want to run ... but Trierarch currently ...
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What would you like Trierarch to do?
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing workarounds, other runtimes, scripts, etc.
+
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Which parts would this affect?
+      options:
+        - label: Runtime (PRoot, chroot, DroidSpaces or a new runtime)
+        - label: Display (terminal, X11 or Wayland)
+        - label: Graphics (llvmpipe, VirGL or Adreno)
+        - label: Input or IME
+        - label: Audio
+        - label: Lifecycle or container management
+        - label: Documentation
+        - label: App UI
+
+  - type: dropdown
+    id: new_runtime
+    attributes:
+      label: Does this require a new runtime?
+      options:
+        - "No"
+        - "Yes"
+        - "Not sure"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: testing
+    attributes:
+      label: Are you willing to test?
+      options:
+        - "Yes, on a physical device"
+        - "Yes, but only with guidance"
+        - "No"
+    validations:
+      required: true
+
+  - type: textarea
+    id: device
+    attributes:
+      label: Device information (optional)
+      description: If relevant, include SoC, GPU, Android version and desktop.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues and the documentation.
+          required: true
+        - label: I understand new runtimes and desktop integrations take time.
+          required: true

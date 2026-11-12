@@ -1,6 +1,11 @@
-# https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository
-blank_issues_enabled: true
+blank_issues_enabled: false
 contact_links:
+  - name: Documentation and known issues
+    url: https://github.com/Beauty114514/trierarch-app/blob/main/docs/en/README.md
+    about: Read the manuals and the one-file-per-issue known-issues tree before filing.
+  - name: Compatibility matrix
+    url: https://github.com/Beauty114514/trierarch-app/blob/main/docs/en/matrices.md
+    about: Check which runtime, desktop and renderer combinations have been tested.
   - name: Security policy
-    url: https://github.com/Beauty114514/trierarch/blob/main/SECURITY.md
-    about: Do not file public issues for undisclosed vulnerabilities—follow this policy.
+    url: https://github.com/Beauty114514/trierarch-app/blob/main/SECURITY.md
+    about: Report security issues privately; do not open a public issue.

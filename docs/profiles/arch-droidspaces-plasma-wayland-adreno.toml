@@ -1,0 +1,21 @@
+# Sample only: replace id/container/user with your device values.
+id = "arch-droidspaces-plasma-wayland-adreno"
+name = "Arch DroidSpaces Plasma Wayland (Adreno)"
+runtime = "droidspaces"
+container = "Arch"
+user = "beauty"
+
+[display]
+type = "wayland"
+# Wayland only: 100 / 125 / 150 / 200 / 250 / 300 / 400
+desktop_scale = 100
+
+[launch]
+argv = ["env", "DISABLE_RTKIT=1", "GALLIUM_DRIVER=freedreno", "MESA_LOADER_DRIVER_OVERRIDE=kgsl", "dbus-run-session", "--", "startplasma-wayland"]
+
+[graphics]
+renderer = "adreno"
+qt_quick_backend = "auto"
+
+[compat]
+udev_monitor = "auto"

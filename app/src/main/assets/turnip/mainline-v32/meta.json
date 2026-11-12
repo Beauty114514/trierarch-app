@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "name": "Mainline Turnip v32",
+  "description": "Upstream Turnip driver with some hacks. Built from turnip/gen8 branch",
+  "author": "whitebelyash",
+  "packageVersion": "1",
+  "vendor": "Mesa",
+  "driverVersion": "Vulkan 1.4.335",
+  "minApi": 28,
+  "libraryName": "libvulkan_freedreno.so"
+}

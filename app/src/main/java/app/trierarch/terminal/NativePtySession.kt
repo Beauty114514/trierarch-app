@@ -1,0 +1,278 @@
+package app.trierarch.terminal
+
+import android.util.Log
+import app.trierarch.nativebridge.NativePtyBridge
+import app.trierarch.nativebridge.SessionCallback
+import com.termux.terminal.TerminalEmulator
+import com.termux.terminal.TerminalOutput
+import com.termux.terminal.TerminalSession
+import com.termux.terminal.TerminalSessionClient
+import com.termux.view.DisplayableTermSession
+import java.io.File
+import java.io.FileOutputStream
+
+/**
+ * Connects a [TerminalEmulator] to Trierarch's own PTY. It never creates a
+ * Termux [TerminalSession], so the native library is the only process owner.
+ */
+class NativePtySession private constructor(
+    private val openNativeSession: (rows: Int, columns: Int, callback: SessionCallback) -> Long,
+    private val clipboard: TerminalClipboard,
+    diagnosticLog: File? = null,
+) : TerminalOutput(), SessionCallback, DisplayableTermSession {
+    companion object {
+        private const val INITIAL_COLUMNS = 80
+        private const val INITIAL_ROWS = 24
+        private const val INITIAL_CELL_WIDTH_PIXELS = 1
+        private const val INITIAL_CELL_HEIGHT_PIXELS = 1
+
+        fun command(config: CommandSessionConfig, clipboard: TerminalClipboard): NativePtySession =
+            NativePtySession(
+                openNativeSession = { rows, columns, callback ->
+                    NativePtyBridge.openSession(
+                        config = config.toJniConfig(),
+                        rows = rows,
+                        columns = columns,
+                        callback = callback,
+                    )
+                },
+                clipboard = clipboard,
+            )
+
+        fun proot(config: ProotSessionConfig, clipboard: TerminalClipboard): NativePtySession =
+            NativePtySession(
+                openNativeSession = { rows, columns, callback ->
+                    NativePtyBridge.openProotSession(
+                        config = config.toJniConfig(),
+                        rows = rows,
+                        columns = columns,
+                        callback = callback,
+                    )
+                },
+                clipboard = clipboard,
+            )
+
+        fun chroot(config: ChrootSessionConfig, clipboard: TerminalClipboard): NativePtySession =
+            NativePtySession(
+                openNativeSession = { rows, columns, callback ->
+                    NativePtyBridge.openChrootSession(
+                        config = config.toJniConfig(),
+                        rows = rows,
+                        columns = columns,
+                        callback = callback,
+                    )
+                },
+                clipboard = clipboard,
+                diagnosticLog = config.diagnosticLog,
+            )
+
+        fun droidspaces(
+            config: DroidspacesSessionConfig,
+            clipboard: TerminalClipboard,
+        ): NativePtySession = NativePtySession(
+            openNativeSession = { rows, columns, callback ->
+                NativePtyBridge.openDroidspacesSession(
+                    config = config.toJniConfig(),
+                    rows = rows,
+                    columns = columns,
+                    callback = callback,
+                )
+            },
+            clipboard = clipboard,
+        )
+    }
+
+    private var sessionId = 0L
+    private var closed = false
+    private var onScreenChanged: (() -> Unit)? = null
+    private val diagnosticsLock = Any()
+    private var diagnostics: FileOutputStream? = diagnosticLog?.let(::openDiagnostics)
+
+    private val emulator = TerminalEmulator(
+        this,
+        INITIAL_COLUMNS,
+        INITIAL_ROWS,
+        INITIAL_CELL_WIDTH_PIXELS,
+        INITIAL_CELL_HEIGHT_PIXELS,
+        TerminalEmulator.DEFAULT_TERMINAL_TRANSCRIPT_ROWS,
+        EmulatorClient,
+    )
+
+    private val outputRelay = PtyOutputRelay(
+        consume = { bytes -> emulator.append(bytes, bytes.size) },
+        onScreenChanged = ::screenChanged,
+    )
+
+    fun setScreenChangedListener(listener: (() -> Unit)?) {
+        onScreenChanged = listener
+    }
+
+    /** Called by the view whenever its pixel size or font metrics change. */
+    fun resize(
+        columns: Int,
+        rows: Int,
+        cellWidthPixels: Int = INITIAL_CELL_WIDTH_PIXELS,
+        cellHeightPixels: Int = INITIAL_CELL_HEIGHT_PIXELS,
+    ) {
+        if (closed) return
+        emulator.resize(columns, rows, cellWidthPixels, cellHeightPixels)
+        if (sessionId == 0L) {
+            startNative(rows, columns)
+        } else {
+            NativePtyBridge.resize(sessionId, rows, columns)
+        }
+        screenChanged()
+    }
+
+    /** Opens the PTY independently of TerminalView layout (needed by X11 sessions). */
+    fun start() {
+        if (!closed && sessionId == 0L) startNative(INITIAL_ROWS, INITIAL_COLUMNS)
+    }
+
+    fun isRunning(): Boolean = !closed && sessionId != 0L
+
+    private fun startNative(rows: Int, columns: Int) {
+        try {
+            sessionId = openNativeSession(rows, columns, this)
+        } catch (error: Throwable) {
+            appendDiagnostic("Trierarch session setup failed: ${error.message}\n")
+            closeDiagnostics()
+            throw error
+        }
+    }
+
+    override fun updateSize(
+        columns: Int,
+        rows: Int,
+        cellWidthPixels: Int,
+        cellHeightPixels: Int,
+    ) = resize(columns, rows, cellWidthPixels, cellHeightPixels)
+
+    fun close() {
+        if (closed) return
+        closed = true
+        outputRelay.close()
+        val id = sessionId
+        sessionId = 0L
+        if (id != 0L) NativePtyBridge.close(id)
+        closeDiagnostics()
+        onScreenChanged = null
+    }
+
+    override fun write(data: ByteArray, offset: Int, count: Int) {
+        val id = sessionId
+        if (!closed && id != 0L && count > 0) {
+            NativePtyBridge.write(id, data.copyOfRange(offset, offset + count))
+        }
+    }
+
+    fun write(bytes: ByteArray) {
+        write(bytes, 0, bytes.size)
+    }
+
+    override fun writeCodePoint(prependEscape: Boolean, codePoint: Int) {
+        if (prependEscape) write("\u001b")
+        write(String(Character.toChars(codePoint)))
+    }
+
+    override fun getEmulator(): TerminalEmulator = emulator
+
+    // The upstream Java terminal API supplies a null old title on its first
+    // OSC title update. Trierarch does not display titles yet, so ignore both
+    // values while preserving that Java nullability boundary.
+    override fun titleChanged(oldTitle: String?, newTitle: String?) = Unit
+
+    override fun onCopyTextToClipboard(text: String) = clipboard.copy(text)
+
+    override fun onPasteTextFromClipboard() {
+        clipboard.paste()?.let(::write)
+    }
+
+    override fun onBell() = Unit
+
+    override fun onColorsChanged() = screenChanged()
+
+    override fun onSessionOutput(sessionId: Long, bytes: ByteArray) {
+        if (!closed && sessionId == this.sessionId) {
+            appendDiagnostic(bytes)
+            outputRelay.offer(bytes)
+        }
+    }
+
+    override fun onSessionExited(sessionId: Long, exitCode: Int) {
+        if (sessionId == this.sessionId) {
+            this.sessionId = 0L
+            val message = "\r\n[Trierarch session exited with code $exitCode]\r\n"
+            appendDiagnostic(message)
+            closeDiagnostics()
+            outputRelay.offer(message.toByteArray())
+            screenChanged()
+        }
+    }
+
+    /** Adds an app-originated diagnostic to the retained terminal transcript. */
+    fun appendDiagnostic(message: String) {
+        appendDiagnostic(message.toByteArray())
+    }
+
+    /** Shows an app-originated status line without sending it to the guest PTY. */
+    fun appendStatus(message: String) {
+        outputRelay.offer(message.toByteArray())
+        screenChanged()
+    }
+
+    private fun appendDiagnostic(bytes: ByteArray) {
+        synchronized(diagnosticsLock) {
+            val output = diagnostics ?: return
+            runCatching {
+                output.write(bytes)
+                output.flush()
+            }.onFailure {
+                Log.e("NativePtySession", "Unable to write session diagnostics", it)
+                runCatching { output.close() }
+                diagnostics = null
+            }
+        }
+    }
+
+    private fun closeDiagnostics() {
+        synchronized(diagnosticsLock) {
+            runCatching { diagnostics?.close() }
+            diagnostics = null
+        }
+    }
+
+    private fun openDiagnostics(file: File): FileOutputStream? = runCatching {
+        check(file.parentFile?.isDirectory == true || file.parentFile?.mkdirs() == true) {
+            "Unable to create diagnostics directory"
+        }
+        FileOutputStream(file, false)
+    }.getOrElse {
+        Log.e("NativePtySession", "Unable to open session diagnostics: ${file.absolutePath}", it)
+        null
+    }
+
+    private fun screenChanged() {
+        onScreenChanged?.invoke()
+    }
+
+    private object EmulatorClient : TerminalSessionClient {
+        override fun onTextChanged(changedSession: TerminalSession) = Unit
+        override fun onTitleChanged(changedSession: TerminalSession) = Unit
+        override fun onSessionFinished(finishedSession: TerminalSession) = Unit
+        override fun onCopyTextToClipboard(session: TerminalSession, text: String) = Unit
+        override fun onPasteTextFromClipboard(session: TerminalSession?) = Unit
+        override fun onBell(session: TerminalSession) = Unit
+        override fun onColorsChanged(session: TerminalSession) = Unit
+        override fun onTerminalCursorStateChange(state: Boolean) = Unit
+        override fun setTerminalShellPid(session: TerminalSession, pid: Int) = Unit
+        override fun getTerminalCursorStyle() = TerminalEmulator.TERMINAL_CURSOR_STYLE_BLOCK
+        override fun logError(tag: String, message: String) { Log.e(tag, message) }
+        override fun logWarn(tag: String, message: String) { Log.w(tag, message) }
+        override fun logInfo(tag: String, message: String) { Log.i(tag, message) }
+        override fun logDebug(tag: String, message: String) { Log.d(tag, message) }
+        override fun logVerbose(tag: String, message: String) { Log.v(tag, message) }
+        override fun logStackTraceWithMessage(tag: String, message: String, exception: Exception) { Log.e(tag, message, exception) }
+        override fun logStackTrace(tag: String, exception: Exception) { Log.e(tag, Log.getStackTraceString(exception)) }
+    }
+}

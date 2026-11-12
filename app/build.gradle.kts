@@ -1,0 +1,496 @@
+import java.util.Properties
+
+plugins {
+    alias(libs.plugins.android.application)
+}
+
+val keystorePropertiesFile = rootProject.file("keystore.properties")
+val keystoreProperties = Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.inputStream().use(keystoreProperties::load)
+}
+
+val nativeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/native")
+val nativeJniLibsDirectory = layout.buildDirectory.dir("generated/jniLibs")
+val cliCommandJniLibsDirectory = layout.buildDirectory.dir("generated/cliCommandJniLibs")
+// Runtime comparison: consume the independently maintained PRoot package.
+// Its source revision and Android build recipe are recorded with the package.
+val prootRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/proot/dist/android/arm64-v8a",
+)
+val prootJniLibsDirectory = layout.buildDirectory.dir("generated/prootJniLibs")
+// Lorie is built and versioned by the independent X11-host package.
+val x11RuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/x11-host/dist/android/arm64-v8a",
+)
+val x11JniLibsDirectory = layout.buildDirectory.dir("generated/x11JniLibs")
+val x11AssetsDirectory = layout.buildDirectory.dir("generated/x11Assets")
+val waylandRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/wayland-host/dist/android/arm64-v8a",
+)
+val waylandJniLibsDirectory = layout.buildDirectory.dir("generated/waylandJniLibs")
+val adrenotoolsRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/adrenotools/dist/android/arm64-v8a",
+)
+val adrenotoolsJniLibsDirectory = layout.buildDirectory.dir("generated/adrenotoolsJniLibs")
+// VirGL is an executable host plus private shared libraries, so it is packaged
+// as APK assets and extracted to the app's private files directory at runtime.
+val virglRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/virgl-host/dist/android/arm64-v8a",
+)
+val virglAssetsDirectory = layout.buildDirectory.dir("generated/virglAssets")
+// PipeWire's Android daemon, policy manager, and AAudio sink are built by the
+// companion package and consumed as private runtime assets.
+val pipewireRuntimeDirectory = rootProject.projectDir.parentFile.resolve(
+    "trierarch-packages/pipewire-host/dist/android/arm64-v8a",
+)
+val pipewireAssetsDirectory = layout.buildDirectory.dir("generated/pipewireAssets")
+val guestCompatibilityProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/compat")
+val gbmShimProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/gbm-shim")
+val gbmShimAssetsDirectory = layout.buildDirectory.dir("generated/gbmShimAssets")
+val guestCompatibilityAssetsDirectory = layout.buildDirectory.dir("generated/guestCompatibilityAssets")
+val waylandImeBridgeProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/wayland-ime-bridge")
+val waylandImeBridgeAssetsDirectory = layout.buildDirectory.dir("generated/waylandImeBridgeAssets")
+val sessionSupervisorProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/session-supervisor")
+val sessionSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/sessionSupervisorAssets")
+val droidspacesSupervisorAssetsDirectory = layout.buildDirectory.dir("generated/droidspacesSupervisorAssets")
+val dmabufDeviceReportProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/dmabuf-device-report")
+val dmabufDeviceReportAssetsDirectory = layout.buildDirectory.dir("generated/dmabufDeviceReportAssets")
+val inputReaderProjectDirectory = rootProject.projectDir.parentFile.resolve("trierarch-packages/input-reader")
+val inputReaderAssetsDirectory = layout.buildDirectory.dir("generated/inputReaderAssets")
+
+val prepareWaylandImeBridgeSysroot by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Fetches the pinned Debian arm64 Wayland client build sysroot."
+    workingDir(waylandImeBridgeProjectDirectory)
+    commandLine("bash", "scripts/fetch-debian-arm64-sysroot.sh")
+    inputs.file(waylandImeBridgeProjectDirectory.resolve("scripts/fetch-debian-arm64-sysroot.sh"))
+    outputs.dir(waylandImeBridgeProjectDirectory.resolve(".sysroot/debian-bookworm-arm64"))
+}
+
+val cleanNativeJniLibs by tasks.registering(Delete::class) {
+    delete(nativeJniLibsDirectory)
+}
+
+val buildNativeArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Rust PTY host for Android arm64."
+    workingDir(nativeProjectDirectory)
+    commandLine(
+        "cargo", "ndk", "-t", "arm64-v8a", "-P", "24",
+        "-o", nativeJniLibsDirectory.get().asFile.absolutePath,
+        "build", "--release", "--lib", "--bin", "trierarch",
+    )
+    inputs.dir(nativeProjectDirectory.resolve("src"))
+    inputs.file(nativeProjectDirectory.resolve("Cargo.toml"))
+    inputs.file(nativeProjectDirectory.resolve("Cargo.lock"))
+    inputs.file(
+        nativeProjectDirectory.parentFile.resolve("wayland-ime-bridge/data/trierarch-wayland-ime.desktop"),
+    )
+    outputs.dir(nativeJniLibsDirectory)
+    dependsOn(cleanNativeJniLibs)
+}
+
+val packageCliCommandArm64 by tasks.registering(Copy::class) {
+    group = "build"
+    description = "Packages Trierarch's internal CLI for Android arm64."
+    dependsOn(buildNativeArm64)
+    from(nativeProjectDirectory.resolve("target/aarch64-linux-android/release/trierarch"))
+    into(cliCommandJniLibsDirectory.map { it.dir("arm64-v8a") })
+    rename { "libtrierarch-cli.so" }
+}
+
+val packageProotArm64 by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Trierarch PRoot arm64 runtime."
+    val prootOutputDirectory = prootRuntimeDirectory
+    from(prootOutputDirectory.resolve("proot")) {
+        into("arm64-v8a")
+        rename { "libproot.so" }
+    }
+    from(prootOutputDirectory.resolve("loader")) {
+        into("arm64-v8a")
+        rename { "libproot_loader.so" }
+    }
+    into(prootJniLibsDirectory)
+    inputs.files(
+        prootOutputDirectory.resolve("proot"),
+        prootOutputDirectory.resolve("loader"),
+    )
+    doFirst {
+        check(prootOutputDirectory.resolve("proot").isFile) {
+            "Missing PRoot executable. Build trierarch-packages/proot first."
+        }
+        check(prootOutputDirectory.resolve("loader").isFile) {
+            "Missing PRoot loader. Build trierarch-packages/proot first."
+        }
+    }
+}
+
+val packageX11LibraryArm64 by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Trierarch Lorie X11 arm64 library."
+    val library = x11RuntimeDirectory.resolve("libXlorie.so")
+    from(library) { into("arm64-v8a") }
+    into(x11JniLibsDirectory)
+    doFirst {
+        check(library.isFile) {
+            "Missing Lorie library. Build trierarch-packages/x11-host first."
+        }
+    }
+}
+
+val packageX11Assets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Trierarch Lorie XKB runtime asset."
+    val xkb = x11RuntimeDirectory.resolve("assets/lorie_xkb_bundled.zip")
+    from(xkb)
+    into(x11AssetsDirectory)
+    doFirst {
+        check(xkb.isFile) {
+            "Missing Lorie XKB runtime asset. Build trierarch-packages/x11-host first."
+        }
+    }
+}
+
+val packageWaylandArm64 by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Trierarch Wayland host arm64 libraries."
+    notCompatibleWithConfigurationCache("Wayland artifacts are copied from an external package workspace")
+    from(waylandRuntimeDirectory) { into("arm64-v8a") }
+    into(waylandJniLibsDirectory)
+    doFirst {
+        check(waylandRuntimeDirectory.resolve("libtrierarch-wayland-host.so").isFile) {
+            "Missing Wayland host. Build trierarch-packages/wayland-host first."
+        }
+        check(waylandRuntimeDirectory.resolve("libwayland-server.so").isFile) {
+            "Missing Wayland server library. Build trierarch-packages/wayland-host first."
+        }
+        check(waylandRuntimeDirectory.resolve("libffi.so").isFile) {
+            "Missing libffi. Build trierarch-packages/wayland-host first."
+        }
+    }
+}
+
+val packageAdrenotoolsArm64 by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the AdrenoTools Turnip runtime for arm64."
+    notCompatibleWithConfigurationCache("AdrenoTools artifacts are copied from an external package workspace")
+    from(adrenotoolsRuntimeDirectory) {
+        include("*.so")
+        into("arm64-v8a")
+    }
+    into(adrenotoolsJniLibsDirectory)
+    doFirst {
+        check(adrenotoolsRuntimeDirectory.resolve("libadrenotools.so").isFile) {
+            "Missing AdrenoTools runtime. Populate trierarch-packages/adrenotools/dist/android/arm64-v8a."
+        }
+    }
+}
+
+val packageVirglAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Trierarch VirGL host arm64 runtime assets."
+    notCompatibleWithConfigurationCache("VirGL artifacts are copied from an external package workspace")
+    from(virglRuntimeDirectory) {
+        include(
+            "virgl_test_server_android",
+            "virgl_render_server",
+            "libvirglrenderer.so",
+            "libepoxy.so",
+        )
+        into("virgl/arm64-v8a")
+    }
+    from(virglRuntimeDirectory.resolve("angle/vulkan")) {
+        include("*.so")
+        into("virgl/arm64-v8a/angle/vulkan")
+    }
+    into(virglAssetsDirectory)
+    doFirst {
+        listOf("virgl_test_server_android", "libvirglrenderer.so", "libepoxy.so").forEach { name ->
+            check(virglRuntimeDirectory.resolve(name).isFile) {
+                "Missing VirGL runtime file '$name'. Build trierarch-packages/virgl-host first."
+            }
+        }
+        check(virglRuntimeDirectory.resolve("angle/vulkan/libEGL_angle.so").isFile) {
+            "Missing VirGL ANGLE Vulkan runtime. Build trierarch-packages/virgl-host first."
+        }
+    }
+}
+
+val packagePipeWireAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Android PipeWire playback host runtime assets."
+    notCompatibleWithConfigurationCache("PipeWire artifacts are copied from an external package workspace")
+    from(pipewireRuntimeDirectory) { into("pipewire/arm64-v8a") }
+    into(pipewireAssetsDirectory)
+}
+
+val buildGuestCompatibilityArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Linux guest compatibility library for arm64."
+    workingDir(guestCompatibilityProjectDirectory)
+    environment("CC", "aarch64-linux-gnu-gcc")
+    commandLine("bash", "scripts/build-linux.sh")
+    inputs.dir(guestCompatibilityProjectDirectory.resolve("src"))
+    inputs.file(guestCompatibilityProjectDirectory.resolve("scripts/build-linux.sh"))
+    outputs.file(guestCompatibilityProjectDirectory.resolve("dist/linux/aarch64/libtrierarch-udev-compat.so"))
+}
+
+val packageGbmShimAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the guest GBM token shim used by the virgl dmabuf POC."
+    notCompatibleWithConfigurationCache("GBM shim artifacts are copied from an external package workspace")
+    val library = gbmShimProjectDirectory.resolve("dist/android/arm64-v8a/libgbm-shim.so")
+    from(library) { into("gbm-shim/arm64-v8a") }
+    into(gbmShimAssetsDirectory)
+    doFirst {
+        check(library.isFile) {
+            "Missing GBM shim. Build trierarch-packages/gbm-shim/scripts/build-android.sh first."
+        }
+    }
+}
+
+val packageGuestCompatibilityAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Linux guest compatibility library as an APK asset."
+    dependsOn(buildGuestCompatibilityArm64)
+    val library = guestCompatibilityProjectDirectory.resolve("dist/linux/aarch64/libtrierarch-udev-compat.so")
+    from(library) { into("compat/arm64-v8a") }
+    into(guestCompatibilityAssetsDirectory)
+    doFirst {
+        check(library.isFile) { "Missing guest compatibility library." }
+    }
+}
+
+val buildWaylandImeBridgeArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Linux guest Wayland IME bridge for arm64."
+    workingDir(waylandImeBridgeProjectDirectory)
+    environment("CC", "aarch64-linux-gnu-gcc")
+    commandLine("bash", "scripts/build-linux.sh")
+    inputs.dir(waylandImeBridgeProjectDirectory.resolve("src"))
+    inputs.file(waylandImeBridgeProjectDirectory.resolve("scripts/build-linux.sh"))
+    inputs.file(waylandImeBridgeProjectDirectory.resolve("input-method-unstable-v2.xml"))
+    outputs.file(waylandImeBridgeProjectDirectory.resolve("dist/trierarch-wayland-ime-bridge"))
+    dependsOn(prepareWaylandImeBridgeSysroot)
+}
+
+val packageWaylandImeBridgeAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Linux guest Wayland IME bridge as an APK asset."
+    dependsOn(buildWaylandImeBridgeArm64)
+    val binary = waylandImeBridgeProjectDirectory.resolve("dist/trierarch-wayland-ime-bridge")
+    from(binary) { into("wayland-ime/arm64-v8a") }
+    into(waylandImeBridgeAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing guest Wayland IME bridge." }
+    }
+}
+
+val buildSessionSupervisorArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Linux guest Wayland session supervisor for arm64."
+    workingDir(sessionSupervisorProjectDirectory)
+    environment("CC", "aarch64-linux-gnu-gcc")
+    commandLine("bash", "scripts/build-linux.sh")
+    inputs.dir(sessionSupervisorProjectDirectory.resolve("src"))
+    inputs.file(sessionSupervisorProjectDirectory.resolve("scripts/build-linux.sh"))
+    outputs.file(sessionSupervisorProjectDirectory.resolve("dist/trierarch-session-supervisor"))
+}
+
+val packageSessionSupervisorAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Linux guest session supervisor as an APK asset."
+    dependsOn(buildSessionSupervisorArm64)
+    val binary = sessionSupervisorProjectDirectory.resolve("dist/trierarch-session-supervisor")
+    from(binary) { into("wayland-session/arm64-v8a") }
+    into(sessionSupervisorAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing guest session supervisor." }
+    }
+}
+
+val buildDroidspacesSupervisorArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds the Android-native DroidSpaces owner supervisor for arm64."
+    workingDir(sessionSupervisorProjectDirectory)
+    commandLine("bash", "scripts/build-android.sh")
+    inputs.dir(sessionSupervisorProjectDirectory.resolve("src"))
+    inputs.file(sessionSupervisorProjectDirectory.resolve("scripts/build-android.sh"))
+    outputs.file(sessionSupervisorProjectDirectory.resolve("dist/trierarch-droidspaces-supervisor"))
+}
+
+val packageDroidspacesSupervisorAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the DroidSpaces owner supervisor as an APK asset."
+    dependsOn(buildDroidspacesSupervisorArm64)
+    val binary = sessionSupervisorProjectDirectory.resolve("dist/trierarch-droidspaces-supervisor")
+    from(binary) { into("droidspaces-session/arm64-v8a") }
+    into(droidspacesSupervisorAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing DroidSpaces owner supervisor." }
+    }
+}
+
+val buildInputReaderArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's root physical keyboard reader for arm64."
+    workingDir(inputReaderProjectDirectory)
+    commandLine("bash", "scripts/build-android.sh")
+    inputs.dir(inputReaderProjectDirectory.resolve("src"))
+    inputs.file(inputReaderProjectDirectory.resolve("scripts/build-android.sh"))
+    outputs.file(inputReaderProjectDirectory.resolve("dist/android/arm64-v8a/trierarch-input-reader"))
+}
+
+val packageInputReaderAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the root physical keyboard reader as an APK asset."
+    dependsOn(buildInputReaderArm64)
+    val binary = inputReaderProjectDirectory.resolve("dist/android/arm64-v8a/trierarch-input-reader")
+    from(binary) { into("input-reader/arm64-v8a") }
+    into(inputReaderAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing root physical keyboard reader." }
+    }
+}
+
+val buildDmabufDeviceReportArm64 by tasks.registering(Exec::class) {
+    group = "build"
+    description = "Builds Trierarch's Linux guest dma-buf device reporter for arm64."
+    workingDir(dmabufDeviceReportProjectDirectory)
+    environment("CC", "aarch64-linux-gnu-gcc")
+    commandLine("bash", "scripts/build-linux.sh")
+    inputs.dir(dmabufDeviceReportProjectDirectory.resolve("include"))
+    inputs.dir(dmabufDeviceReportProjectDirectory.resolve("src"))
+    inputs.file(dmabufDeviceReportProjectDirectory.resolve("scripts/build-linux.sh"))
+    outputs.file(dmabufDeviceReportProjectDirectory.resolve("dist/trierarch-dmabuf-device-report"))
+}
+
+val packageDmabufDeviceReportAssets by tasks.registering(Sync::class) {
+    group = "build"
+    description = "Packages the Linux guest dma-buf device reporter as an APK asset."
+    dependsOn(buildDmabufDeviceReportArm64)
+    val binary = dmabufDeviceReportProjectDirectory.resolve("dist/trierarch-dmabuf-device-report")
+    from(binary) { into("wayland-dmabuf/arm64-v8a") }
+    into(dmabufDeviceReportAssetsDirectory)
+    doFirst {
+        check(binary.isFile) { "Missing guest dma-buf device reporter." }
+    }
+}
+
+android {
+    namespace = "app.trierarch"
+    compileSdk {
+        version = release(36) {
+            minorApiLevel = 1
+        }
+    }
+
+    defaultConfig {
+        applicationId = "app.trierarch"
+        minSdk = 24
+        targetSdk = 28
+        versionCode = 9
+        versionName = "0.5.0"
+
+        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    signingConfigs {
+        if (keystorePropertiesFile.exists()) {
+            create("release") {
+                keyAlias = keystoreProperties.getProperty("keyAlias")
+                keyPassword = keystoreProperties.getProperty("keyPassword")
+                storeFile = rootProject.file(keystoreProperties.getProperty("storeFile"))
+                storePassword = keystoreProperties.getProperty("storePassword")
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            val releaseSigning = signingConfigs.findByName("release")
+                ?: error("release signing requires trierarch-app/keystore.properties")
+            signingConfig = releaseSigning
+            optimization {
+                enable = false
+            }
+        }
+    }
+    lint {
+        // 0.5.0 is a direct APK release for rooted devices, not a Play upload.
+        disable += "ExpiredTargetSdkVersion"
+    }
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_11
+        targetCompatibility = JavaVersion.VERSION_11
+    }
+    buildFeatures {
+        aidl = true
+    }
+
+    sourceSets {
+        getByName("main").jniLibs.srcDirs(
+            nativeJniLibsDirectory.get().asFile,
+            cliCommandJniLibsDirectory.get().asFile,
+            prootJniLibsDirectory.get().asFile,
+            x11JniLibsDirectory.get().asFile,
+            waylandJniLibsDirectory.get().asFile,
+            adrenotoolsJniLibsDirectory.get().asFile,
+        )
+        // SourceSet accepts a concrete directory, not Gradle's Provider wrapper.
+        // `preBuild` explicitly depends on packageX11Assets below.
+        getByName("main").assets.srcDirs(
+            file("src/main/assets"),
+            x11AssetsDirectory.get().asFile,
+            virglAssetsDirectory.get().asFile,
+            pipewireAssetsDirectory.get().asFile,
+            guestCompatibilityAssetsDirectory.get().asFile,
+            gbmShimAssetsDirectory.get().asFile,
+            waylandImeBridgeAssetsDirectory.get().asFile,
+            sessionSupervisorAssetsDirectory.get().asFile,
+            droidspacesSupervisorAssetsDirectory.get().asFile,
+            dmabufDeviceReportAssetsDirectory.get().asFile,
+            inputReaderAssetsDirectory.get().asFile,
+        )
+    }
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
+    }
+}
+
+tasks.named("preBuild").configure {
+    dependsOn(
+        buildNativeArm64,
+        packageCliCommandArm64,
+        packageProotArm64,
+        packageX11LibraryArm64,
+        packageX11Assets,
+        packageWaylandArm64,
+        packageAdrenotoolsArm64,
+        packageVirglAssets,
+        packagePipeWireAssets,
+        packageGuestCompatibilityAssets,
+        packageGbmShimAssets,
+        packageWaylandImeBridgeAssets,
+        packageSessionSupervisorAssets,
+        packageDroidspacesSupervisorAssets,
+        packageDmabufDeviceReportAssets,
+        packageInputReaderAssets,
+    )
+}
+
+dependencies {
+    implementation(libs.androidx.activity.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.material)
+    implementation("androidx.annotation:annotation:1.9.0")
+    implementation(libs.tomlj)
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
+    androidTestImplementation(libs.androidx.junit)
+}

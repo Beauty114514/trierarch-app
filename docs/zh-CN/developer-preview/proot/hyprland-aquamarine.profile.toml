@@ -1,0 +1,19 @@
+id = "arch-proot-hyprland-adreno"
+name = "Arch PRoot Hyprland (Adreno)"
+runtime = "proot"
+rootfs = "/data/user/0/app.trierarch/files/rootfs/arch"
+shell = "/bin/bash"
+
+[display]
+type = "wayland"
+
+[launch]
+argv = ["sh", "-lc", "export DISABLE_RTKIT=1 HYPRLAND_NO_SYSTEMD=1 HYPRLAND_LOG_WLR=1 AQ_LOG_LEVEL=debug MESA_LOADER_DRIVER_OVERRIDE=zink GALLIUM_DRIVER=zink LIBGL_KOPPER_DRI2=true GALLIUM_THREAD=0; export LD_PRELOAD=/opt/trierarch/kwin/test/libtrierarch-drm-compat4.so; export TRIERARCH_MESA=/opt/trierarch/gpu/mesa-26.0/usr; export LD_LIBRARY_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH; export LIBGL_DRIVERS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/dri; export GBM_BACKENDS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/gbm; export __EGL_VENDOR_LIBRARY_FILENAMES=$TRIERARCH_MESA/share/glvnd/egl_vendor.d/50_mesa.json; export VK_ICD_FILENAMES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json VK_DRIVER_FILES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json; exec Hyprland --i-am-really-stupid > /opt/trierarch/hyprland-adreno.log 2>&1"]
+
+[graphics]
+renderer = "adreno"
+buffer = "dmabuf"
+qt_quick_backend = "auto"
+
+[compat]
+udev_monitor = "auto"

@@ -1,40 +1,121 @@
 # Contributing to Trierarch
 
-[中文](CONTRIBUTING.zh.md) | English
+Trierarch is an early-stage project. Contributions are welcome, but please keep
+changes focused and testable. English is used for code and issue forms; Chinese
+documentation and comments are welcome where they help users.
 
-Thanks for your interest in this project. This document is a **starting point**—adjustments are welcome via PR.
+## Before you start
 
-## Communication
+- Read the [documentation index](docs/en/README.md) and
+  [known issues](docs/en/README.md#known-issues).
+- Search existing issues before opening a new one.
+- For a bug, use the **Bug report** form; it asks for the device, runtime,
+  display, renderer and logs needed to reproduce the problem.
+- For a feature or a new runtime, use the **Feature request** form. New runtimes
+  take design, implementation and testing time.
+- Do not report security problems publicly. Follow [SECURITY.md](SECURITY.md).
 
-- **Issues and PRs** can be in **English or 中文** (or mixed). Prefer the language you are comfortable with.
-- For **large changes** (new features, refactors, API changes), open an **issue first** so we can align on direction.
+## Repository layout
 
-## How to contribute
+Trierarch is split across two repositories that are normally checked out as
+sibling directories:
 
-1. **Fork** the repository and create a branch from **`main`**.
-2. Make focused commits with **clear messages** (e.g. `fix(native): …`, `docs: …`, `feat(app): …`—[Conventional Commits](https://www.conventionalcommits.org/) style is appreciated but not mandatory).
-3. Open a **Pull Request** against `main` with a short description of **what** and **why**.
-4. If your change touches **build or docs**, update the relevant `README` / `README_DEV` so others can still reproduce builds.
+```text
+trierarch-app/          Android app, Kotlin UI, docs, issue templates
+trierarch-packages/     native runtimes, packaging, upstream patches and assets
+```
 
-## Code expectations (high level)
+The app build expects the packages checkout at `../trierarch-packages/`.
+Some packaged artifacts are produced by the package build scripts rather than
+committed to Git.
 
-| Area | Notes |
-|------|--------|
-| **Kotlin / Compose** (`trierarch-app/`) | Follow Android/Kotlin idioms; keep UI logic readable. |
-| **Rust** (`trierarch-native/`) | Run `cargo fmt` and `cargo clippy` where practical before submitting. |
-| **C / NDK** (`trierarch-proot/`, `trierarch-wayland/`) | Match existing style; avoid unrelated reformatting in the same commit as logic fixes. |
+## Development requirements
+
+- JDK 21;
+- Android SDK and NDK;
+- Rust and `cargo-ndk`;
+- Meson and Ninja;
+- the guest cross compiler used by the asset tasks
+  (for example `aarch64-linux-gnu-gcc`);
+- an Android device for runtime and display testing.
+
+## Build and test
+
+Run unit tests that do not require a device:
+
+```bash
+./gradlew :app:testDebugUnitTest
+```
+
+Run the Rust tests:
+
+```bash
+cd ../trierarch-packages/native
+cargo test
+```
+
+Build the debug APK:
+
+```bash
+./gradlew :app:assembleDebug
+```
+
+The APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+
+Device tests are manual for now. When a change affects a runtime, display or
+renderer, record what you tested:
+
+- device and Android version;
+- SoC and GPU;
+- runtime;
+- display;
+- renderer;
+- whether effects were enabled;
+- the relevant logs or a short result.
+
+Update [docs/en/matrices.md](docs/en/matrices.md) and
+[docs/zh-CN/matrices.md](docs/zh-CN/matrices.md) when you have a
+result worth recording. Mark untested combinations as untested; do not turn a
+missing result into a failure.
+
+## Code guidelines
+
+- Keep changes focused; avoid unrelated formatting or drive-by rewrites.
+- Preserve upstream source boundaries. PRoot, Lorie, virglrenderer, Mesa and
+  other third-party code are not relicensed by Trierarch.
+- Keep the distinction between the host app, the guest runtime and the display
+  layer clear.
+- Do not add prebuilt binaries without a source reference, pinned revision and
+  license note.
+- Do not commit build output, APKs, local keystores, credentials, device dumps or
+  personal data.
+- Do not weaken TLS, SELinux, permissions or sandboxing merely to silence a
+  warning.
 
 ## Documentation
 
-- User-facing behaviour: update root [`README.md`](README.md) / [`README.zh.md`](README.zh.md) if needed.
-- Build instructions: [`README_DEV.md`](README_DEV.md) and the **module** `README` under each directory.
-- Releases: [`docs/RELEASING.md`](docs/RELEASING.md) ([中文](docs/RELEASING.zh.md)).
-- Plasma/rootfs tips: [`trierarch-optimize/`](trierarch-optimize/).
+Product documentation is bilingual:
 
-## License
+- English: `README.md`, `docs/en/`,
+  `docs/en/matrices.md`;
+- Chinese: `README.zh-CN.md`, `docs/zh-CN/`,
+  `docs/zh-CN/matrices.md`.
 
-By contributing, you agree that your contributions are licensed under the same terms as the project (see root [`LICENSE`](LICENSE)).
+Known issues are one file per runtime and problem, with separate `en/` and
+`zh-CN/` trees. Documentation for unverified or preview functionality belongs
+under `developer-preview/`, not under `tutorials/` or `known-issues/`.
+If you add a product-level behavior, update both languages or clearly mark the
+translation as pending.
 
-## Questions
+## Pull requests
 
-If something is unclear, open an **issue** with the **question** label (or describe it as a question in the title)—that helps future contributors too.
+- Open one focused pull request per change.
+- Describe what changed and why.
+- List the tests you ran and the device combinations you tested.
+- Update documentation and compatibility notes when behavior changes.
+- Mention known limitations instead of hiding them.
+- Do not include generated files, secrets or personal logs.
+
+By contributing, you agree that your contribution is distributed under the
+project's GPL-3.0 license and that you have the right to submit it. Preserve all
+upstream copyright and license notices.

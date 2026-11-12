@@ -1,172 +1,251 @@
-> [!WARNING]
-> # Warning: KWin Instability on Trierarch
->
->Due to recent KDE updates, Trierarch encounters KWin crashes. Developers are actively working to resolve these compatibility issues. If the situation remains unfixable, a transition to the Debian distribution is planned, as testing confirms that Debian’s stable KDE version remains functional on Trierarch.
-
-> [!NOTE]
-> Good news, everyone! I’ve successfully fixed the crash issue. Right now, I'm in the middle of reworking trierarch to add several highly requested features from the community. Thanks for bearing with me—I really want to bring you a much better version of trierarch!
 # Trierarch
 
-[中文](README.zh.md) | English
+English | [中文](README.zh-CN.md)
+
+### The all-in-one Linux workstation in your pocket.
+
+Trierarch turns an Android phone or tablet into a local Linux machine. It gives
+you a real terminal, X11 and Wayland desktops, and three ways to run a Linux
+userspace: PRoot, chroot, and DroidSpaces containers.
+
+No virtual machine. No CPU emulation. No cloud desktop. The Linux environment
+runs on the device you are already holding, and Trierarch handles the parts
+that normally make that experience painful: display surfaces, input, audio,
+GPU paths, and session cleanup.
+
+## Start here
+
+New to Trierarch? Read the tutorial in order:
+
+1. [Trierarch CLI](docs/en/tutorials/01-cli.md)
+2. [Deploy a runtime](docs/en/tutorials/02-deploy.md)
+3. [Profile fields](docs/en/tutorials/03-profile-fields.md)
+4. [Hardware acceleration](docs/en/tutorials/04-hardware-acceleration.md)
+5. [Desktops](docs/en/tutorials/05-desktops.md)
+6. [Run and choose a sample](docs/en/tutorials/06-run.md)
+
+Reference: [Documentation index](docs/en/README.md) ·
+[Compatibility matrix](docs/en/matrices.md) ·
+[中文文档](docs/zh-CN/README.md).
 
 ---
 
-**Download:** latest APK → **[GitHub Releases](https://github.com/Beauty114514/trierarch/releases/latest)**.
+## A Trierarch remake
 
-## Demo
-
-| KDE Plasma (Wayland) | VS Code (inside proot) |
-|------------------------|-------------------------|
-| ![KDE Plasma desktop](docs/images/desktop.jpg) | ![VS Code](docs/images/vscode.jpg) |
+This repository is the **current, rewritten Trierarch**. The earlier Trierarch
+version has been rewritten: its old codebase and early optimization notes are
+not the current implementation. The Android app, native runtimes, packaging and
+session model in this repository are the new version. Early workarounds are
+kept only in the known-issues notes for older environments.
 
 ---
 
-**Trierarch** is an Android app that runs an **Arch Linux** rootfs using a **proot**-style container, with a custom **Wayland** compositor (development and tuning focus on **KDE Plasma (Wayland)**). The goal is your own **Arch** + **KDE Plasma 6 (Wayland)** mobile desktop.
+## Why choose Trierarch
 
-## 1. First launch: automatic rootfs download
+Many ways to run Linux on Android stop at a terminal or, at best, X11.
+Trierarch's biggest difference is that it also gives you a real Wayland
+session: a nested compositor such as KDE Plasma (KWin) or Hyprland, with its
+native effects, animations and window management.
 
-- If there is no usable rootfs under `data_dir/arch` at first launch, the app **downloads and extracts** the Arch Linux aarch64 rootfs from [proot-distro](https://github.com/termux/proot-distro/releases) (~156 MB). Network required.
+That is the capability this project is built around. Shell and X11 are
+supported too, but they are not the reason Trierarch exists.
 
-## 2. Before the desktop: enter Terminal (shortcut) and install Plasma inside proot
+On top of that, Trierarch turns the usual pile of scripts, sockets, environment
+variables and half-configured desktops into a managed session:
 
-Long-press the app icon to show **shortcuts**, then tap **Terminal** to enter the **Arch shell inside proot**.
+- start a runtime from a profile;
+- attach a terminal, an X11 display, or a Wayland desktop;
+- forward touch, keyboard, mouse and IME input;
+- route audio through PipeWire;
+- stop what was started when the session ends.
 
-![App shortcut](docs/images/shortcut.jpg)
+It is built for people who want a small, local Linux machine on a device they
+already carry — not a remote desktop and not a toy terminal.
 
-In the proot Arch shell, **update first, then install the desktop** (example; adjust packages as you like):
+## Screenshots
 
-```bash
-pacman -Syu
-pacman -S plasma-meta dolphin konsole
-```
+Phone screenshots from the current build, landscape:
 
-## 3. Floating menu orb and Display (open menu, set Display script, start the desktop)
+![Arch Linux KDE Plasma Wayland desktop on Trierarch](docs/assets/screenshots/arch-droidspace-plasma-wayland-phone.jpg)
 
-- **Floating menu orb** — A draggable **orb** on screen; **short tap** opens a **glass menu** (**Display**, **View Settings**, **Appearance**, **Keyboard**, and related actions). Drag the orb to move it; position is remembered between sessions.
+| Arch Linux + Hyprland | Kali Linux + Plasma |
+| --- | --- |
+| ![Arch Linux Hyprland on Trierarch](docs/assets/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Kali Linux Plasma on Trierarch](docs/assets/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
 
-![Floating menu orb](docs/images/floatingOrb.jpg)
+## What you can run
 
-| Menu open (terminal / Wayland view) | Menu open (desktop session) |
-|--------------------------------------|-----------------------------|
-| ![Orb menu in terminal view](docs/images/floutMenuInTerminal.jpg) | ![Orb menu on desktop](docs/images/floutMenuInDesktop.jpg) |
+| Runtime | Root | Best for |
+| --- | --- | --- |
+| **DroidSpaces** | Yes | Containers with their own init/systemd, started and stopped by Trierarch when it owns them |
+| **chroot** | Yes | A full rootfs on the device, with a session supervisor that cleans up after the app |
+| **PRoot** | No | A Linux userspace without root, kept inside the app's private storage |
 
-- **Display** — **Long-press** to edit the **Display startup script**; **short-press** to run it and start Plasma. **If a Wayland client is already connected, the app does not run the script again.**
+Trierarch is the shell, not the distribution. You provide a rootfs or a
+DroidSpaces container; Trierarch starts it, displays it, and manages its
+lifetime.
 
-**Recommended script** (session D-Bus via `dbus-launch`, then Plasma Wayland; redirect output so the script doesn’t block):
+## Runtime scope and extensibility
 
-```bash
-dbus-launch --exit-with-session startplasma-wayland > /dev/null 2>&1 &
-```
+Trierarch's session model is not tied to these three runtimes: in principle it
+can be adapted to other ways of running Linux on Android.
 
-**Audio note (PulseAudio):** Trierarch runs a host PulseAudio daemon (AAudio sink) and exposes it to the proot desktop over a Unix socket. To avoid "silent but playing" cases caused by the default **Null Output**, Trierarch will **auto-inject** a small snippet into your saved Display startup script that waits for PulseAudio and runs `pactl set-default-sink trierarch-out` (idempotent; it won’t be inserted twice).
+Trierarch currently maintains **PRoot, chroot and DroidSpaces** because those
+are the three the developer uses day to day. That is not a claim that other
+runtimes are impossible or unsupported by design.
 
-Even in a **proot** environment, it is good practice to **run the desktop as a normal user**, not as root. If you want to dig deeper, read ArchWiki **[Users and groups](https://wiki.archlinux.org/title/Users_and_groups)** and **[Sudo](https://wiki.archlinux.org/title/Sudo)**; otherwise the short recipe below is enough.
+If you want another runtime added, open an issue and describe your use case.
+Adding a new runtime is real design, implementation and testing work, and
+development takes time. Please be patient.
 
-**Create a user and sudo (example user `myuser`):**
+## Desktops and graphics
 
-```bash
-pacman -S sudo
-useradd -m -G wheel -s /bin/bash myuser
-passwd myuser
-EDITOR=nano visudo
-```
+- **Terminal** — a real TTY with touch scrolling, soft keyboard and hardware
+  keyboard support.
+- **Wayland** — KDE Plasma, Hyprland and other nested compositors through
+  Trierarch's Wayland host.
+- **X11** — XFCE, KDE and other X11 desktops through Trierarch's built-in X
+  server.
+- **Graphics paths** — llvmpipe software rendering, VirGL, Venus, or direct
+  Qualcomm Adreno, depending on the device and profile.
 
-In the editor, you can either **uncomment** the line `%wheel ALL=(ALL:ALL) ALL` so everyone in group `wheel` may use `sudo`, **or** leave that line as-is and **add below it** a dedicated rule, e.g. `myuser ALL=(ALL:ALL) ALL`. Alternatively, add a file under `/etc/sudoers.d/` (same syntax; use `visudo -f /etc/sudoers.d/myuser` to avoid syntax errors). Save and exit.
+Graphics acceleration is device- and profile-dependent. llvmpipe is the
+compatibility path; VirGL, Venus and Adreno are for devices and desktops where
+the matching guest/host stack is available. Trierarch does not promise the same
+GPU behavior on every phone.
 
-In the **Display** script editor (long-press **Display**), start Plasma **as that user** so files under `/home/myuser` belong to the session: **first line** switch to the account, **Enter**, **second line** the startup command. See the screenshot below.
+## Device support and stability
 
-![Display in orb menu](docs/images/displayScript.jpg)
+Trierarch is primarily developed and recommended for **Qualcomm Snapdragon
+devices**, especially Adreno-based phones and tablets. That is where the
+freedreno/Turnip/Adreno graphics stack is tested most and where the most
+complete experience is expected.
 
-**Sessions** (orb menu) lists terminal tabs—switch, add, or remove sessions.
+Other SoCs can run the terminal, PRoot, chroot and DroidSpaces paths, but their
+GPU drivers are less complete. Expect more missing graphics features, more
+fallbacks to software rendering, and more device-specific problems.
 
-![Sessions](docs/images/sessionSettings.jpg)
+For desktops, **Wayland is Trierarch's main differentiator**: it is what lets
+you run Plasma, Hyprland and other nested compositors with their native
+effects. It is also the fastest-moving part of the stack; technology that a
+stable setup relied on is often removed or changed in newer compositor
+versions. **X11 remains the safer fallback** for VirGL-style graphics and
+long-lived desktops, but it is not the reason this project exists.
 
-**Appearance** (orb menu): customize the in-app **Terminal** look—**fonts only** for now. For further beautification or theming ideas, **open an issue**—reasonable suggestions welcome.
+### Rooted and unrooted devices
 
-![Appearance settings](docs/images/appearenceSettings.jpg)
+A **rooted device can use Trierarch more completely**: DroidSpaces and chroot
+can give the guest direct Adreno access, so Plasma/Hyprland Wayland effects and
+the full GPU desktop path are available.
 
-## 4. Daily use: tap app to auto-start the desktop
+An **unrooted device is limited to PRoot** for a rootless Linux userspace.
+PRoot's Linux environment is not complete: running a full desktop or window
+manager has substantial limitations and often needs extra compatibility patches,
+and development is still in progress. Some terminal, software Wayland/Sway and
+host-side VirGL X11 paths work today. KDE Plasma Wayland on PRoot is supported
+with the KWin compatibility and guest GPU components. The exact tested
+combinations are listed in the
+[compatibility matrix](docs/en/matrices.md); treat the matrix as the source of
+truth rather than assuming every desktop works or fails.
 
-After you have set a Display startup script, you can **tap the app icon normally** to enter the desktop view; the app will **inject and run the Display script automatically** (idempotent when a desktop client is already connected).
+## Input, audio and storage
 
-The **Terminal** shortcut is for **first-time setup** (e.g. installing the desktop and terminal packages) or when you **prefer the in-app native terminal**—it’s optimized for **smooth switching** between the **desktop and terminal** views.
+- Touch, physical keyboard, mouse and virtual keyboard input;
+- rooted builds capture external physical keyboards through a root evdev
+  helper, so system-reserved Super/Meta shortcuts reach Wayland;
+- an IME bridge for desktop sessions;
+- PipeWire audio for PRoot, chroot and DroidSpaces sessions;
+- app-private storage for profiles and rootfs images;
+- Android's document provider for moving files in and out.
 
-## 5. After Plasma starts: View Settings and terminal ↔ desktop switching
+## Sessions that clean up after themselves
 
-### Hardware acceleration
+Leaving a Linux desktop running in the background is useful. Leaving an
+orphaned container behind is not.
 
-Trierarch currently supports **cross-chip** hardware acceleration (see renderer mode **UNIVERSAL**). More **high-performance** device-specific paths are still **in development**.
+- **PRoot** processes live with the app/PTY and end with the session.
+- **chroot** sessions are watched by an owner supervisor and end when the app
+  disappears.
+- **DroidSpaces** containers that Trierarch started are stopped when the app
+  exits or is force-stopped.
 
-### View Settings
+Containers that were already running before Trierarch are left alone. Trierarch
+only cleans up what it started.
 
-Open **View Settings** from the orb menu to tune the compositor and pointer behavior:
+## Project status
 
-![View Settings](docs/images/viewSettings.jpg)
+Trierarch is an **early-stage project**. The terminal, PRoot, chroot and core
+desktop paths are usable, but Trierarch is not a finished product.
 
-- **Pointer / mouse mode** — e.g. **touchpad-style (relative)** vs **tablet-style (absolute)**.
-- **UI size vs clarity** — **Resolution** and **Scale** can be **combined**: Resolution lowers output resolution to reduce compositing load **and** adjusts on-screen element size; Scale resizes via scaling without changing the backing resolution to keep text/UI sharp. There’s no single “correct” mix—tune until it fits **your** device and habits.
+Some parts can be genuinely frustrating right now: GPU behavior and nested
+Wayland vary by device and distribution, audio and input can have
+device-specific quirks, and some graphics paths are still experimental. Expect
+rough edges, incomplete features and occasional breakage.
 
-### Switching between terminal and desktop with Display
+The developers are actively working on these problems. Fixes, compatibility
+work and cleanup are ongoing, and the project will keep changing as that work
+lands. If something does not work on your device, it is not being ignored — it
+is part of the work still in progress.
 
-After Plasma is running, tap **Display** in the orb menu again to return to the **terminal / Wayland** view; **open the orb menu → Display** to go back to the desktop. The orb menu and Display work in both the shell view and on the desktop.
+## Built on other projects
 
-## 6. In-rootfs tuning (`trierarch-optimize`)
+Trierarch is the shell, not the whole stack. It uses, builds on, or
+redistributes components, binaries and data from other projects. Copyright and
+license notices remain with their upstream authors; none of the following is
+claimed as Trierarch's own work.
 
-For topic guides (browser, IME, fonts, etc.) after you’re on the desktop, see **[`trierarch-optimize/README.md`](trierarch-optimize/README.md)** ([中文](trierarch-optimize/README.zh.md)).
+| Component | Upstream / pinned revision | What Trierarch uses | License |
+| --- | --- | --- | --- |
+| **Termux terminal** | [termux/termux-app](https://github.com/termux/termux-app), commit `3df69d1da197dd9bd71a3bafd902dffd720576b4` | `com.termux.terminal`, `com.termux.view` | Termux repo is GPL-3.0; `terminal-emulator`/`terminal-view` are Apache-2.0 per Termux's notices |
+| **Termux:X11 / Lorie** | [termux/termux-x11](https://github.com/termux/termux-x11), commit `9471ad977d21b7c7bec45117008f74f330d45983` | `libXlorie.so` and XKB runtime asset | GPL-3.0-or-later |
+| **PRoot** | [termux/proot](https://github.com/termux/proot), commit `a89b3732ec6ae1db674510f0843b2f3db54d0a2f` | `proot` and `loader` Android binaries | GPL-2.0-only |
+| **virglrenderer** | [virgl/virglrenderer](https://gitlab.freedesktop.org/virgl/virglrenderer), `1.3.0` | Android vtest/Venus host server | MIT |
+| **Mesa 3D / lfdevs Freedreno** | Mesa upstream; [lfdevs Mesa fork](https://github.com/lfdevs/mesa-for-android-container) tag `mesa-27.0.0-devel-20261025-r1`; [lfdevs packaging](https://github.com/lfdevs/archlinuxarm-PKGBUILDs) commit `8a29bd2e...` | Guest virpipe/Adreno paths; Trierarch `mesa-adreno` recipe | Mesa per-file licenses (MIT / BSD-3-Clause / SGI-B-2.0); Trierarch patches/recipes GPL-3.0 unless a file says otherwise |
+| **ANGLE** | [google/angle](https://chromium.googlesource.com/angle/angle), Termux package `2.1.24923-f09a19ce-2` | Vulkan/GL backends used by the VirGL host | BSD-3-Clause |
+| **libepoxy** | [anholt/libepoxy](https://github.com/anholt/libepoxy), `1.5.10` | EGL/GL function dispatch | MIT |
+| **PipeWire** | [pipewire/pipewire](https://gitlab.freedesktop.org/pipewire/pipewire), `1.4.9-1` | Android audio server | MIT |
+| **WirePlumber** | [pipewire/wireplumber](https://gitlab.freedesktop.org/pipewire/wireplumber), `0.5.13` | Session/policy manager | MIT |
+| **Local Desktop AAudio sink** | [localdesktop](https://github.com/localdesktop/localdesktop.github.io/tree/0543368d3262e098b92ff0305e149ff0d1fce3e1), commit `0543368d...` | AAudio-backed `Audio/Sink` | GPL-3.0 |
+| **Wayland / wayland-protocols** | [wayland](https://gitlab.freedesktop.org/wayland/wayland) | Host compositor and protocols | MIT |
+| **libffi** | [libffi/libffi](https://github.com/libffi/libffi) | Wayland server support | MIT |
+| **X.Org XKB data** | XKeyboardConfig | XKB rules bundled for Lorie | X11-style |
+| **DroidSpaces** | [Droidspaces-OSS](https://github.com/ravindu644/Droidspaces-OSS) | Optional external container runtime | GPL-3.0 |
+| **AndroidX / Kotlin** | Android Open Source Project / JetBrains | App UI and Kotlin runtime | Apache-2.0 |
 
-**Strongly recommended:** fix **Baloo / virtual `tags:/`** issues common under **proot** (otherwise repeated pop-ups and wasted resources). Follow **[Baloo and `tags:/`](trierarch-optimize/baloo-tags-warning.md)** ([中文](trierarch-optimize/baloo-tags-warning.zh.md)).
+Additional notes:
 
-For general Arch setup and troubleshooting, use **[ArchWiki](https://wiki.archlinux.org/)** and the **[Arch Linux Chinese Wiki](https://wiki.archlinuxcn.org/)**. This app is **proot + Wayland**; some full-desktop assumptions (kernel, systemd sessions, …) may not apply.
+- PRoot's build also uses **talloc** (LGPL-3.0-or-later) and
+  **libandroid-shmem** (BSD-3-Clause); see `trierarch-packages/proot/UPSTREAM.md`
+  in the packages repository.
+- Mesa is a derivative chain (Mesa → lfdevs fork → lfdevs packaging → Trierarch
+  `mesa-adreno`), not a single MIT component. The Arch recipe pins the ifdevs
+  packaging commit by default; see `trierarch-packages/mesa-adreno/UPSTREAM.md`
+  and record the exact revision for each release.
+- The guest environments themselves — KDE Plasma/KWin, Hyprland/aquamarine,
+  XFCE and the Linux distributions — are external projects supplied by the
+  user's rootfs or container. Trierarch supports them but does not bundle them.
+- Exact pins, patch series and provenance notes live in the package
+  `UPSTREAM.md` files and in
+  [Termux terminal tracking](docs/en/upstream/termux-terminal.md) and
+  [Termux:X11 tracking](docs/en/upstream/termux-x11.md).
+- Some of these components are copyleft. If you redistribute binaries, keep
+  their copyright/license notices and comply with their licenses; Trierarch
+  does not relicense them.
 
-## 7. Keyboard and input (orb menu Keyboard, GTK / Qt)
+## License
 
-The **Keyboard** item in the orb menu can **invoke** the soft keyboard.
+Trierarch is released under the **GNU General Public License, version 3**.
+The full text is in [LICENSE](LICENSE).
 
-![Keyboard in orb menu](docs/images/keyboard.jpg)
+Upstream components keep their own licenses; see
+[Built on other projects](#built-on-other-projects) and the exact pins in the
+package `UPSTREAM.md` files. Trierarch does not relicense them. In particular:
 
-In **GTK** apps you can enter **non-ASCII** characters (Chinese, emoji, special characters, etc.); input is completed automatically via the **`Ctrl+Shift+U`** path.
+- Termux's `terminal-emulator` and `terminal-view` modules retain their
+  Apache-2.0 exception;
+- Termux:X11 / Lorie and the Local Desktop AAudio sink are GPL-3.0;
+- PRoot is GPL-2.0-only and is distributed as a separate executable, not linked
+  into the Trierarch app.
 
-**Qt** apps often don’t support that path: type in a **GTK** app first (**Mousepad**), then **copy/paste** into Qt. The **Android soft keyboard** and **Plasma clipboard** are **not integrated**—copy/paste inside Linux using the mouse or shortcuts (e.g. `Ctrl+C`, `Ctrl+V`). You can use a full soft keyboard such as [**Unexpected Keyboard**](https://play.google.com/store/apps/details?id=juloo.keyboard2) ([GitHub](https://github.com/Julow/Unexpected-Keyboard)).
-
-## 8. Build, changes, and releases
-
-To build from source, see [`README_DEV.md`](README_DEV.md). **Contributing & security:** [`CONTRIBUTING.md`](CONTRIBUTING.md), [`SECURITY.md`](SECURITY.md); changes in [`CHANGELOG.md`](CHANGELOG.md); releases: [`docs/RELEASING.md`](docs/RELEASING.md).
-
-## 9. Acknowledgments and licenses
-
-This section covers: **thanks to upstreams**, **bundled terminal font licenses**, and **other in-tree code** (see each tree’s `COPYING` / `LICENSE`).
-
-### Thanks
-
-| Thanks to |
-|-----------|
-| **[PRoot](https://github.com/termux/proot)**; Android build and loader integration under `trierarch-proot/` |
-| **Termux**: **[proot-distro](https://github.com/termux/proot-distro)** (Arch rootfs), **[terminal-emulator](https://github.com/termux/termux-app/tree/master/terminal-emulator)** (VT / screen buffer dependency), and the **TerminalView** code under `com.termux.view` derived from Termux |
-| **[Wayland](https://wayland.freedesktop.org/)**, **wayland-protocols**; in-app compositor native code under **`trierarch-wayland/`** |
-| **[libffi](https://github.com/libffi/libffi)** (Wayland stack), **Rust**, **Kotlin**, **Android NDK / JNI**; host native glue in **`trierarch-native/`** |
-| **Jetpack Compose**, **Material 3**, **AndroidX**, **Kotlin Coroutines**, and related Google open-source Android components |
-| **GNU/Linux** userland, **[Arch Linux](https://archlinux.org/)** packages and docs (**[ArchWiki](https://wiki.archlinux.org/)**, etc.) |
-| **[KDE](https://kde.org/)**, **Plasma**, and sibling free-software communities |
-| **AOSP** and fonts such as **Droid Sans Mono** commonly shipped with the platform |
-| **[Unexpected Keyboard](https://github.com/Julow/Unexpected-Keyboard)** (third-party keyboard cited in this README; install separately) |
-| Upstream font projects listed under **Bundled terminal fonts** below |
-
-### Bundled terminal fonts
-
-In-app shell fonts: open **Appearance** from the floating orb menu. **System monospace** is not shipped under `res/font/`.
-
-| File (`trierarch-app/app/src/main/res/font/`) | Upstream | License |
-|-----------------------------------------------|----------|---------|
-| `jetbrains_mono_regular.ttf` | [JetBrains Mono](https://github.com/JetBrains/JetBrainsMono) | [SIL OFL 1.1](https://openfontlicense.org) |
-| `ibm_plex_mono_regular.ttf` | [IBM Plex Mono](https://github.com/googlefonts/ibm-plex) | [SIL OFL 1.1](https://openfontlicense.org) |
-| `source_code_pro_regular.ttf` | [Source Code Pro](https://github.com/adobe-fonts/source-code-pro) | [SIL OFL 1.1](https://openfontlicense.org) |
-| `noto_sans_mono_regular.ttf` | [Noto Sans Mono](https://github.com/googlefonts/noto-fonts) | [SIL OFL 1.1](https://openfontlicense.org) |
-| `droid_sans_mono.ttf` | [Droid Sans Mono](https://cs.android.com/android/platform/frameworks/base/+/master:data/fonts) (AOSP) | [Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0) |
-
-**JetBrains Mono** (copyright excerpt from upstream):
-
-> Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
->
-> This Font Software is licensed under the SIL Open Font License, Version 1.1.
-
-Other SIL fonts in the table are under OFL as well; full terms and notices are in each upstream repository. **Complete license texts** shipped with the app are in **`assets/licenses/FONT_LICENSES.txt`** (in-tree: `trierarch-app/app/src/main/assets/licenses/FONT_LICENSES.txt`).
+The formal component-by-component attribution, pinned revisions and source
+locations are in [THIRD_PARTY.md](THIRD_PARTY.md). The short redistribution
+notice is [NOTICE](NOTICE).
