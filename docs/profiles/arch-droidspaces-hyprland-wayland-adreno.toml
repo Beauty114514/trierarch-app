@@ -11,7 +11,7 @@ type = "wayland"
 desktop_scale = 100
 
 [launch]
-argv = ["start-hyprland"]
+argv = ["env", "GALLIUM_DRIVER=freedreno", "MESA_LOADER_DRIVER_OVERRIDE=kgsl", "dbus-run-session", "--", "start-hyprland"]
 
 [graphics]
 renderer = "adreno"

@@ -129,8 +129,8 @@ Guest 应用通常走三种 GPU 路径之一：
 
 - **llvmpipe**：guest 软件渲染，兼容路径；
 - **VirGL**：host 运行 VirGL/vtest server，guest Mesa 使用 virpipe；
-- **Adreno**：支持的 Qualcomm 设备上，guest 使用 freedreno/kgsl 直接走设备
-  GPU，仅 Wayland。
+- **Adreno**：支持的 Qualcomm 设备上，guest 使用 KGSL 设备。profile 的启动命令
+  自己选择 Gallium 前端：freedreno 直通，或 Zink + Turnip；仅 Wayland。
 
 Wayland host 自己还有一条独立的显示路径：
 

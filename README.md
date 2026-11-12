@@ -141,8 +141,9 @@ An **unrooted device is limited to PRoot** for a rootless Linux userspace.
 PRoot's Linux environment is not complete: running a full desktop or window
 manager has substantial limitations and often needs extra compatibility patches,
 and development is still in progress. Some terminal, software Wayland/Sway and
-host-side VirGL X11 paths work today; KDE Plasma Wayland is a developer preview
-with additional components. The exact tested combinations are listed in the
+host-side VirGL X11 paths work today. KDE Plasma Wayland on PRoot is supported
+with the KWin compatibility and guest GPU components. The exact tested
+combinations are listed in the
 [compatibility matrix](docs/en/matrices.md); treat the matrix as the source of
 truth rather than assuming every desktop works or fails.
 

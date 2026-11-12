@@ -393,9 +393,10 @@ class ProfileStore(context: Context) {
                 add("VN_DEBUG=vtest")
             }
             if (renderer == GRAPHICS_ADRENO) {
-                add("MESA_LOADER_DRIVER_OVERRIDE=kgsl")
+                // Keep only the hints shared by the freedreno and Zink paths.
+                // The profile launch command selects the actual Gallium driver,
+                // so users can choose either path without another renderer enum.
                 add("TURNIP_KMD=kgsl")
-                add("GALLIUM_DRIVER=freedreno")
                 add("FD_FORCE_KGSL=1")
             }
             if (resolvedBuffer == BUFFER_SHM) {

@@ -140,8 +140,10 @@ Guest applications usually use one of three GPU paths:
 - **llvmpipe** — guest software rendering. It is the compatibility path.
 - **VirGL** — the host runs the VirGL/vtest server; the guest Mesa uses the
   virpipe driver.
-- **Adreno** — on supported Qualcomm devices, the guest uses freedreno/kgsl and
-  renders directly through the device GPU. This path is Wayland-only.
+- **Adreno** — on supported Qualcomm devices, the guest uses the KGSL device.
+  The profile launch command chooses the Gallium frontend: freedreno for the
+  direct path, or Zink with Turnip for the Vulkan-backed path. This renderer is
+  Wayland-only.
 
 The Wayland host has a separate display path:
 

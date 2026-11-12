@@ -11,7 +11,7 @@ type = "wayland"
 desktop_scale = 100
 
 [launch]
-argv = ["env", "DISABLE_RTKIT=1", "KWIN_COMPOSE=O2", "KWIN_RENDER_NODES=/dev/dri/renderD128", "dbus-run-session", "--", "startplasma-wayland"]
+argv = ["env", "DISABLE_RTKIT=1", "KWIN_COMPOSE=O2", "KWIN_RENDER_NODES=/dev/dri/renderD128", "GALLIUM_DRIVER=freedreno", "MESA_LOADER_DRIVER_OVERRIDE=kgsl", "dbus-run-session", "--", "startplasma-wayland"]
 
 [graphics]
 renderer = "adreno"
