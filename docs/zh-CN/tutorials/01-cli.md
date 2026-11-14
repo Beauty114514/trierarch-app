@@ -48,7 +48,7 @@ Profile ID 只能用小写字母、数字和 `-`，以字母开头，最长 64 �
 PRoot rootfs 从 `.tar.xz` 归档导入：
 
 ```sh
-trierarch --import /sdcard/Download/arch-rootfs.tar.xz --name arch
+trierarch --import ~/arch-rootfs.tar.xz --name arch
 ```
 
 命令会输出安装后的 rootfs 路径，把它填进 profile 的 `rootfs` 字段。删除：

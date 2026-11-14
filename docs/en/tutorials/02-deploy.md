@@ -17,17 +17,26 @@ Choose the latest date directory and download its `rootfs.tar.xz`. The archive
 is the rootfs tarball Trierarch imports; do not use a desktop image or a
 different architecture.
 
-Then push it to a location the app can read, for example the shared Download
-directory:
+Do not use `/sdcard/Download` directly. Android 11 and newer enforce scoped
+storage, and Trierarch cannot read a `.tar.xz` from the shared Download directory
+by default. Doing so fails with:
 
-```sh
-adb push rootfs.tar.xz /sdcard/Download/arch-rootfs.tar.xz
+```text
+open rootfs archive: Permission denied (os error 13)
 ```
 
-In the Trierarch shell, import it:
+Download the archive into the app-private home directory from the Trierarch
+shell:
 
 ```sh
-trierarch --import /sdcard/Download/arch-rootfs.tar.xz --name arch
+cd ~
+curl -fL -o arch-rootfs.tar.xz "<rootfs.tar.xz download URL>"
+```
+
+Then import it from the same directory:
+
+```sh
+trierarch --import ~/arch-rootfs.tar.xz --name arch
 ```
 
 The command prints the installed path. Record it for the profile:
@@ -36,8 +45,9 @@ The command prints the installed path. Record it for the profile:
 /data/user/0/app.trierarch/files/rootfs/arch
 ```
 
-If the app cannot read the shared Download path on your Android version, put the
-archive in an app-readable directory first, then use that absolute path.
+If the archive is already on your computer, download it again from inside the
+app with `curl`, or use the app's own import flow. Do not pass
+`/sdcard/Download/...` to `--import`.
 
 Remove an imported environment with:
 

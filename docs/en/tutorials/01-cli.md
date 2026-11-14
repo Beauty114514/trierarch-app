@@ -48,7 +48,7 @@ at most 64 characters.
 A PRoot rootfs is imported from an `.tar.xz` archive:
 
 ```sh
-trierarch --import /sdcard/Download/arch-rootfs.tar.xz --name arch
+trierarch --import ~/arch-rootfs.tar.xz --name arch
 ```
 
 The command prints the installed rootfs path. Put that path in the profile's

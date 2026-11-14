@@ -15,16 +15,24 @@ Trierarch 不内置 Linux rootfs。从 Linux Containers 镜像站下载 Arch Lin
 选择最新的日期目录，下载其中的 `rootfs.tar.xz`。这个归档才是 Trierarch 导入的
 rootfs；不要用桌面镜像或其他架构的镜像。
 
-把它推到 App 能读取的位置，例如共享 Download 目录：
+不要直接使用 `/sdcard/Download`。Android 11 及以上版本对共享存储启用 Scoped
+Storage，Trierarch 默认不能读取 Download 目录里的 `.tar.xz`，会报：
 
-```sh
-adb push rootfs.tar.xz /sdcard/Download/arch-rootfs.tar.xz
+```text
+open rootfs archive: Permission denied (os error 13)
 ```
 
-在 Trierarch shell 中导入：
+先在 Trierarch shell 中把归档下载到 App 私有目录：
 
 ```sh
-trierarch --import /sdcard/Download/arch-rootfs.tar.xz --name arch
+cd ~
+curl -fL -o arch-rootfs.tar.xz "<rootfs.tar.xz 下载地址>"
+```
+
+然后在同一目录导入：
+
+```sh
+trierarch --import ~/arch-rootfs.tar.xz --name arch
 ```
 
 命令会输出安装路径，记录下来填进 profile：
@@ -33,8 +41,8 @@ trierarch --import /sdcard/Download/arch-rootfs.tar.xz --name arch
 /data/user/0/app.trierarch/files/rootfs/arch
 ```
 
-如果当前 Android 版本下 App 读不到共享 Download 路径，先把归档放进 App 可读目录，
-再使用那个绝对路径。
+如果归档已经在电脑上，先在 App 内用 `curl` 下载，或通过 App 自己的导入入口处理；
+不要把 `/sdcard/Download/...` 直接传给 `--import`。
 
 删除已导入环境：
 
