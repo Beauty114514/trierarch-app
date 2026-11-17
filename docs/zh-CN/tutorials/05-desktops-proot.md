@@ -213,13 +213,18 @@ Mesa 组件和 Plasma 共用。`libaquamarine-compat.so` 是 PRoot Hyprland 的�
 
 ```sh
 pacman -S --needed hyprland
+pacman -S --needed dbus
 
 install -d /opt/trierarch/compat
 install -m 755 /path/to/libaquamarine-compat.so /opt/trierarch/compat/
 
 ls -l /opt/trierarch/compat/libaquamarine-compat.so
 command -v Hyprland
+command -v dbus-run-session
 ```
+
+`--needed` 表示已安装的包不重复安装。`dbus` 提供 `dbus-run-session`，
+profile 用它建立 session bus。
 
 如果不用 release 资产，而是在源码树里构建：
 
@@ -252,7 +257,7 @@ hl.monitor({
 
 使用样例 profile：
 
-- [`arch-proot-hyprland-wayland-adreno.toml`](../../profiles/arch-proot-hyprland-wayland-adreno.toml)
+- [`arch-proot-hyprland-adreno.toml`](../../profiles/arch-proot-hyprland-adreno.toml)
 
 关键部分是：
 
@@ -265,7 +270,7 @@ type = "wayland"
 desktop_scale = 100
 
 [launch]
-argv = ["sh", "-lc", "export MESA_LOADER_DRIVER_OVERRIDE=zink GALLIUM_DRIVER=zink LIBGL_KOPPER_DRI2=true GALLIUM_THREAD=0 TRIERARCH_NESTED_RENDER_NODE=1; export TRIERARCH_MESA=/opt/trierarch/gpu/mesa-26.0/usr; export LD_LIBRARY_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH; export LIBGL_DRIVERS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/dri; export GBM_BACKENDS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/gbm; export __EGL_VENDOR_LIBRARY_FILENAMES=$TRIERARCH_MESA/share/glvnd/egl_vendor.d/50_mesa.json; export VK_ICD_FILENAMES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json VK_DRIVER_FILES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json; export LD_PRELOAD=/opt/trierarch/compat/libaquamarine-compat.so; exec Hyprland --i-am-really-stupid >/tmp/trierarch-hyprland-pr.log 2>&1"]
+argv = ["sh", "-lc", "export MESA_LOADER_DRIVER_OVERRIDE=zink GALLIUM_DRIVER=zink LIBGL_KOPPER_DRI2=true GALLIUM_THREAD=0 TRIERARCH_NESTED_RENDER_NODE=1; export TRIERARCH_MESA=/opt/trierarch/gpu/mesa-26.0/usr; export LD_LIBRARY_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH; export LIBGL_DRIVERS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/dri; export GBM_BACKENDS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/gbm; export __EGL_VENDOR_LIBRARY_FILENAMES=$TRIERARCH_MESA/share/glvnd/egl_vendor.d/50_mesa.json; export VK_ICD_FILENAMES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json VK_DRIVER_FILES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json; export LD_PRELOAD=/opt/trierarch/compat/libaquamarine-compat.so; exec dbus-run-session -- start-hyprland -- --i-am-really-stupid >/tmp/trierarch-hyprland-pr.log 2>&1"]
 
 [graphics]
 renderer = "adreno"
@@ -285,8 +290,9 @@ buffer = "dmabuf"
 | `TRIERARCH_MESA`、`LIBGL_DRIVERS_PATH`、`GBM_BACKENDS_PATH` | 指向解压后的 PRoot Mesa 组件 |
 | `VK_ICD_FILENAMES` / `VK_DRIVER_FILES` | 指向配套 Turnip ICD |
 
-因为 PRoot guest 以 root 运行，且 Trierarch 直接启动 compositor，所以使用
-`Hyprland --i-am-really-stupid`，不经过 `start-hyprland`。
+`dbus-run-session` 提供 session bus，供 portal、通知和音频等服务使用。
+`start-hyprland` 是 Hyprland 上游推荐的 watchdog 启动包装器；`--` 后面的
+`--i-am-really-stupid` 会透传给 Hyprland，因为 PRoot guest 以 root 运行。
 
 ### 4. 启动 Hyprland
 
