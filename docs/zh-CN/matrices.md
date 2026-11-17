@@ -125,7 +125,8 @@ PRoot 不是完整的 Linux 环境。未 root 的 Android 上，App UID 通常�
   kwin_core: We are going to quit KWin now as it is broken
   ```
 - **Hyprland** 使用合并版 `libaquamarine-compat.so`。没有它时，Aquamarine 会在
-  fake render node 上失败或卡住；见第五章 A。
+  fake render node 上失败或卡住；见
+  [PRoot — Hyprland](tutorials/05-desktops-proot-hyprland.md)。
 - dmabuf device report 可能报 `open /dev/dri: Permission denied`，host 因此可能不会
   发布 GPU compositor 需要的 dmabuf 路径。
 

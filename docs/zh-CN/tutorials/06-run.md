@@ -71,7 +71,8 @@ docs/profiles/
 - [Arch PRoot Plasma profile](../../profiles/arch-proot-plasma-wayland-adreno.toml)
   是 KWin compatibility 资产路径的参考。
 - [Arch PRoot Hyprland profile](../../profiles/arch-proot-hyprland-adreno.toml)
-  使用单个 `libaquamarine-compat.so` 和 PRoot Mesa 组件；见第五章 A。
+  使用单个 `libaquamarine-compat.so` 和 PRoot Mesa 组件；见
+  [PRoot — Hyprland](05-desktops-proot-hyprland.md)。
 - [Arch DroidSpaces Plasma profile](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)
   和 [Arch DroidSpaces Hyprland profile](../../profiles/arch-droidspaces-hyprland-wayland-adreno.toml)
   是手机上可用的 Arch profile，整理成样例。

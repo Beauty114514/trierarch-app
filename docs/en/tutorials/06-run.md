@@ -75,7 +75,7 @@ docs/profiles/
   is the reference for the KWin compatibility-asset path.
 - [Arch PRoot Hyprland profile](../../profiles/arch-proot-hyprland-adreno.toml)
   uses the single `libaquamarine-compat.so` guest library and the PRoot Mesa
-  component; see Chapter 5A.
+  component; see [PRoot — Hyprland](05-desktops-proot-hyprland.md).
 - [Arch DroidSpaces Plasma profile](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)
   and [Arch DroidSpaces Hyprland profile](../../profiles/arch-droidspaces-hyprland-wayland-adreno.toml)
   are the phone's working Arch profiles, cleaned up as examples.

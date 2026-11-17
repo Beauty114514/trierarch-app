@@ -133,7 +133,8 @@ Tested examples:
   kwin_core: We are going to quit KWin now as it is broken
   ```
 - **Hyprland** uses the combined `libaquamarine-compat.so` guest library. Without
-  it, Aquamarine fails or blocks on the fake render node; see Chapter 5A.
+  it, Aquamarine fails or blocks on the fake render node; see
+  [PRoot — Hyprland](tutorials/05-desktops-proot-hyprland.md).
 - A dmabuf device report can fail with `open /dev/dri: Permission denied`, so the
   host may not publish the dmabuf path a GPU compositor needs.
 

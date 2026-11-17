@@ -6,6 +6,8 @@ Choose the runtime first, then follow its desktop tutorial. Trierarch does not
 bundle KDE, Hyprland, XFCE, or their drivers.
 
 - [5A — Desktops on PRoot](05-desktops-proot.md)
+  - [KDE Plasma Wayland](05-desktops-proot-kde.md)
+  - [Hyprland](05-desktops-proot-hyprland.md)
 - [5B — Desktops on chroot](05-desktops-chroot.md)
 - [5C — Desktops on DroidSpaces](05-desktops-droidspaces.md)
 

@@ -13,6 +13,8 @@ profile fields, GPU assets, desktops, and finally running a sample.
 4. [Hardware acceleration assets](tutorials/04-hardware-acceleration.md)
 5. [Desktops](tutorials/05-desktops.md)
    - [PRoot](tutorials/05-desktops-proot.md)
+     - [KDE Plasma](tutorials/05-desktops-proot-kde.md)
+     - [Hyprland](tutorials/05-desktops-proot-hyprland.md)
    - [chroot](tutorials/05-desktops-chroot.md)
    - [DroidSpaces](tutorials/05-desktops-droidspaces.md)
 6. [Run and choose a sample](tutorials/06-run.md)

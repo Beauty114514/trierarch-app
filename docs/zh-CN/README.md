@@ -12,6 +12,8 @@
 4. [硬件加速资产](tutorials/04-hardware-acceleration.md)
 5. [桌面](tutorials/05-desktops.md)
    - [PRoot](tutorials/05-desktops-proot.md)
+     - [KDE Plasma](tutorials/05-desktops-proot-kde.md)
+     - [Hyprland](tutorials/05-desktops-proot-hyprland.md)
    - [chroot](tutorials/05-desktops-chroot.md)
    - [DroidSpaces](tutorials/05-desktops-droidspaces.md)
 6. [运行和选择样例](tutorials/06-run.md)
