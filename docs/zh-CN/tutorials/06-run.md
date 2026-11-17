@@ -55,6 +55,7 @@ trierarch --rerun arch-demo
 | 样例 | 运行环境 | 桌面 | 说明 |
 | --- | --- | --- | --- |
 | [Arch PRoot Plasma](../../profiles/arch-proot-plasma-wayland-adreno.toml) | PRoot | KDE Plasma | KWin compat + fake DRM |
+| [Arch PRoot Hyprland](../../profiles/arch-proot-hyprland-wayland-adreno.toml) | PRoot | Hyprland | aquamarine-compat + fake DRM |
 | [Arch DroidSpaces Plasma](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml) | DroidSpaces | KDE Plasma | Adreno，已有容器 |
 | [Arch DroidSpaces Hyprland](../../profiles/arch-droidspaces-hyprland-wayland-adreno.toml) | DroidSpaces | Hyprland | Adreno，已有容器 |
 | [Kali chroot Plasma](../../profiles/kali-chroot-plasma-wayland-adreno.toml) | chroot | KDE Plasma | Adreno，chroot rootfs |
@@ -68,7 +69,9 @@ docs/profiles/
 ## 样例说明
 
 - [Arch PRoot Plasma profile](../../profiles/arch-proot-plasma-wayland-adreno.toml)
-  是 compatibility 资产路径的参考。
+  是 KWin compatibility 资产路径的参考。
+- [Arch PRoot Hyprland profile](../../profiles/arch-proot-hyprland-wayland-adreno.toml)
+  使用单个 `libaquamarine-compat.so` 和 PRoot Mesa 组件；见第五章 A。
 - [Arch DroidSpaces Plasma profile](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)
   和 [Arch DroidSpaces Hyprland profile](../../profiles/arch-droidspaces-hyprland-wayland-adreno.toml)
   是手机上可用的 Arch profile，整理成样例。

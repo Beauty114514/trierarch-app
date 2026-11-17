@@ -58,6 +58,7 @@ users for your device.
 | Sample | Runtime | Desktop | Notes |
 | --- | --- | --- | --- |
 | [Arch PRoot Plasma](../../profiles/arch-proot-plasma-wayland-adreno.toml) | PRoot | KDE Plasma | KWin compat + fake DRM |
+| [Arch PRoot Hyprland](../../profiles/arch-proot-hyprland-wayland-adreno.toml) | PRoot | Hyprland | aquamarine-compat + fake DRM |
 | [Arch DroidSpaces Plasma](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml) | DroidSpaces | KDE Plasma | Adreno, existing container |
 | [Arch DroidSpaces Hyprland](../../profiles/arch-droidspaces-hyprland-wayland-adreno.toml) | DroidSpaces | Hyprland | Adreno, existing container |
 | [Kali chroot Plasma](../../profiles/kali-chroot-plasma-wayland-adreno.toml) | chroot | KDE Plasma | Adreno, chroot rootfs |
@@ -71,7 +72,10 @@ docs/profiles/
 ## Sample notes
 
 - [Arch PRoot Plasma profile](../../profiles/arch-proot-plasma-wayland-adreno.toml)
-  is the reference for the compatibility-asset path.
+  is the reference for the KWin compatibility-asset path.
+- [Arch PRoot Hyprland profile](../../profiles/arch-proot-hyprland-wayland-adreno.toml)
+  uses the single `libaquamarine-compat.so` guest library and the PRoot Mesa
+  component; see Chapter 5A.
 - [Arch DroidSpaces Plasma profile](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)
   and [Arch DroidSpaces Hyprland profile](../../profiles/arch-droidspaces-hyprland-wayland-adreno.toml)
   are the phone's working Arch profiles, cleaned up as examples.

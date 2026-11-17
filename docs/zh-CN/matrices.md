@@ -27,7 +27,7 @@
 | --- | --- | --- | --- |
 | **DroidSpaces** | 是 | Adreno 直通，特效可用 | Adreno 直通；也可用 VirGL |
 | **chroot** | 是 | Adreno 直通，特效可用 | Adreno 直通；也可用 VirGL |
-| **PRoot** | 否 | 取决于 compositor 和所需 patch；不是完整的 Linux 环境。KDE Plasma 和 Plasma Mobile Wayland 在使用兼容组件时受支持 | 宿主 **VirGL**（`virpipe`），guest 不需要 `/dev/dri` |
+| **PRoot** | 否 | 取决于 compositor 和所需 patch；不是完整的 Linux 环境。KDE Plasma、Plasma Mobile 和 Hyprland Wayland 在使用兼容组件时受支持 | 宿主 **VirGL**（`virpipe`），guest 不需要 `/dev/dri` |
 
 ### Wayland 硬件加速
 
@@ -38,7 +38,7 @@ Wayland 是主要桌面路径，也是 Plasma/Hyprland 特效的来源。它的 
 | --- | --- | --- |
 | **DroidSpaces** | Adreno 直通（freedreno/kgsl） | ✅ 已验证；特效可用 |
 | **chroot** | Adreno 直通（freedreno/kgsl） | ✅ 已验证；特效可用 |
-| **PRoot** | 取决于 compositor 和 patch；Adreno Plasma 和 Plasma Mobile 使用兼容组件 | ⚠️ 取决于配置；见下方已测试项 |
+| **PRoot** | 取决于 compositor 和 patch；Adreno Plasma、Plasma Mobile 和 Hyprland 使用兼容组件 | ⚠️ 取决于配置；见下方已测试项 |
 
 PRoot 不是完整的 Linux 环境，运行桌面或窗口管理器有很多限制，很多路径需要额外
 兼容 patch 或资产。下面的结果只是已经测试过的配置，不代表所有桌面都一定不能用，
@@ -90,11 +90,11 @@ PRoot 不是完整的 Linux 环境，桌面和窗口管理器支持有限，通�
 | **KDE Plasma Wayland** | adreno + 兼容组件 | ✅ 已验证；需要匹配的 KWin 与 guest GPU userspace stack |
 | **KDE Plasma Mobile Wayland** | adreno + 兼容组件 | ✅ 已验证；特效可用；使用 `startplasmamobile` 启动 |
 | **KDE Plasma Wayland** | llvmpipe / 软件 | ⚠️ 旧配置；不走 GPU 路径 |
-| **Hyprland** | adreno | ❌ 当前测试配置失败；见预览说明 |
+| **Hyprland** | adreno + `libaquamarine-compat.so` | ✅ 已验证；需要 PRoot Hyprland 兼容库 |
 | **KDE Plasma X11** | llvmpipe / VirGL | ❌ 当前 KWin/Plasma ABI 下测试 profile 失败；需要匹配的 X11 session |
 
 安装步骤和当前限制见
-[PRoot + Adreno + Plasma Wayland](tutorials/05-desktops-proot.md)。
+[PRoot + Adreno + Plasma/Hyprland Wayland](tutorials/05-desktops-proot.md)。
 
 Plasma X11 的失败是 `kwin_x11` 6.7.5 与 Plasma 6.8.2 的包/ABI 不匹配，不能据此
 断言 X11 或 VirGL 永远不可用；需要匹配的 X11 session 或 XFCE。
@@ -124,7 +124,8 @@ PRoot 不是完整的 Linux 环境。未 root 的 Android 上，App UID 通常�
   kwin_core: The used windowing system requires compositing
   kwin_core: We are going to quit KWin now as it is broken
   ```
-- **Hyprland** 在当前 Aquamarine 测试配置下失败；更新组件或 patch 后结果可能变化；
+- **Hyprland** 使用合并版 `libaquamarine-compat.so`。没有它时，Aquamarine 会在
+  fake render node 上失败或卡住；见第五章 A。
 - dmabuf device report 可能报 `open /dev/dri: Permission denied`，host 因此可能不会
   发布 GPU compositor 需要的 dmabuf 路径。
 

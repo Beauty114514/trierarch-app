@@ -23,7 +23,7 @@ frontend is Freedreno; Vulkan applications use Turnip.
 
 | Runtime | Adreno device access | KWin compatibility patch |
 | --- | --- | --- |
-| PRoot | Trierarch synthesizes a fake render node | required for Plasma Wayland |
+| PRoot | Trierarch synthesizes a fake render node | required for Plasma/Hyprland Wayland |
 | chroot | real `/dev/dri` via root | no |
 | DroidSpaces | real `/dev/dri` inside the container | no |
 

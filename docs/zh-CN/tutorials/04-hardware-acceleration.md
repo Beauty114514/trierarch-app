@@ -23,7 +23,7 @@ Freedreno；Vulkan 应用使用 Turnip。
 
 | 运行环境 | Adreno 设备访问 | KWin compatibility patch |
 | --- | --- | --- |
-| PRoot | Trierarch 合成 fake render node | Plasma Wayland 需要 |
+| PRoot | Trierarch 合成 fake render node | Plasma/Hyprland Wayland 需要 |
 | chroot | 通过 root 访问真实 `/dev/dri` | 不需要 |
 | DroidSpaces | 容器内访问真实 `/dev/dri` | 不需要 |
 
