@@ -61,7 +61,7 @@ profile 里的 `TRIERARCH_MESA`、`LIBGL_DRIVERS_PATH`、`GBM_BACKENDS_PATH`、
 ## 选择桌面
 
 - [KDE Plasma Wayland](05-desktops-proot-kde.md) — KWin compatibility library
-- [Hyprland](05-desktops-proot-hyprland.md) — aquamarine-compat 和壁纸配置
+- [Hyprland（实验性，非公开）](05-desktops-proot-hyprland.md) — 仅开发参考，不提供公开兼容资产
 
 ## XFCE
 
@@ -72,7 +72,7 @@ KWin 或 aquamarine compatibility library。
 
 - PRoot 不能打开 `/dev/dri/renderD128` 或 `/dev/dri/card0`；
 - Adreno Plasma 需要 KWin 兼容组件和匹配的 KWin 构建；
-- Hyprland 需要 `libaquamarine-compat.so`；这是较新的路径，暂时按实验性功能对待；
+- Hyprland 目前是实验性功能，不作为公开方案，也不提供兼容资产；
 - 音频使用 profile 的 `audio.backend = "pipewire"`；
 - 其他已验证组合见[兼容性矩阵](../matrices.md)。
 

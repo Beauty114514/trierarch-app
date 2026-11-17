@@ -4,6 +4,12 @@
 
 [返回 PRoot 桌面总览](05-desktops-proot.md)
 
+> **实验性功能，暂不作为公开方案。**
+>
+> PRoot 上的 Hyprland 目前还不稳定，不是受支持的公开桌面路径；
+> Trierarch 暂不提供它的兼容库、公开 profile 或相关资产。
+> 本页仅作为开发记录，配置可能随时变更或失效。
+
 先完成[公共 Mesa 26 + Turnip 准备](05-desktops-proot.md)，然后配置 Hyprland。
 Hyprland 还需要 `libaquamarine-compat.so` 和壁纸 daemon。
 
@@ -37,8 +43,8 @@ PRoot Hyprland 使用一个合并库：
 libaquamarine-compat.so
 ```
 
-它作为 Trierarch release 资产发布。如果从源码构建，在
-`trierarch-packages/aquamarine-compat` 里执行 `make combined`。
+在实验阶段，这个库**不作为 release 资产发布**。开发者可以在
+`trierarch-packages/aquamarine-compat` 里执行 `make combined` 本地构建。
 
 在 guest 内安装：
 
@@ -51,7 +57,7 @@ Hyprland 不要安装 KWin compatibility library。
 
 ## Profile
 
-使用样例：
+下面的文件**仅作为开发参考**，不属于公开样例集，可能随时移除或修改：
 
 - [`arch-proot-hyprland-adreno.toml`](../../profiles/arch-proot-hyprland-adreno.toml)
 

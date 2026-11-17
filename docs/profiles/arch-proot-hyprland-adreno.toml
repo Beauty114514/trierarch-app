@@ -1,3 +1,7 @@
+# DEVELOPMENT ONLY — not a public/supported profile.
+# Hyprland on PRoot is experimental; its compatibility assets are not published.
+# This profile may change or be removed without notice.
+
 # PRoot Hyprland sample.
 #
 # Requires the aquamarine-compat guest library under /opt/trierarch/compat/:

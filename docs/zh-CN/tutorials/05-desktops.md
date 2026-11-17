@@ -7,7 +7,7 @@
 
 - [5A — PRoot 桌面](05-desktops-proot.md)
   - [KDE Plasma Wayland](05-desktops-proot-kde.md)
-  - [Hyprland](05-desktops-proot-hyprland.md)
+  - [Hyprland（实验性，非公开）](05-desktops-proot-hyprland.md)
 - [5B — chroot 桌面](05-desktops-chroot.md)
 - [5C — DroidSpaces 桌面](05-desktops-droidspaces.md)
 

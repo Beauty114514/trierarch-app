@@ -63,7 +63,7 @@ must point at this extracted component.
 ## Choose a desktop
 
 - [KDE Plasma Wayland](05-desktops-proot-kde.md) — KWin compatibility library
-- [Hyprland](05-desktops-proot-hyprland.md) — aquamarine-compat and wallpaper setup
+- [Hyprland (experimental, not public)](05-desktops-proot-hyprland.md) — development reference only; no public compatibility asset
 
 ## XFCE
 
@@ -75,7 +75,7 @@ aquamarine compatibility libraries.
 
 - PRoot cannot open `/dev/dri/renderD128` or `/dev/dri/card0`;
 - Adreno Plasma needs the KWin compatibility components and a matching KWin build;
-- Hyprland needs `libaquamarine-compat.so`; treat this newer path as experimental;
+- Hyprland is experimental and not a public solution; its compatibility asset is not published;
 - sound uses the normal `audio.backend = "pipewire"` profile setting;
 - other tested combinations are in the [compatibility matrix](../matrices.md).
 

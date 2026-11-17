@@ -4,6 +4,13 @@ English | [中文](../../zh-CN/tutorials/05-desktops-proot-hyprland.md)
 
 [Back to PRoot desktops](05-desktops-proot.md)
 
+> **Experimental — not a public feature.**
+>
+> Hyprland on PRoot is still unstable. It is not currently a supported public
+> desktop path, and Trierarch does not publish its compatibility library or a
+> public profile/asset for it. This page is kept for development reference
+> only; the setup may change or break without notice.
+
 Complete the [common Mesa 26 + Turnip setup](05-desktops-proot.md)
 first. Hyprland also needs `libaquamarine-compat.so` and a wallpaper daemon.
 
@@ -38,8 +45,9 @@ PRoot Hyprland uses one combined library:
 libaquamarine-compat.so
 ```
 
-It is published as a Trierarch release asset. If you build it from source, run
-`make combined` in `trierarch-packages/aquamarine-compat`.
+The library is **not published as a release asset** while this path is
+experimental. Developers can build it locally with `make combined` in
+`trierarch-packages/aquamarine-compat`.
 
 Install it inside the guest:
 
@@ -52,7 +60,8 @@ Do not install the KWin compatibility library for Hyprland.
 
 ## Profile
 
-Use the sample profile:
+The file below is a **development reference only**. It is not part of the
+public sample set and may be removed or changed without notice:
 
 - [`arch-proot-hyprland-adreno.toml`](../../profiles/arch-proot-hyprland-adreno.toml)
 

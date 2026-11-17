@@ -27,7 +27,7 @@ This round covers:
 | --- | --- | --- | --- |
 | **DroidSpaces** | Yes | Adreno direct; effects usable | Adreno direct; VirGL also available |
 | **chroot** | Yes | Adreno direct; effects usable | Adreno direct; VirGL also available |
-| **PRoot** | No | Depends on the compositor and required patches; not a complete Linux environment. KDE Plasma, Plasma Mobile and Hyprland Wayland are supported with compatibility components | Host **VirGL** via `virpipe`; no `/dev/dri` required |
+| **PRoot** | No | Depends on the compositor and required patches; not a complete Linux environment. KDE Plasma and Plasma Mobile Wayland are supported with compatibility components; Hyprland is experimental and not a public path | Host **VirGL** via `virpipe`; no `/dev/dri` required |
 
 ### Wayland hardware acceleration
 
@@ -38,7 +38,7 @@ Its GPU path depends on the runtime:
 | --- | --- | --- |
 | **DroidSpaces** | Adreno direct (freedreno/kgsl) | ✅ tested; effects usable |
 | **chroot** | Adreno direct (freedreno/kgsl) | ✅ tested; effects usable |
-| **PRoot** | Depends on the compositor and patches; Plasma, Plasma Mobile and Hyprland Adreno are supported with compatibility components | ⚠️ configuration-dependent; see the tested rows below |
+| **PRoot** | Depends on the compositor and patches; Plasma and Plasma Mobile Adreno are supported with compatibility components; Hyprland is experimental | ⚠️ configuration-dependent; see the tested rows below |
 
 PRoot is not a complete Linux environment. Running a desktop or window manager
 inside it has significant limitations, and many paths need extra compatibility
@@ -95,7 +95,7 @@ work.
 | **KDE Plasma Wayland** | adreno with compat components | ✅ tested; requires matching KWin + guest GPU userspace stack |
 | **KDE Plasma Mobile Wayland** | adreno with compat components | ✅ tested; effects usable; launch with `startplasmamobile` |
 | **KDE Plasma Wayland** | llvmpipe / software | ⚠️ legacy configuration; GPU path not used |
-| **Hyprland** | adreno with `libaquamarine-compat.so` | ✅ tested; requires the PRoot Hyprland compatibility library |
+| **Hyprland** | adreno with a local `libaquamarine-compat.so` build | ⚠️ experimental; not a public supported path; compatibility assets withheld |
 | **KDE Plasma X11** | llvmpipe / VirGL | ❌ tested profile failed on the current KWin/Plasma ABI; a matching X11 session is required |
 
 The setup procedure and current limits are in
@@ -132,9 +132,9 @@ Tested examples:
   kwin_core: The used windowing system requires compositing
   kwin_core: We are going to quit KWin now as it is broken
   ```
-- **Hyprland** uses the combined `libaquamarine-compat.so` guest library. Without
-  it, Aquamarine fails or blocks on the fake render node; see
-  [PRoot — Hyprland](tutorials/05-desktops-proot-hyprland.md).
+- **Hyprland** is experimental and not a public solution yet. Its compatibility
+  library is not published; see
+  [PRoot — Hyprland](tutorials/05-desktops-proot-hyprland.md) for development notes.
 - A dmabuf device report can fail with `open /dev/dri: Permission denied`, so the
   host may not publish the dmabuf path a GPU compositor needs.
 
