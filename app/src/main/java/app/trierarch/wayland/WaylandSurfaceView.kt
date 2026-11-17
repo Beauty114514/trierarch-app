@@ -59,6 +59,7 @@ class WaylandSurfaceView(
 
     override fun surfaceDestroyed(holder: SurfaceHolder) {
         Log.i(TAG, "surfaceDestroyed surface=${holder.surface.hashCode()} valid=${holder.surface.isValid}")
+        WaylandBridge.detachSurface(holder.surface)
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {

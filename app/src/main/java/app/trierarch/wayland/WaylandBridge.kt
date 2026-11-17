@@ -19,6 +19,17 @@ object WaylandBridge {
     /** Buffer path the running server was started with, or null when stopped. */
     private var activeBufferMode: String? = null
 
+    /**
+     * Last Android Surface handed to the host.
+     *
+     * The host server and the SurfaceView start asynchronously; the Surface is
+     * often attached before nativeStart creates the server. Re-attaching after
+     * a successful start closes that window and guarantees the renderer is
+     * created even when the pending-window command is missed.
+     */
+    @Volatile
+    private var lastSurface: Surface? = null
+
     @JvmStatic
     fun start(context: Context, bufferMode: String, desktopScalePercent: Int): Boolean {
         val runtime = File(context.filesDir, "wayland/runtime")
@@ -38,6 +49,9 @@ object WaylandBridge {
         }
         val started = nativeStart(runtime.absolutePath, mode, desktopScalePercent)
         activeBufferMode = if (started) mode else null
+        if (started) {
+            lastSurface?.takeIf { it.isValid }?.let { nativeAttachSurface(it) }
+        }
         return started
     }
 
@@ -48,7 +62,16 @@ object WaylandBridge {
     }
 
     @JvmStatic
-    fun attachSurface(surface: Surface) = nativeAttachSurface(surface)
+    fun attachSurface(surface: Surface) {
+        lastSurface = surface
+        nativeAttachSurface(surface)
+    }
+
+    /** Forget a Surface that is no longer valid, without touching the host. */
+    @JvmStatic
+    fun detachSurface(surface: Surface) {
+        if (lastSurface === surface) lastSurface = null
+    }
 
     @JvmStatic
     fun setOutputSize(width: Int, height: Int) {
