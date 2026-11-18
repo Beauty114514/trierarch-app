@@ -65,6 +65,10 @@ Hyprland 这类桌面/窗口管理器，保留原生特效、动画和窗口管�
 | --- | --- |
 | ![Trierarch 上的 Arch Linux Hyprland](docs/assets/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Trierarch 上的 Kali Linux Plasma](docs/assets/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
 
+PRoot + Hyprland，折叠屏手机：
+
+![Trierarch 上通过 PRoot 运行的 Arch Linux Hyprland](docs/assets/screenshots/arch-proot-hyprland-foldable-phone.jpg)
+
 ## 可以运行什么
 
 | 运行环境 | Root | 适合 |

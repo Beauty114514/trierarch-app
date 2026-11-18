@@ -72,6 +72,10 @@ Phone screenshots from the current build, landscape:
 | --- | --- |
 | ![Arch Linux Hyprland on Trierarch](docs/assets/screenshots/arch-droidspace-hyprland-phone.jpg) | ![Kali Linux Plasma on Trierarch](docs/assets/screenshots/kali-chroot-plasma-wayland-phone.jpg) |
 
+PRoot + Hyprland on a foldable phone:
+
+![Arch Linux Hyprland under PRoot on Trierarch](docs/assets/screenshots/arch-proot-hyprland-foldable-phone.jpg)
+
 ## What you can run
 
 | Runtime | Root | Best for |
