@@ -297,7 +297,7 @@ Last verified against `trierarch-app` `506bbf0` and `trierarch-packages`
 - DroidSpaces depends on the device kernel and runtime support;
 - VirGL currently targets the compositor path; ordinary applications may not
   get hardware OpenGL;
-- Venus, dmabuf and Adreno direct paths are experimental;
+- Venus and some direct dmabuf paths are still experimental; the tested PRoot Hyprland path uses `libaquamarine-compat.so`;
 - compatibility differs across GPUs, Android versions and distributions;
 - there is no universal one-click image for every distribution; provide a rootfs
   or a DroidSpaces container yourself.

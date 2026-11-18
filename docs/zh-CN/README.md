@@ -13,7 +13,7 @@
 5. [桌面](tutorials/05-desktops.md)
    - [PRoot](tutorials/05-desktops-proot.md)
      - [KDE Plasma](tutorials/05-desktops-proot-kde.md)
-     - [Hyprland（实验性，非公开）](tutorials/05-desktops-proot-hyprland.md)
+     - [Hyprland](tutorials/05-desktops-proot-hyprland.md)
    - [chroot](tutorials/05-desktops-chroot.md)
    - [DroidSpaces](tutorials/05-desktops-droidspaces.md)
 6. [运行和选择样例](tutorials/06-run.md)
@@ -33,6 +33,6 @@
 - [PRoot 下的 KDE Baloo](known-issues/proot/baloo-tags.md)
 - [PipeWire/RTKit](known-issues/pipewire-rtkit.md)
 
-## 开发者预览
+## 故障排查记录
 
-- [Hyprland / Aquamarine](developer-preview/proot/hyprland-aquamarine.md)
+- [Hyprland / Aquamarine 黑屏](developer-preview/proot/hyprland-aquamarine.md)

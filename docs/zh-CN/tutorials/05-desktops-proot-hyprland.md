@@ -4,12 +4,6 @@
 
 [返回 PRoot 桌面总览](05-desktops-proot.md)
 
-> **实验性功能，暂不作为公开方案。**
->
-> PRoot 上的 Hyprland 目前还不稳定，不是受支持的公开桌面路径；
-> Trierarch 暂不提供它的兼容库、公开 profile 或相关资产。
-> 本页仅作为开发记录，配置可能随时变更或失效。
-
 先完成[公共 Mesa 26 + Turnip 准备](05-desktops-proot.md)，然后配置 Hyprland。
 Hyprland 还需要 `libaquamarine-compat.so` 和壁纸 daemon。
 
@@ -43,10 +37,7 @@ PRoot Hyprland 使用一个合并库：
 libaquamarine-compat.so
 ```
 
-在实验阶段，这个库**不作为 release 资产发布**。开发者可以在
-`trierarch-packages/aquamarine-compat` 里执行 `make combined` 本地构建。
-
-在 guest 内安装：
+这个库随正常 release 资产一起发布。在 guest 内安装：
 
 ```sh
 install -d /opt/trierarch/compat
@@ -55,13 +46,16 @@ install -m 755 /path/to/libaquamarine-compat.so /opt/trierarch/compat/
 
 Hyprland 不要安装 KWin compatibility library。
 
+本地开发时，也可以在 `trierarch-packages/aquamarine-compat` 里执行
+`make combined` 构建同一个库。
+
 ## Profile
 
-下面的文件**仅作为开发参考**，不属于公开样例集，可能随时移除或修改：
+公开样例 profile：
 
 - [`arch-proot-hyprland-adreno.toml`](../../profiles/arch-proot-hyprland-adreno.toml)
 
-样例额外加了两行 PRoot 专用设置：
+它额外加了两行 PRoot 专用设置：
 
 ```sh
 ln -sfn /tmp/trierarch-wayland-user /tmp/t
@@ -70,6 +64,16 @@ export XDG_RUNTIME_DIR=/tmp/t
 
 Hyprland 的 IPC socket 路径原本刚好卡在 Unix socket 上限，`hyprctl`/Waybar
 连不上；软链把路径缩短，同时不移动 host Wayland socket。
+
+profile 还会启用兼容库的 PRIME 校验桥：
+
+```sh
+export TRIERARCH_FAKE_PRIME_IMPORT=1
+export LD_PRELOAD=/opt/trierarch/compat/libaquamarine-compat.so
+```
+
+`TRIERARCH_FAKE_PRIME_IMPORT` 只用于 PRoot 的 fake render node。它让 Hyprland
+把 dmabuf 客户端交给真正的 EGLImage 导入路径，而不是在 PRIME 校验阶段直接拒绝。
 
 启动命令使用上游推荐的 wrapper：
 

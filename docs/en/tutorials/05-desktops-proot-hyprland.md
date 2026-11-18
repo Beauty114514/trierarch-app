@@ -4,13 +4,6 @@ English | [中文](../../zh-CN/tutorials/05-desktops-proot-hyprland.md)
 
 [Back to PRoot desktops](05-desktops-proot.md)
 
-> **Experimental — not a public feature.**
->
-> Hyprland on PRoot is still unstable. It is not currently a supported public
-> desktop path, and Trierarch does not publish its compatibility library or a
-> public profile/asset for it. This page is kept for development reference
-> only; the setup may change or break without notice.
-
 Complete the [common Mesa 26 + Turnip setup](05-desktops-proot.md)
 first. Hyprland also needs `libaquamarine-compat.so` and a wallpaper daemon.
 
@@ -45,11 +38,8 @@ PRoot Hyprland uses one combined library:
 libaquamarine-compat.so
 ```
 
-The library is **not published as a release asset** while this path is
-experimental. Developers can build it locally with `make combined` in
-`trierarch-packages/aquamarine-compat`.
-
-Install it inside the guest:
+The library is published as `libaquamarine-compat.so` alongside the normal
+release assets. Install it inside the guest:
 
 ```sh
 install -d /opt/trierarch/compat
@@ -58,14 +48,16 @@ install -m 755 /path/to/libaquamarine-compat.so /opt/trierarch/compat/
 
 Do not install the KWin compatibility library for Hyprland.
 
+For local development, the same library can be built with `make combined` in
+`trierarch-packages/aquamarine-compat`.
+
 ## Profile
 
-The file below is a **development reference only**. It is not part of the
-public sample set and may be removed or changed without notice:
+The public sample profile is:
 
 - [`arch-proot-hyprland-adreno.toml`](../../profiles/arch-proot-hyprland-adreno.toml)
 
-The sample adds two PRoot-specific things:
+It adds two PRoot-specific things:
 
 ```sh
 ln -sfn /tmp/trierarch-wayland-user /tmp/t
@@ -75,6 +67,17 @@ export XDG_RUNTIME_DIR=/tmp/t
 Hyprland's IPC socket path is otherwise exactly at the Unix-socket limit and
 `hyprctl`/Waybar cannot connect. The symlink shortens the path without moving
 the host Wayland socket.
+
+The profile also enables the compatibility library's PRIME validation bridge:
+
+```sh
+export TRIERARCH_FAKE_PRIME_IMPORT=1
+export LD_PRELOAD=/opt/trierarch/compat/libaquamarine-compat.so
+```
+
+`TRIERARCH_FAKE_PRIME_IMPORT` is only for the fake PRoot render node. It lets
+Hyprland hand dmabuf clients to its real EGLImage import path instead of
+rejecting them at the PRIME validation step.
 
 The launch command uses the upstream watchdog wrapper:
 

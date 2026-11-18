@@ -268,7 +268,7 @@ buffer，但没有向 host 暴露可用的 acquire fence。这是同步限制，
 - chroot 和 DroidSpaces 需要 root；
 - DroidSpaces 需要设备内核和运行时支持；
 - VirGL 当前主要服务合成器路径，普通应用不一定获得硬件 OpenGL；
-- Venus、dmabuf、Adreno 直通等路径带有实验性质；
+- Venus 和部分 dmabuf 直通路径仍带实验性质；已验证的 PRoot Hyprland 路径使用 `libaquamarine-compat.so`；
 - 不同 GPU、Android 版本和发行版组合的兼容性不同；
 - 没有“一键安装所有发行版”的通用镜像，需要自己准备 rootfs 或 DroidSpaces
   容器。

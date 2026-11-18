@@ -14,7 +14,7 @@ profile fields, GPU assets, desktops, and finally running a sample.
 5. [Desktops](tutorials/05-desktops.md)
    - [PRoot](tutorials/05-desktops-proot.md)
      - [KDE Plasma](tutorials/05-desktops-proot-kde.md)
-     - [Hyprland (experimental, not public)](tutorials/05-desktops-proot-hyprland.md)
+     - [Hyprland](tutorials/05-desktops-proot-hyprland.md)
    - [chroot](tutorials/05-desktops-chroot.md)
    - [DroidSpaces](tutorials/05-desktops-droidspaces.md)
 6. [Run and choose a sample](tutorials/06-run.md)
@@ -34,6 +34,6 @@ profile fields, GPU assets, desktops, and finally running a sample.
 - [KDE Baloo under PRoot](known-issues/proot/baloo-tags.md)
 - [PipeWire/RTKit](known-issues/pipewire-rtkit.md)
 
-## Developer preview
+## Troubleshooting notes
 
-- [Hyprland / Aquamarine](developer-preview/proot/hyprland-aquamarine.md)
+- [Hyprland / Aquamarine black screen](developer-preview/proot/hyprland-aquamarine.md)
