@@ -26,6 +26,7 @@ not linked into the app.
 | **AdrenoTools** | [bylaws/libadrenotools](https://github.com/bylaws/libadrenotools), vendored prebuilt `libadrenotools` and hook libraries | Loads the host Vulkan presenter driver | BSD-2-Clause |
 | **Host Turnip v32** | [whitebelyash/AdrenoToolsDrivers](https://github.com/whitebelyash/AdrenoToolsDrivers), release `tu_v32` / `mainline-turnip-V32.zip`; built from Mesa's Turnip/gen8 source | Host Vulkan presenter driver for Adreno 6xx/7xx/8xx | Mesa per-file licenses (MIT, BSD-3-Clause, SGI-B-2.0 and others where marked) |
 | **LLVM 21.1** | [llvm/llvm-project](https://github.com/llvm/llvm-project), runtime `libLLVM.so.21.1` from the Mesa 26 noroot component | Mesa/LLVM runtime dependency | Apache-2.0 WITH LLVM-exception |
+| **Mesa 26 PRoot (noroot)** | [Droid-Deck/DroidDeck](https://github.com/Droid-Deck/DroidDeck), Mesa component `26.0.8-1ubuntu0.3+droiddeck1` | PRoot `mesa-26.0-noroot.tar.zst` guest Mesa/Zink/Turnip stack | Mesa per-file licenses; retain DroidDeck packaging notices |
 | **KWin compatibility library** | KDE KWin `6.8.2-2`, [KDE/kwin](https://invent.kde.org/plasma/kwin); Trierarch patch series `trierarch-packages/kwin-compat/patches/` | Host-side KWin library with the Wayland render-node fallback | GPL-2.0-or-later / LGPL-2.1-or-later where applicable; retain upstream notices |
 | **ANGLE** | [google/angle](https://chromium.googlesource.com/angle/angle), Termux package `2.1.24923-f09a19ce-2` | Vulkan/GL backends used by the VirGL host | BSD-3-Clause |
 | **PipeWire** | [pipewire/pipewire](https://gitlab.freedesktop.org/pipewire/pipewire), `1.4.9-1` | Android audio server | MIT |
@@ -79,6 +80,15 @@ The Arch recipe pins the ifdevs `freedreno` packaging commit
 `8a29bd2e...` by default; `MESA_PKGBUILD_COMMIT` overrides it. The exact commit
 and Mesa tag must still be recorded for each released binary. See
 `trierarch-packages/mesa-adreno/UPSTREAM.md` for the full chain.
+
+### PRoot Mesa 26 (no-root)
+
+The PRoot asset `mesa-26.0-noroot.tar.zst` is imported from DroidDeck, not
+built by Trierarch's `mesa-adreno` recipe. The packaged Mesa version is
+`26.0.8-1ubuntu0.3+droiddeck1` (visible in the `libgallium-...` filename).
+Retain DroidDeck packaging notices and Mesa's per-file license notices when
+redistributing this component. The root/chroot/DroidSpaces Mesa asset follows
+the lfdevs chain above.
 
 ## 3. Trierarch patch series
 
