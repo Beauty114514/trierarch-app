@@ -40,7 +40,7 @@ them with arbitrary distro Mesa packages.
 | --- | --- |
 | DroidSpaces / chroot (Arch guest) | `mesa-27.0.0-91-root.tar.xz` |
 | PRoot, any desktop | `mesa-26.0-noroot.tar.zst` |
-| PRoot + KDE Plasma Wayland only | `kwin-compat-6.8.2-2-archlinuxarm-aarch64.tar.zst` |
+| PRoot + KDE Plasma Wayland only | `kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst` |
 
 Freedreno is the OpenGL frontend inside the Mesa asset. Turnip is the Vulkan
 ICD included with the DroidSpaces/chroot release asset.
@@ -84,13 +84,13 @@ Do **not** install this for Hyprland, XFCE, X11, or terminal-only profiles. It i
 only needed when PRoot runs KDE Plasma Wayland:
 
 ```sh
-mkdir -p /tmp/kwin-compat /opt/trierarch/kwin/6.8.2/compat
-tar --zstd -xf kwin-compat-6.8.2-2-archlinuxarm-aarch64.tar.zst \
+mkdir -p /tmp/kwin-compat /opt/trierarch/kwin/6.8.3/compat
+tar --zstd -xf kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst \
   -C /tmp/kwin-compat
-install -m 755 /tmp/kwin-compat/kwin-compat/libkwin-6.8.2-2-archlinuxarm-aarch64.so \
-  /opt/trierarch/kwin/6.8.2/compat/libkwin.so.6.8.2
-ln -sfn libkwin.so.6.8.2 /opt/trierarch/kwin/6.8.2/compat/libkwin.so.6
-ln -sfn libkwin.so.6 /opt/trierarch/kwin/6.8.2/compat/libkwin.so
+install -m 755 /tmp/kwin-compat/kwin-compat/libkwin-6.8.3-1-archlinuxarm-aarch64.so \
+  /opt/trierarch/kwin/6.8.3/compat/libkwin.so.6.8.3
+ln -sfn libkwin.so.6.8.3 /opt/trierarch/kwin/6.8.3/compat/libkwin.so.6
+ln -sfn libkwin.so.6 /opt/trierarch/kwin/6.8.3/compat/libkwin.so
 ```
 
 ### Verify

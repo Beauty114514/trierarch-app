@@ -11,7 +11,7 @@
 KDE Plasma Wayland 额外需要一个 release 资产：
 
 ```text
-kwin-compat-6.8.2-2-archlinuxarm-aarch64.tar.zst
+kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst
 ```
 
 Mesa 组件与 Hyprland 共用；这个 KWin 库只用于 KDE。
@@ -21,23 +21,23 @@ Mesa 组件与 Hyprland 共用；这个 KWin 库只用于 KDE。
 把压缩包放到 `/opt/trierarch/tmp/`，在 guest 内解压：
 
 ```sh
-install -d /opt/trierarch/kwin/6.8.2/compat
+install -d /opt/trierarch/kwin/6.8.3/compat
 rm -rf /tmp/kwin-compat
 mkdir -p /tmp/kwin-compat
 
 tar --zstd -xf \
-  /opt/trierarch/tmp/kwin-compat-6.8.2-2-archlinuxarm-aarch64.tar.zst \
+  /opt/trierarch/tmp/kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst \
   -C /tmp/kwin-compat
 
 install -m 755 \
-  /tmp/kwin-compat/kwin-compat/libkwin-6.8.2-2-archlinuxarm-aarch64.so \
-  /opt/trierarch/kwin/6.8.2/compat/libkwin.so.6.8.2
+  /tmp/kwin-compat/kwin-compat/libkwin-6.8.3-1-archlinuxarm-aarch64.so \
+  /opt/trierarch/kwin/6.8.3/compat/libkwin.so.6.8.3
 
-ln -sfn libkwin.so.6.8.2 /opt/trierarch/kwin/6.8.2/compat/libkwin.so.6
-ln -sfn libkwin.so.6 /opt/trierarch/kwin/6.8.2/compat/libkwin.so
+ln -sfn libkwin.so.6.8.3 /opt/trierarch/kwin/6.8.3/compat/libkwin.so.6
+ln -sfn libkwin.so.6 /opt/trierarch/kwin/6.8.3/compat/libkwin.so
 ```
 
-不要覆盖 `/usr/lib/libkwin.so.6.8.2`。profile 通过 `LD_LIBRARY_PATH` 加载
+不要覆盖 `/usr/lib/libkwin.so.6.8.3`。profile 通过 `LD_LIBRARY_PATH` 加载
 compat 目录。
 
 ## 安装 Plasma
@@ -64,7 +64,7 @@ type = "wayland"
 desktop_scale = 100
 
 [launch]
-argv = ["sh", "-lc", "export DISABLE_RTKIT=1 KWIN_COMPOSE=O2 MESA_LOADER_DRIVER_OVERRIDE=zink GALLIUM_DRIVER=zink LIBGL_KOPPER_DRI2=true GALLIUM_THREAD=0 KWIN_RENDER_NODES=/dev/dri/renderD0 TRIERARCH_NESTED_RENDER_NODE=1; export TRIERARCH_MESA=/opt/trierarch/gpu/mesa-26.0/usr; export LD_LIBRARY_PATH=/opt/trierarch/kwin/6.8.2/compat:$TRIERARCH_MESA/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH; export LIBGL_DRIVERS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/dri; export GBM_BACKENDS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/gbm; export __EGL_VENDOR_LIBRARY_FILENAMES=$TRIERARCH_MESA/share/glvnd/egl_vendor.d/50_mesa.json; export VK_ICD_FILENAMES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json VK_DRIVER_FILES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json; exec dbus-run-session -- startplasma-wayland > /opt/trierarch/kwin/6.8.2/full-plasma-app.log 2>&1"]
+argv = ["sh", "-lc", "export DISABLE_RTKIT=1 KWIN_COMPOSE=O2 MESA_LOADER_DRIVER_OVERRIDE=zink GALLIUM_DRIVER=zink LIBGL_KOPPER_DRI2=true GALLIUM_THREAD=0 KWIN_RENDER_NODES=/dev/dri/renderD0 TRIERARCH_NESTED_RENDER_NODE=1; export TRIERARCH_MESA=/opt/trierarch/gpu/mesa-26.0/usr; export LD_LIBRARY_PATH=/opt/trierarch/kwin/6.8.3/compat:$TRIERARCH_MESA/lib/aarch64-linux-gnu:$LD_LIBRARY_PATH; export LIBGL_DRIVERS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/dri; export GBM_BACKENDS_PATH=$TRIERARCH_MESA/lib/aarch64-linux-gnu/gbm; export __EGL_VENDOR_LIBRARY_FILENAMES=$TRIERARCH_MESA/share/glvnd/egl_vendor.d/50_mesa.json; export VK_ICD_FILENAMES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json VK_DRIVER_FILES=$TRIERARCH_MESA/share/vulkan/icd.d/freedreno_icd.json; exec dbus-run-session -- startplasma-wayland > /opt/trierarch/kwin/6.8.3/full-plasma-app.log 2>&1"]
 
 [graphics]
 renderer = "adreno"
@@ -94,7 +94,7 @@ backend = "pipewire"
 从 App 启动 profile。日志写入：
 
 ```text
-/opt/trierarch/kwin/6.8.2/full-plasma-app.log
+/opt/trierarch/kwin/6.8.3/full-plasma-app.log
 ```
 
 如果 Plasma 没有出现，先在 guest 内看这个日志。
@@ -106,7 +106,7 @@ backend = "pipewire"
 ```sh
 ls -l /opt/trierarch/gpu/mesa-26.0/usr/lib/aarch64-linux-gnu/libgallium-*.so
 ls -l /opt/trierarch/gpu/mesa-26.0/usr/lib/aarch64-linux-gnu/libvulkan_freedreno.so
-ls -l /opt/trierarch/kwin/6.8.2/compat/libkwin.so.6.8.2
+ls -l /opt/trierarch/kwin/6.8.3/compat/libkwin.so.6.8.3
 ```
 
 Plasma 运行时检查 KWin 实际加载的库：
@@ -120,7 +120,7 @@ grep -E 'libgallium-26|libkwin\.so\.6\.8\.2|libvulkan_freedreno' \
 
 ```text
 libgallium-26...
-libkwin.so.6.8.2
+libkwin.so.6.8.3
 libvulkan_freedreno.so
 ```
 
@@ -129,6 +129,6 @@ libvulkan_freedreno.so
 | 现象 | 原因 |
 | --- | --- |
 | `tar: exec zstd: No such file or directory` | 在 Android shell 里解压；必须在 guest 内执行 |
-| KWin 仍加载 `/usr/lib/libkwin.so.6.8.2` | `LD_LIBRARY_PATH` 没有包含 compat，或顺序在 Mesa 之后 |
+| KWin 仍加载 `/usr/lib/libkwin.so.6.8.3` | `LD_LIBRARY_PATH` 没有包含 compat，或顺序在 Mesa 之后 |
 | Zink 选不到设备 | Turnip ICD 没指向解压后的组件 |
 | Plasma 启动但没有窗口 | 检查 compatibility library 和 fake render node |

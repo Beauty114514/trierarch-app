@@ -38,7 +38,7 @@ KWin patch 不是 GPU 驱动，而是 PRoot fake-DRM 路径的 Wayland render-no
 | --- | --- |
 | DroidSpaces / chroot（Arch guest） | `mesa-27.0.0-91-root.tar.xz` |
 | PRoot，任意桌面 | `mesa-26.0-noroot.tar.zst` |
-| 仅 PRoot + KDE Plasma Wayland | `kwin-compat-6.8.2-2-archlinuxarm-aarch64.tar.zst` |
+| 仅 PRoot + KDE Plasma Wayland | `kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst` |
 
 Freedreno 是 Mesa 资产里的 OpenGL 前端；Turnip 是 DroidSpaces/chroot
 release 资产里的 Vulkan ICD。
@@ -81,13 +81,13 @@ Hyprland、XFCE、X11、纯终端 profile **不要装**。只有 PRoot 跑 KDE P
 Wayland 时才需要：
 
 ```sh
-mkdir -p /tmp/kwin-compat /opt/trierarch/kwin/6.8.2/compat
-tar --zstd -xf kwin-compat-6.8.2-2-archlinuxarm-aarch64.tar.zst \
+mkdir -p /tmp/kwin-compat /opt/trierarch/kwin/6.8.3/compat
+tar --zstd -xf kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst \
   -C /tmp/kwin-compat
-install -m 755 /tmp/kwin-compat/kwin-compat/libkwin-6.8.2-2-archlinuxarm-aarch64.so \
-  /opt/trierarch/kwin/6.8.2/compat/libkwin.so.6.8.2
-ln -sfn libkwin.so.6.8.2 /opt/trierarch/kwin/6.8.2/compat/libkwin.so.6
-ln -sfn libkwin.so.6 /opt/trierarch/kwin/6.8.2/compat/libkwin.so
+install -m 755 /tmp/kwin-compat/kwin-compat/libkwin-6.8.3-1-archlinuxarm-aarch64.so \
+  /opt/trierarch/kwin/6.8.3/compat/libkwin.so.6.8.3
+ln -sfn libkwin.so.6.8.3 /opt/trierarch/kwin/6.8.3/compat/libkwin.so.6
+ln -sfn libkwin.so.6 /opt/trierarch/kwin/6.8.3/compat/libkwin.so
 ```
 
 ### 验证
