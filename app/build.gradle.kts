@@ -391,8 +391,8 @@ android {
         applicationId = "app.trierarch"
         minSdk = 24
         targetSdk = 28
-        versionCode = 9
-        versionName = "0.5.0"
+        versionCode = 10
+        versionName = "0.5.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -419,7 +419,7 @@ android {
         }
     }
     lint {
-        // 0.5.0 is a direct APK release for rooted devices, not a Play upload.
+        // 0.5.1 is a direct APK release for rooted devices, not a Play upload.
         disable += "ExpiredTargetSdkVersion"
     }
     compileOptions {
