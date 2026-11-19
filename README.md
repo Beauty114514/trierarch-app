@@ -34,9 +34,10 @@ Reference: [Documentation index](docs/en/README.md) ·
 
 This repository is the **current, rewritten Trierarch**. The earlier Trierarch
 version has been rewritten: its old codebase and early optimization notes are
-not the current implementation. The Android app, native runtimes, packaging and
-session model in this repository are the new version. Early workarounds are
-kept only in the known-issues notes for older environments.
+not the current implementation. The Android app, native runtime integration and
+session model in this repository, together with the build recipes in
+`trierarch-packages`, are the new version. Early workarounds are kept only in the
+known-issues notes for older environments.
 
 ---
 
@@ -174,6 +175,13 @@ orphaned container behind is not.
 
 Containers that were already running before Trierarch are left alone. Trierarch
 only cleans up what it started.
+
+## Related repositories
+
+Trierarch is split into two repositories:
+
+- [trierarch-app](https://github.com/Beauty114514/trierarch-app) — the Android app, CLI, profiles, and documentation (this repository).
+- [trierarch-packages](https://github.com/Beauty114514/trierarch-packages) — the native side: the Wayland/X11 hosts, PRoot/chroot/DroidSpaces helpers, PipeWire/VirGL/AdrenoTools integration, Mesa/KWin/aquamarine/IME build recipes and compatibility shims, the session supervisor, input/GPU probes, and the sources used to produce release assets. Regular users only need the APK and release assets; this repository is for building, auditing, or contributing to the native components.
 
 ## Project status
 

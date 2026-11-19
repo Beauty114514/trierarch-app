@@ -32,8 +32,9 @@ X11 和 Wayland 桌面，并通过 PRoot、chroot、DroidSpaces 三种方式运�
 ## Trierarch 的重制版
 
 这是 **Trierarch 的重制版**。早期 Trierarch 的代码和早期优化笔记已经被重写，
-当前仓库是新的实现；Android App、native 运行时、打包方式和会话模型都以当前
-代码为准。早期 workaround 只保留在 known issues 里，供旧环境参考。
+当前仓库是新的实现；Android App、native 运行时接入和会话模型以当前代码为准，
+原生运行时的构建配方与补丁则在 `trierarch-packages`。早期 workaround 只保留在
+known issues 里，供旧环境参考。
 
 ## 为什么选择 Trierarch
 
@@ -147,6 +148,13 @@ VirGL 类图形和长期稳定的桌面，但它不是这个项目存在的理�
   会被停止。
 
 Trierarch 不会停止在它附着之前就已经运行的容器，只清理自己启动的东西。
+
+## 关联仓库
+
+Trierarch 分为两个仓库：
+
+- [trierarch-app](https://github.com/Beauty114514/trierarch-app) — Android App、CLI、profile 和文档（当前仓库）。
+- [trierarch-packages](https://github.com/Beauty114514/trierarch-packages) — 原生侧内容：Wayland/X11 host、PRoot/chroot/DroidSpaces 辅助组件、PipeWire/VirGL/AdrenoTools 集成、Mesa/KWin/aquamarine/IME 构建配方与兼容层、会话 supervisor、输入/GPU 探测工具，以及生成 release 资产所用的源码。普通用户只需要 APK 和 release 资产；这个仓库面向想构建、审查或贡献原生组件的用户。
 
 ## 项目状态
 
