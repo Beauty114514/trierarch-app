@@ -16,7 +16,6 @@ import androidx.core.view.WindowInsetsControllerCompat
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
 import app.trierarch.input.InputModeController
-import app.trierarch.input.InputMode
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
 import app.trierarch.terminal.DefaultTerminalViewModel
@@ -135,7 +134,7 @@ class MainActivity : AppCompatActivity() {
     private fun showWaylandSurface() {
         Log.i(TAG, "showWaylandSurface current=$displayedSurface wayland=${waylandSurface != null}")
         if (waylandSurface == null) {
-            waylandSurface = WaylandSurfaceView(this, inputMode)
+            waylandSurface = WaylandSurfaceView(this)
             terminalContainer.addView(
                 waylandSurface,
                 0,
@@ -207,7 +206,6 @@ class MainActivity : AppCompatActivity() {
         -> listOf(
             returnToShellAction(),
             keyboardAction(),
-            virtualKeyboardModeAction(),
             desktopImeModeAction(),
         )
     }
@@ -234,23 +232,6 @@ class MainActivity : AppCompatActivity() {
             }
             else -> Unit
         }
-    }
-
-    /**
-     * Selects Android IME delivery only. Hardware keyboards always keep their
-     * direct PhysicalKeyboardRouter path and are not switched by this action.
-     */
-    private fun virtualKeyboardModeAction() = when (inputMode.current) {
-        InputMode.TEXT -> FloatingMenuAction(
-            id = "virtual-keyboard-mode",
-            icon = R.drawable.ic_floating_action_text,
-            contentDescription = "Android virtual keyboard: switch to key-event mode",
-        ) { switchVirtualKeyboardMode() }
-        InputMode.KEY -> FloatingMenuAction(
-            id = "virtual-keyboard-mode",
-            icon = R.drawable.ic_floating_action_key_events,
-            contentDescription = "Android virtual keyboard: switch to text-input mode",
-        ) { switchVirtualKeyboardMode() }
     }
 
     private fun desktopImeModeAction() = FloatingMenuAction(
@@ -305,16 +286,6 @@ class MainActivity : AppCompatActivity() {
             ViewCompat.requestApplyInsets(window.decorView)
             window.decorView.requestLayout()
         }
-    }
-
-    private fun switchVirtualKeyboardMode() {
-        when (displayedSurface) {
-            DisplaySurface.X11 -> x11Host.resetInputModeState()
-            DisplaySurface.WAYLAND -> waylandSurface?.resetInputModeState()
-            else -> return
-        }
-        inputMode.toggle()
-        setDisplayedSurface(displayedSurface)
     }
 
     override fun onPause() {

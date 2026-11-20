@@ -12,12 +12,10 @@ import app.trierarch.input.PointerInputRouter
 import app.trierarch.input.PhysicalKeyEvent
 import app.trierarch.input.PhysicalKeyboardRouter
 import app.trierarch.input.AndroidImeController
-import app.trierarch.input.InputModeController
 
 /** Full-screen, display-only target for the first Wayland milestone. */
 class WaylandSurfaceView(
     context: Context,
-    inputMode: InputModeController,
 ) : SurfaceView(context), SurfaceHolder.Callback {
     private val inputRouter = PointerInputRouter(context, WaylandPointerEventSink) {
         WaylandBridge.setCursorVisible(it)
@@ -32,7 +30,6 @@ class WaylandSurfaceView(
     }
     private val waylandImeSink = WaylandImeEventSink(
         socket = WaylandImeBridgeRuntime.socket(context),
-        inputMode = inputMode,
     )
     private val androidIme = AndroidImeController(this, waylandImeSink)
 
@@ -85,12 +82,7 @@ class WaylandSurfaceView(
 
     fun releasePressedKeys() {
         keyboardRouter.releaseAll(SystemClock.uptimeMillis())
-    }
-
-    fun resetInputModeState() {
-        releasePressedKeys()
         waylandImeSink.resetInputState()
-        androidIme.restartInput()
     }
 
     fun showAndroidKeyboard() = androidIme.showKeyboard()
