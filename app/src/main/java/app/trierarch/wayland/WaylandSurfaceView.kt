@@ -33,7 +33,22 @@ class WaylandSurfaceView(
     )
     private val androidIme = AndroidImeController(this, waylandImeSink)
 
+    /** Guest text-input focus as last reported by the IME bridge. */
+    var onTextInputFocusChanged: ((TextInputFocus) -> Unit)? = null
+    private val textInputStateFile = WaylandImeBridgeRuntime.state(context)
+    private var lastFocusSequence = Int.MIN_VALUE
+    private var lastPointerPressMillis = 0L
+    private val focusPoll = object : Runnable {
+        override fun run() {
+            pollTextInputFocus()
+            postDelayed(this, FOCUS_POLL_MILLIS)
+        }
+    }
+
     init {
+        // A state file left by an earlier session must not pop the keyboard on
+        // its own; the bridge replaces it once the guest focuses a text input.
+        WaylandTextInputState.reset(textInputStateFile)
         holder.setFormat(PixelFormat.RGBA_8888)
         holder.addCallback(this)
         // The pixels are rendered by the separate Surface. Keeping the
@@ -60,11 +75,19 @@ class WaylandSurfaceView(
     }
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+            lastPointerPressMillis = SystemClock.uptimeMillis()
+        }
         return inputRouter.onTouchEvent(this, event)
     }
 
-    override fun onGenericMotionEvent(event: MotionEvent): Boolean =
-        inputRouter.onGenericMotionEvent(this, event) || super.onGenericMotionEvent(event)
+    override fun onGenericMotionEvent(event: MotionEvent): Boolean {
+        val action = event.actionMasked
+        if (action == MotionEvent.ACTION_DOWN || action == MotionEvent.ACTION_BUTTON_PRESS) {
+            lastPointerPressMillis = SystemClock.uptimeMillis()
+        }
+        return inputRouter.onGenericMotionEvent(this, event) || super.onGenericMotionEvent(event)
+    }
 
     override fun onHoverEvent(event: MotionEvent): Boolean =
         inputRouter.onHoverEvent(this, event) || super.onHoverEvent(event)
@@ -86,6 +109,33 @@ class WaylandSurfaceView(
     }
 
     fun showAndroidKeyboard() = androidIme.showKeyboard()
+
+    /** Re-evaluates text-input focus now instead of waiting for the next poll. */
+    fun refreshTextInputFocus() {
+        lastFocusSequence = Int.MIN_VALUE
+        pollTextInputFocus()
+    }
+
+    /** Whether the user touched the desktop recently enough to open the IME. */
+    fun didUserTapRecently(windowMillis: Long): Boolean =
+        SystemClock.uptimeMillis() - lastPointerPressMillis <= windowMillis
+
+    private fun pollTextInputFocus() {
+        if (!isShown) {
+            // Re-report the current state when the surface becomes visible again.
+            lastFocusSequence = Int.MIN_VALUE
+            return
+        }
+        val focus = WaylandTextInputState.read(textInputStateFile)
+        if (focus.sequence == lastFocusSequence) return
+        lastFocusSequence = focus.sequence
+        onTextInputFocusChanged?.invoke(focus)
+    }
+
+    override fun onAttachedToWindow() {
+        super.onAttachedToWindow()
+        post(focusPoll)
+    }
 
     /** Reattaches a preserved Android Surface after the Wayland host restarts. */
     fun attachHostSurface() {
@@ -111,6 +161,7 @@ class WaylandSurfaceView(
     }
 
     override fun onDetachedFromWindow() {
+        removeCallbacks(focusPoll)
         inputRouter.cancel(this)
         releasePressedKeys()
         waylandImeSink.close()
@@ -125,5 +176,6 @@ class WaylandSurfaceView(
 
     private companion object {
         const val TAG = "TrierarchSurface"
+        const val FOCUS_POLL_MILLIS = 250L
     }
 }

@@ -21,6 +21,9 @@ class KeyboardPanelController(
         ViewCompat.getWindowInsetsController(hostView)?.hide(WindowInsetsCompat.Type.ime())
     }
 
+    /** Whether the Android IME panel is currently visible. */
+    fun isShowing(): Boolean = isImeVisibleNow()
+
     private fun isImeVisibleNow(): Boolean =
         ViewCompat.getRootWindowInsets(hostView)
             ?.isVisible(WindowInsetsCompat.Type.ime())

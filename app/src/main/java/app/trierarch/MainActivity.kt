@@ -1,5 +1,6 @@
 package app.trierarch
 
+import android.content.res.Configuration
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
@@ -21,6 +22,7 @@ import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
 import app.trierarch.ui.FloatingMenuAction
 import app.trierarch.ui.FloatingActionMenuView
+import app.trierarch.wayland.TextInputFocus
 import app.trierarch.wayland.WaylandSurfaceView
 import app.trierarch.x11.X11HostController
 import com.termux.view.TerminalView
@@ -44,6 +46,14 @@ class MainActivity : AppCompatActivity() {
         getSharedPreferences("trierarch-ui", MODE_PRIVATE)
     }
     private var desktopImeMode = DesktopImeMode.OVERLAY
+    /** True while the Android IME was opened because the guest focused a text input. */
+    private var keyboardAutoShown = false
+    private val autoHideKeyboard = Runnable {
+        if (keyboardAutoShown) {
+            keyboardPanel.hide()
+            keyboardAutoShown = false
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -111,7 +121,10 @@ class MainActivity : AppCompatActivity() {
         )
         setDisplayedSurface(DisplaySurface.INTERNAL_SHELL)
         ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
-            floatingMenu.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            val imeHeight = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            floatingMenu.setImeBottomInset(imeHeight)
+            // A keyboard the user dismissed manually must not be treated as auto-shown.
+            if (imeHeight == 0) keyboardAutoShown = false
             insets
         }
         setContentView(terminalContainer)
@@ -132,9 +145,11 @@ class MainActivity : AppCompatActivity() {
     private fun showWaylandSurface() {
         Log.i(TAG, "showWaylandSurface current=$displayedSurface wayland=${waylandSurface != null}")
         if (waylandSurface == null) {
-            waylandSurface = WaylandSurfaceView(this)
+            val surface = WaylandSurfaceView(this)
+            surface.onTextInputFocusChanged = ::onTextInputFocusChanged
+            waylandSurface = surface
             terminalContainer.addView(
-                waylandSurface,
+                surface,
                 0,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
@@ -149,6 +164,7 @@ class MainActivity : AppCompatActivity() {
         }
         terminalView?.visibility = android.view.View.INVISIBLE
         setDisplayedSurface(DisplaySurface.WAYLAND)
+        waylandSurface?.refreshTextInputFocus()
         rootKeyboard.start()
     }
 
@@ -184,7 +200,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun hideWaylandSurface() {
+        keyboardAutoShown = false
         waylandSurface?.let {
+            it.removeCallbacks(autoHideKeyboard)
             it.releasePressedKeys()
             it.visibility = android.view.View.INVISIBLE
         }
@@ -223,6 +241,7 @@ class MainActivity : AppCompatActivity() {
         icon = R.drawable.ic_floating_action_keyboard,
         contentDescription = "Show or hide Android keyboard",
     ) {
+        keyboardAutoShown = false
         when (displayedSurface) {
             DisplaySurface.X11 -> keyboardPanel.toggle(x11Host::showAndroidKeyboard)
             DisplaySurface.WAYLAND -> waylandSurface?.let { surface ->
@@ -230,6 +249,30 @@ class MainActivity : AppCompatActivity() {
             }
             else -> Unit
         }
+    }
+
+    /**
+     * Opens the Android keyboard when the guest focuses a text input, but only
+     * for a tap the user just made and only without a physical keyboard. A
+     * keyboard opened this way closes again when the guest focus leaves.
+     */
+    private fun onTextInputFocusChanged(focus: TextInputFocus) {
+        if (displayedSurface != DisplaySurface.WAYLAND) return
+        val surface = waylandSurface ?: return
+        if (!focus.active) {
+            // Guest focus can move between two text fields; a short delay avoids
+            // hiding and immediately reopening the keyboard for such a move.
+            if (keyboardAutoShown) surface.postDelayed(autoHideKeyboard, AUTO_HIDE_DELAY_MILLIS)
+            return
+        }
+        surface.removeCallbacks(autoHideKeyboard)
+        if (keyboardAutoShown || keyboardPanel.isShowing()) return
+        val hardwareKeyboard =
+            resources.configuration.hardKeyboardHidden == Configuration.HARDKEYBOARDHIDDEN_NO
+        if (hardwareKeyboard || !surface.hasWindowFocus()) return
+        if (!surface.didUserTapRecently(TEXT_FIELD_TAP_MILLIS)) return
+        surface.showAndroidKeyboard()
+        keyboardAutoShown = true
     }
 
     private fun desktopImeModeAction() = FloatingMenuAction(
@@ -318,6 +361,8 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val TAG = "TrierarchSurface"
         const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
+        const val TEXT_FIELD_TAP_MILLIS = 1000L
+        const val AUTO_HIDE_DELAY_MILLIS = 300L
     }
 
     private enum class DisplaySurface {
