@@ -28,8 +28,12 @@ class WaylandSurfaceView(
             timeMillis = event.eventTime.toWaylandTime(),
         )
     }
+    /** Whether the guest currently has a text-input object focused. */
+    @Volatile
+    private var textInputActive = false
     private val waylandImeSink = WaylandImeEventSink(
         socket = WaylandImeBridgeRuntime.socket(context),
+        textChannelAvailable = { textInputActive },
     )
     private val androidIme = AndroidImeController(this, waylandImeSink)
 
@@ -127,6 +131,7 @@ class WaylandSurfaceView(
             return
         }
         val focus = WaylandTextInputState.read(textInputStateFile)
+        textInputActive = focus.active
         if (focus.sequence == lastFocusSequence) return
         lastFocusSequence = focus.sequence
         onTextInputFocusChanged?.invoke(focus)

@@ -63,7 +63,8 @@ public final class LorieView extends SurfaceView {
                 text -> {
                     if (nativeHandle == 0 || !isConnected()) return;
                     sendTextEvent(nativeHandle, text.getBytes(StandardCharsets.UTF_8));
-                });
+                },
+                () -> true);
         androidIme = new AndroidImeController(this, imeRouter);
         nativeHandle = nativeInit();
         setFocusable(true);

@@ -160,6 +160,67 @@ class DesktopImeRouterTest {
         )
     }
 
+    @Test
+    fun `text is retyped as keys when no text input is focused`() {
+        val router = fallbackRouter()
+
+        router.send(AndroidImeEvent.CommitText("hi", 1))
+
+        assertEquals(keyStroke(KeyEvent.KEYCODE_H) + keyStroke(KeyEvent.KEYCODE_I), keys)
+        assertTrue(texts.isEmpty())
+    }
+
+    @Test
+    fun `fallback types capitals with shift`() {
+        val router = fallbackRouter()
+
+        router.send(AndroidImeEvent.CommitText("Hi", 1))
+
+        assertEquals(
+            listOf(
+                SentKey(KeyEvent.KEYCODE_SHIFT_LEFT, 0, true),
+                SentKey(KeyEvent.KEYCODE_H, 0, true),
+                SentKey(KeyEvent.KEYCODE_H, 0, false),
+                SentKey(KeyEvent.KEYCODE_SHIFT_LEFT, 0, false),
+            ) + keyStroke(KeyEvent.KEYCODE_I),
+            keys,
+        )
+    }
+
+    @Test
+    fun `fallback keeps control characters as keys`() {
+        val router = fallbackRouter()
+
+        router.send(AndroidImeEvent.CommitText("a\nb", 1))
+
+        assertEquals(
+            keyStroke(KeyEvent.KEYCODE_A) +
+                keyStroke(KeyEvent.KEYCODE_ENTER) +
+                keyStroke(KeyEvent.KEYCODE_B),
+            keys,
+        )
+    }
+
+    @Test
+    fun `fallback drops characters without a key`() {
+        val router = fallbackRouter()
+
+        router.send(AndroidImeEvent.CommitText("a你b", 1))
+
+        assertEquals(keyStroke(KeyEvent.KEYCODE_A) + keyStroke(KeyEvent.KEYCODE_B), keys)
+        assertTrue(texts.isEmpty())
+    }
+
+    private fun fallbackRouter(): DesktopImeRouter =
+        DesktopImeRouter(
+            keySink = { keyCode, scanCode, pressed ->
+                keys += SentKey(keyCode, scanCode, pressed)
+                accepted
+            },
+            textSink = { texts += it },
+            textChannelAvailable = { false },
+        )
+
     private fun key(
         action: Int,
         keyCode: Int,

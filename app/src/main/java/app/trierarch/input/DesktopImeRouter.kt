@@ -19,6 +19,11 @@ fun interface DesktopTextSink {
     fun sendText(text: String)
 }
 
+/** Whether the focused guest can receive text through the protocol's text channel. */
+fun interface TextChannelAvailability {
+    fun isAvailable(): Boolean
+}
+
 /**
  * Routes Android input-method events to a desktop display host.
  *
@@ -37,12 +42,18 @@ fun interface DesktopTextSink {
  * chord such as Ctrl+C reaches guests even when the input method delivers the
  * letter as text.
  *
+ * When [textChannelAvailable] reports that the focused guest has no text-input
+ * object (terminals without text-input, XWayland windows, games), committed
+ * text is retyped through [keySink] with the US layout instead of being sent to
+ * a channel that would drop it. Characters without a key are skipped.
+ *
  * The router is single-threaded. Callers serialize events and call [reset] when
  * the focused surface changes, so a held modifier cannot leak into the next one.
  */
 class DesktopImeRouter(
     private val keySink: DesktopKeySink,
     private val textSink: DesktopTextSink,
+    private val textChannelAvailable: TextChannelAvailability = TextChannelAvailability { true },
 ) : AndroidImeEventSink {
     private var composingText = ""
     private var batchEditDepth = 0
@@ -124,7 +135,38 @@ class DesktopImeRouter(
     private fun commitText(text: String) {
         if (text.isEmpty()) return
         if (hasShortcutModifier() && pressTextAsKeys(text)) return
-        sendPrintableText(text)
+        if (textChannelAvailable.isAvailable()) {
+            sendPrintableText(text)
+            return
+        }
+        // No text input is focused (terminals without text-input, XWayland
+        // windows, games). Those still accept a physical keyboard, so retype the
+        // committed text as keys and drop whatever has no key.
+        typeTextAsKeys(text)
+    }
+
+    /** Retypes committed text through the key sink for guests without a text channel. */
+    private fun typeTextAsKeys(text: String) {
+        var index = 0
+        while (index < text.length) {
+            val codePoint = text.codePointAt(index)
+            index += Character.charCount(codePoint)
+            when (codePoint) {
+                0x0a, 0x0d, 0x2028, 0x2029 -> pressKey(KeyEvent.KEYCODE_ENTER)
+                0x09 -> pressKey(KeyEvent.KEYCODE_TAB)
+                0x08 -> pressKey(KeyEvent.KEYCODE_DEL)
+                0x7f -> pressKey(KeyEvent.KEYCODE_FORWARD_DEL)
+                0x1b -> pressKey(KeyEvent.KEYCODE_ESCAPE)
+                else -> {
+                    val stroke = if (codePoint <= Char.MAX_VALUE.code) {
+                        typingStroke(codePoint.toChar())
+                    } else {
+                        null
+                    }
+                    if (stroke != null) withShift(stroke.shift) { pressKey(stroke.keyCode) }
+                }
+            }
+        }
     }
 
     /** Splits final text into printable runs and real key presses. */
@@ -243,7 +285,7 @@ class DesktopImeRouter(
      */
     private fun pressTextAsKeys(text: String): Boolean {
         if (text.length != 1) return false
-        val stroke = asciiStroke(text[0]) ?: return false
+        val stroke = shortcutStroke(text[0]) ?: return false
         withShift(stroke.shift) { pressKey(stroke.keyCode) }
         return true
     }
@@ -274,15 +316,27 @@ class DesktopImeRouter(
 
     private data class KeyStroke(val keyCode: Int, val shift: Boolean)
 
-    /** US-layout mapping, matching the key map the Wayland host sends. */
-    private fun asciiStroke(character: Char): KeyStroke? {
+    /**
+     * Shortcut mapping: letters ignore case so auto-capitalisation cannot turn
+     * Ctrl+C into Ctrl+Shift+C.
+     */
+    private fun shortcutStroke(character: Char): KeyStroke? {
+        if (character.isLetter()) {
+            val lower = character.lowercaseChar()
+            if (lower in 'a'..'z') return KeyStroke(KeyEvent.KEYCODE_A + (lower - 'a'), shift = false)
+        }
+        return PLAIN_STROKES[character] ?: SHIFTED_STROKES[character]
+    }
+
+    /** Typing mapping for the US layout the hosts send; case needs Shift. */
+    private fun typingStroke(character: Char): KeyStroke? {
         when (character) {
-            in 'a'..'z', in 'A'..'Z' -> {
-                val lower = character.lowercaseChar()
-                // Android key codes for letters and digits are contiguous ranges.
-                return KeyStroke(KeyEvent.KEYCODE_A + (lower - 'a'), shift = false)
-            }
-            in '0'..'9' -> return KeyStroke(KeyEvent.KEYCODE_0 + (character - '0'), shift = false)
+            in 'a'..'z' ->
+                return KeyStroke(KeyEvent.KEYCODE_A + (character - 'a'), shift = false)
+            in 'A'..'Z' ->
+                return KeyStroke(KeyEvent.KEYCODE_A + (character - 'A'), shift = true)
+            in '0'..'9' ->
+                return KeyStroke(KeyEvent.KEYCODE_0 + (character - '0'), shift = false)
         }
         return PLAIN_STROKES[character] ?: SHIFTED_STROKES[character]
     }
