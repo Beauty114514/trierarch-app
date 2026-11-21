@@ -35,6 +35,10 @@ argv = ["env", "DISABLE_RTKIT=1", "dbus-run-session", "--", "startplasma-wayland
 
 - [`arch-droidspaces-plasma-wayland-adreno.toml`](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)
 
+首次进入 Plasma 后，在 **系统设置 → 键盘 → 虚拟键盘** 中选中
+**Trierarch Wayland Input Method**。不选的话软键盘只能输入英文按键，
+中文输入和点击文本框自动弹出键盘都不会生效。
+
 ## Hyprland
 
 使用普通 `hyprland` 包和真实 DRM/KGSL 路径。如果会话启动后没有可见输出，检查

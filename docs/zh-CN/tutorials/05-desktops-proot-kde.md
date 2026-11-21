@@ -99,6 +99,12 @@ backend = "pipewire"
 
 如果 Plasma 没有出现，先在 guest 内看这个日志。
 
+## 输入法
+
+Trierarch 已经在 guest 内安装了名为 **Trierarch Wayland Input Method** 的虚拟键盘条目。
+首次进入 Plasma 后，在 **系统设置 → 键盘 → 虚拟键盘** 中选中它，只需设置一次。
+不选中的话，软键盘只能按按键方式输入英文，中文输入和点击文本框自动弹出键盘都不会生效。
+
 ## 验证 GPU 路径
 
 检查文件：

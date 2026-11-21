@@ -100,6 +100,13 @@ Start the profile from the app. The log is written to:
 
 If Plasma does not appear, read that log inside the guest first.
 
+## Input method
+
+Trierarch installs a virtual-keyboard entry named **Trierarch Wayland Input Method**
+inside the guest. After the first Plasma start, select it once in
+**System Settings → Keyboard → Virtual Keyboard**. Without it the soft keyboard can
+only type English as key presses; Chinese input and tap-to-open keyboard do not work.
+
 ## Verify the GPU path
 
 Check the expected files:

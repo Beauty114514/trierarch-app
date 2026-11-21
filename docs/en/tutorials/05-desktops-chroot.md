@@ -38,6 +38,11 @@ Use the sample profile:
 
 - [`kali-chroot-plasma-wayland-adreno.toml`](../../profiles/kali-chroot-plasma-wayland-adreno.toml)
 
+After the first Plasma start, select **Trierarch Wayland Input Method** in
+**System Settings → Keyboard → Virtual Keyboard**. Without it the soft keyboard
+can only type English as key presses; Chinese input and tap-to-open keyboard do
+not work.
+
 ## Hyprland
 
 Install the normal `hyprland` package and use the real DRM/KGSL path. If the

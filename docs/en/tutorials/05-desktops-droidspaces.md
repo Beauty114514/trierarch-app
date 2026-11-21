@@ -37,6 +37,11 @@ Use the sample profile:
 
 - [`arch-droidspaces-plasma-wayland-adreno.toml`](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)
 
+After the first Plasma start, select **Trierarch Wayland Input Method** in
+**System Settings → Keyboard → Virtual Keyboard**. Without it the soft keyboard
+can only type English as key presses; Chinese input and tap-to-open keyboard do
+not work.
+
 ## Hyprland
 
 Use the normal `hyprland` package and the real DRM/KGSL path. Check the
