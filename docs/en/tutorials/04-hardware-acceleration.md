@@ -146,7 +146,10 @@ find /usr/share/vulkan/icd.d -iname '*freedreno*'
 
 Do not mix an arbitrary Mesa build with an arbitrary Turnip build.
 
-## Sample profiles
+On Adreno 740, if the desktop corrupts when the notification shade or a
+floating window appears, see
+[Adreno 740 UBWC corruption](../known-issues/adreno-740-ubwc.md).
+
 ## Sample profiles
 
 - [Freedreno sample](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)

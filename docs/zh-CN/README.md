@@ -32,6 +32,7 @@
 - [PRoot 下的 Firefox](known-issues/proot/firefox.md)
 - [PRoot 下的 KDE Baloo](known-issues/proot/baloo-tags.md)
 - [PipeWire/RTKit](known-issues/pipewire-rtkit.md)
+- [Adreno 740：通知栏/悬浮窗花屏](known-issues/adreno-740-ubwc.md)
 
 ## 故障排查记录
 

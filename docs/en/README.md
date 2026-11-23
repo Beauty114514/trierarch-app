@@ -33,6 +33,7 @@ profile fields, GPU assets, desktops, and finally running a sample.
 - [Firefox under PRoot](known-issues/proot/firefox.md)
 - [KDE Baloo under PRoot](known-issues/proot/baloo-tags.md)
 - [PipeWire/RTKit](known-issues/pipewire-rtkit.md)
+- [Adreno 740: notification/floating-window corruption](known-issues/adreno-740-ubwc.md)
 
 ## Troubleshooting notes
 

@@ -141,7 +141,9 @@ find /usr/share/vulkan/icd.d -iname '*freedreno*'
 
 不能把任意 Mesa 构建和任意 Turnip 构建混在一起。
 
-## 样例 profile
+Adreno 740 上如果通知栏/悬浮窗出现时桌面花屏，见
+[Adreno 740 UBWC 花屏](../known-issues/adreno-740-ubwc.md)。
+
 ## 样例 profile
 
 - [Freedreno 样例](../../profiles/arch-droidspaces-plasma-wayland-adreno.toml)
