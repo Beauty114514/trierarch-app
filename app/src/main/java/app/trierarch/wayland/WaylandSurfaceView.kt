@@ -36,6 +36,10 @@ class WaylandSurfaceView(
         textChannelAvailable = { textInputActive },
     )
     private val androidIme = AndroidImeController(this, waylandImeSink)
+    private val clipboardBridge = WaylandClipboardBridge(
+        context,
+        WaylandImeBridgeRuntime.clipboardSocket(context),
+    )
     private val textInputStateFile = WaylandImeBridgeRuntime.state(context)
     private val focusPoll = object : Runnable {
         override fun run() {
@@ -48,6 +52,7 @@ class WaylandSurfaceView(
         // A state file left by an earlier session must not pop the keyboard on
         // its own; the bridge replaces it once the guest focuses a text input.
         WaylandTextInputState.reset(textInputStateFile)
+        clipboardBridge.start()
         holder.setFormat(PixelFormat.RGBA_8888)
         holder.addCallback(this)
         // The pixels are rendered by the separate Surface. Keeping the
@@ -139,6 +144,7 @@ class WaylandSurfaceView(
         inputRouter.cancel(this)
         releasePressedKeys()
         waylandImeSink.close()
+        clipboardBridge.stop()
         super.onDetachedFromWindow()
     }
 

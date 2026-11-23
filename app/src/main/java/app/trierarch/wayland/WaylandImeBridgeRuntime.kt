@@ -72,6 +72,10 @@ object WaylandImeBridgeRuntime {
 
     fun socket(context: Context): File = File(context.filesDir, "wayland/runtime/ime/trierarch-ime.sock")
 
+    /** Clipboard socket served by the bridge's `--clipboard` mode. */
+    fun clipboardSocket(context: Context): File =
+        File(context.filesDir, "wayland/runtime/ime/trierarch-clipboard.sock")
+
     /** Text-input focus file written by the bridge next to its socket. */
     fun state(context: Context): File = File(context.filesDir, "wayland/runtime/ime/trierarch-ime-state")
 }
