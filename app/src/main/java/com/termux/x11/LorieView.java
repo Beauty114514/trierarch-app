@@ -1,7 +1,10 @@
 package com.termux.x11;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.content.Context;
 import android.os.SystemClock;
+import android.util.Log;
 import android.view.Surface;
 import android.view.SurfaceHolder;
 import android.view.MotionEvent;
@@ -27,11 +30,12 @@ import dalvik.annotation.optimization.FastNative;
 /**
  * A deliberately small SurfaceView facade for the fixed Lorie JNI ABI.
  *
- * It owns rendering and the X11 pointer input path. Keyboard,
- * clipboard, scaling controls and external-display policy remain separate.
+ * It owns rendering, the X11 pointer input path and the clipboard bridge.
+ * Keyboard, scaling controls and external-display policy remain separate.
  */
 @Keep
 public final class LorieView extends SurfaceView {
+    private static final String TAG = "TrierarchX11";
     private long nativeHandle;
     private int latestWidth;
     private int latestHeight;
@@ -39,9 +43,12 @@ public final class LorieView extends SurfaceView {
     private final PhysicalKeyboardRouter keyboardRouter;
     private final AndroidImeController androidIme;
     private final DesktopImeRouter imeRouter;
+    private final ClipboardManager clipboardManager;
+    private String lastClipboardText;
 
     public LorieView(Context context) {
         super(context);
+        clipboardManager = (ClipboardManager) context.getSystemService(Context.CLIPBOARD_SERVICE);
         inputRouter = new PointerInputRouter(context,
                 new X11PointerEventSink((x, y, button, down, relative) ->
                         sendMouseEvent(nativeHandle, x, y, button, down, relative)),
@@ -92,6 +99,7 @@ public final class LorieView extends SurfaceView {
     public void attachConnection(int fileDescriptor) {
         if (nativeHandle == 0) return;
         connect(nativeHandle, fileDescriptor);
+        setClipboardSyncEnabled(nativeHandle, true, false);
         publishSize();
     }
 
@@ -184,9 +192,35 @@ public final class LorieView extends SurfaceView {
         int x, int y, int width, int height, float left, float top, float sourceWidth, float sourceHeight
     ) {}
 
-    // Called by Lorie's native event loop; clipboard is intentionally deferred.
-    @Keep void setClipboardText(String text) {}
-    @Keep void requestClipboard() {}
+    /** Called by Lorie's native event loop when an X11 client copies text. */
+    @Keep void setClipboardText(String text) {
+        if (text == null || text.isEmpty() || text.equals(lastClipboardText)) return;
+        lastClipboardText = text;
+        try {
+            clipboardManager.setPrimaryClip(ClipData.newPlainText("Linux", text));
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Unable to copy X11 clipboard text to Android", error);
+        }
+    }
+
+    /** Called by Lorie's native event loop when an X11 client pastes. */
+    @Keep void requestClipboard() {
+        if (nativeHandle == 0 || !isConnected()) return;
+        CharSequence text = null;
+        try {
+            ClipData clip = clipboardManager.getPrimaryClip();
+            if (clip != null && clip.getItemCount() > 0) {
+                text = clip.getItemAt(0).getText();
+            }
+        } catch (RuntimeException error) {
+            Log.w(TAG, "Unable to read the Android clipboard for X11", error);
+        }
+        if (text == null || text.length() == 0) return;
+        lastClipboardText = text.toString();
+        sendClipboardAnnounce(nativeHandle);
+        sendClipboardEvent(nativeHandle, text.toString().getBytes(StandardCharsets.UTF_8));
+    }
+
     @Keep void resetIme() {}
 
     @FastNative private native long nativeInit();
