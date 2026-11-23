@@ -78,6 +78,15 @@ class X11HostController(
         display?.showAndroidKeyboard()
     }
 
+    /** Shrinks the X11 surface above the Android IME without changing the window. */
+    fun setBottomInset(inset: Int) {
+        val view = display ?: return
+        val params = view.layoutParams as? FrameLayout.LayoutParams ?: return
+        if (params.bottomMargin == inset) return
+        params.bottomMargin = inset
+        view.layoutParams = params
+    }
+
     private fun bindServerIfNeeded() {
         if (binding || server != null) return
         binding = appContext.bindService(

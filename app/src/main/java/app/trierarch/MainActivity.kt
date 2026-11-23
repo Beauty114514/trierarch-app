@@ -117,7 +117,15 @@ class MainActivity : AppCompatActivity() {
         )
         setDisplayedSurface(DisplaySurface.INTERNAL_SHELL)
         ViewCompat.setOnApplyWindowInsetsListener(terminalContainer) { _, insets ->
-            floatingMenu.setImeBottomInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            val ime = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            if (displayedSurface == DisplaySurface.WAYLAND ||
+                displayedSurface == DisplaySurface.X11
+            ) {
+                applyDesktopBottomInset(
+                    if (desktopImeMode == DesktopImeMode.RESIZE) ime else 0,
+                )
+            }
+            floatingMenu.setImeBottomInset(ime)
             insets
         }
         setContentView(terminalContainer)
@@ -202,6 +210,23 @@ class MainActivity : AppCompatActivity() {
         applySystemBars(surface)
         applyImeMode(surface)
         floatingMenu.setActions(actionsFor(surface))
+    }
+
+    /**
+     * Edge-to-edge desktop windows no longer resize for the IME automatically,
+     * so shrink the desktop surface explicitly when the resize mode is active.
+     */
+    private fun applyDesktopBottomInset(inset: Int) {
+        when (displayedSurface) {
+            DisplaySurface.WAYLAND -> waylandSurface?.let { view ->
+                val params = view.layoutParams as? FrameLayout.LayoutParams ?: return
+                if (params.bottomMargin == inset) return
+                params.bottomMargin = inset
+                view.layoutParams = params
+            }
+            DisplaySurface.X11 -> x11Host.setBottomInset(inset)
+            else -> Unit
+        }
     }
 
     /** The terminal shows the native status bar; desktop surfaces hide it. */
