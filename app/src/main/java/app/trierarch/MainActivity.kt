@@ -53,9 +53,7 @@ class MainActivity : AppCompatActivity() {
         )
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
-            hide(WindowInsetsCompat.Type.statusBars())
         }
-        WindowCompat.setDecorFitsSystemWindows(window, false)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
             window.attributes = window.attributes.apply {
                 layoutInDisplayCutoutMode =
@@ -201,8 +199,24 @@ class MainActivity : AppCompatActivity() {
 
     private fun setDisplayedSurface(surface: DisplaySurface) {
         displayedSurface = surface
+        applySystemBars(surface)
         applyImeMode(surface)
         floatingMenu.setActions(actionsFor(surface))
+    }
+
+    /** The terminal shows the native status bar; desktop surfaces hide it. */
+    private fun applySystemBars(surface: DisplaySurface) {
+        val terminal = surface == DisplaySurface.INTERNAL_SHELL ||
+            surface == DisplaySurface.RUNTIME_SHELL
+        WindowCompat.setDecorFitsSystemWindows(window, terminal)
+        val controller = WindowCompat.getInsetsController(window, window.decorView)
+        if (terminal) {
+            controller.show(WindowInsetsCompat.Type.statusBars())
+        } else {
+            controller.hide(WindowInsetsCompat.Type.statusBars())
+        }
+        controller.isAppearanceLightStatusBars = false
+        window.decorView.post { ViewCompat.requestApplyInsets(window.decorView) }
     }
 
     private fun actionsFor(surface: DisplaySurface): List<FloatingMenuAction> = when (surface) {
