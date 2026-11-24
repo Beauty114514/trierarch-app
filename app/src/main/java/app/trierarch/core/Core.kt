@@ -1,5 +1,7 @@
 package app.trierarch.core
 
+import java.util.concurrent.CopyOnWriteArrayList
+
 /**
  * The single entry point both frontends use: the GUI in-process, the CLI
  * through the control socket. The core owns documents and sessions; frontends
@@ -9,6 +11,16 @@ class Core(
     private val profiles: ProfileService,
     private val sessionService: SessionService,
 ) {
+    private val listeners = CopyOnWriteArrayList<(CoreEvent) -> Unit>()
+
+    fun addListener(listener: (CoreEvent) -> Unit) {
+        listeners += listener
+    }
+
+    fun removeListener(listener: (CoreEvent) -> Unit) {
+        listeners -= listener
+    }
+
     fun documents(): List<ProfileDocument> = profiles.listDocuments()
 
     fun read(id: String): DocumentContent? = profiles.readDocument(id)
@@ -20,7 +32,15 @@ class Core(
     fun submit(command: Command, onDone: (CommandOutcome) -> Unit) {
         when (command) {
             is Command.Session -> sessionService.dispatch(command, onDone)
-            is Command.Document -> onDone(apply(command))
+            is Command.Document -> {
+                val outcome = apply(command)
+                onDone(outcome)
+                if (outcome is CommandOutcome.Success) {
+                    listeners.forEach { listener ->
+                        runCatching { listener(CoreEvent.DocumentsChanged) }
+                    }
+                }
+            }
         }
     }
 

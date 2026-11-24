@@ -4,14 +4,10 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
-import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.ScrollView
-import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
 import androidx.activity.viewModels
@@ -20,24 +16,19 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import app.trierarch.core.Command
-import app.trierarch.core.CommandOutcome
 import app.trierarch.core.Core
-import app.trierarch.core.ProfileDocument
 import app.trierarch.core.ProfileService
-import app.trierarch.core.SessionPhase
 import app.trierarch.core.SessionService
-import app.trierarch.core.SessionSnapshot
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
+import app.trierarch.ui.gui.GuiScreen
 import app.trierarch.ui.FloatingActionMenuView
 import app.trierarch.ui.FloatingMenuAction
 import app.trierarch.wayland.WaylandSurfaceView
 import app.trierarch.x11.X11HostController
-import com.google.android.material.button.MaterialButton
 import com.termux.view.TerminalView
 
 /** The first Trierarch profile: a shell using the app's private files directory as its home. */
@@ -54,9 +45,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var floatingMenu: FloatingActionMenuView
     /** Opaque layer that covers the runtime surfaces; the terminal stays alive underneath. */
     private lateinit var guiLayer: FrameLayout
-    private lateinit var guiRows: LinearLayout
-    private lateinit var guiCountLabel: TextView
-    private lateinit var guiErrorLabel: TextView
+    private lateinit var guiScreen: GuiScreen
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
@@ -138,7 +127,26 @@ class MainActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
-        guiLayer = createGuiLayer()
+        guiScreen = GuiScreen(
+            context = this,
+            core = core,
+            onClose = { closeGui() },
+            onFollowSession = { hideGuiLayer() },
+        )
+        guiLayer = FrameLayout(this).apply {
+            visibility = View.GONE
+            setBackgroundColor(android.graphics.Color.BLACK)
+            isClickable = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            addView(
+                guiScreen.view,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                ),
+            )
+        }
         terminalContainer.addView(
             guiLayer,
             FrameLayout.LayoutParams(
@@ -157,12 +165,13 @@ class MainActivity : AppCompatActivity() {
                 )
             }
             floatingMenu.setImeBottomInset(ime)
+            guiScreen.setImeInset(ime)
             insets
         }
         setContentView(terminalContainer)
         onBackPressedDispatcher.addCallback(this) {
             if (guiLayer.visibility == View.VISIBLE) {
-                closeGui()
+                if (!guiScreen.handleBack()) closeGui()
             } else {
                 finish()
             }
@@ -297,8 +306,7 @@ class MainActivity : AppCompatActivity() {
         if (guiLayer.visibility == View.VISIBLE) return
         rememberFrontend(Frontend.GUI)
         keyboardPanel.hide()
-        hideGuiError()
-        refreshGui()
+        guiScreen.refresh()
         floatingMenu.visibility = View.GONE
         guiLayer.visibility = View.VISIBLE
         guiLayer.requestFocus()
@@ -336,281 +344,6 @@ class MainActivity : AppCompatActivity() {
     private fun rememberFrontend(frontend: Frontend) {
         uiPreferences.edit().putString(KEY_FRONTEND, frontend.value).apply()
     }
-
-    /** Read-only environment list; the profile directory is the only data source. */
-    private fun createGuiLayer(): FrameLayout {
-        val header = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            addView(
-                TextView(this@MainActivity).apply {
-                    text = "Trierarch"
-                    setTextColor(android.graphics.Color.WHITE)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
-                },
-                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-            )
-            addView(MaterialButton(this@MainActivity).apply {
-                text = "Terminal"
-                setOnClickListener { closeGui() }
-            })
-        }
-        guiCountLabel = TextView(this).apply {
-            setTextColor(SECONDARY_TEXT)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            letterSpacing = 0.08f
-            setPadding(0, dp(20), 0, dp(4))
-        }
-        guiErrorLabel = TextView(this).apply {
-            setTextColor(ERROR_TEXT)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(0, dp(8), 0, 0)
-            visibility = View.GONE
-        }
-        guiRows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        val column = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(dp(20), dp(16), dp(20), dp(16))
-            addView(header)
-            addView(guiCountLabel)
-            addView(guiErrorLabel)
-            addView(
-                ScrollView(this@MainActivity).apply {
-                    isFillViewport = true
-                    addView(
-                        guiRows,
-                        FrameLayout.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.WRAP_CONTENT,
-                        ),
-                    )
-                },
-                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f),
-            )
-        }
-        return FrameLayout(this).apply {
-            visibility = View.GONE
-            setBackgroundColor(android.graphics.Color.BLACK)
-            // Opaque and clickable: neither touches nor keys may reach the
-            // runtime surface underneath.
-            isClickable = true
-            isFocusable = true
-            isFocusableInTouchMode = true
-            addView(
-                column,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                ),
-            )
-        }
-    }
-
-    /**
-     * Re-reads the profile directory and the runtime state on every refresh.
-     * Nothing is cached: the CLI can change both at any moment.
-     */
-    private fun refreshGui() {
-        val documents = core.documents()
-        val snapshot = core.sessions()
-        val busy = snapshot.pending != null
-        guiCountLabel.text = "ENVIRONMENTS · ${documents.size}"
-        guiRows.removeAllViews()
-        if (documents.isEmpty()) {
-            guiRows.addView(createEmptyState())
-            return
-        }
-        documents.forEach { document ->
-            guiRows.addView(createEnvironmentRow(document, snapshot.sessions[document.id], busy))
-        }
-    }
-
-    private fun createEnvironmentRow(
-        document: ProfileDocument,
-        session: SessionSnapshot?,
-        busy: Boolean,
-    ): View {
-        val container = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            setPadding(0, dp(14), 0, 0)
-        }
-        val line = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
-        details.addView(TextView(this).apply {
-            text = document.id
-            setTextColor(android.graphics.Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
-            typeface = android.graphics.Typeface.MONOSPACE
-        })
-        if (document.error == null) {
-            val display = if (document.display == ProfileService.DISPLAY_NONE) {
-                "terminal"
-            } else {
-                document.display
-            }
-            val badges = listOf(document.runtime, display, document.renderer)
-                .filterNotNull()
-                .filter { it.isNotEmpty() }
-                .joinToString(" · ")
-            details.addView(TextView(this).apply {
-                text = badges
-                setTextColor(SECONDARY_TEXT)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                setPadding(0, dp(4), 0, 0)
-            })
-        }
-        val phase = session?.phase ?: SessionPhase.STOPPED
-        val phaseText = when (phase) {
-            SessionPhase.STOPPED -> "stopped"
-            SessionPhase.STARTING -> "starting"
-            SessionPhase.RUNNING -> "running"
-            SessionPhase.STOPPING -> "stopping"
-        } + if (session?.active == true) " · shown" else ""
-        details.addView(TextView(this).apply {
-            text = phaseText
-            setTextColor(
-                when (phase) {
-                    SessionPhase.STARTING, SessionPhase.STOPPING -> PENDING_TEXT
-                    SessionPhase.RUNNING -> RUNNING_TEXT
-                    SessionPhase.STOPPED -> SECONDARY_TEXT
-                },
-            )
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(0, dp(4), 0, 0)
-        })
-        document.error?.let { message ->
-            details.addView(TextView(this).apply {
-                text = message
-                setTextColor(ERROR_TEXT)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                setPadding(0, dp(4), 0, 0)
-            })
-        }
-        line.addView(
-            details,
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-        )
-        createRowActions(document, phase, busy)?.let { actions ->
-            line.addView(
-                actions,
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { marginStart = dp(12) },
-            )
-        }
-        container.addView(line)
-        container.addView(
-            View(this).apply { setBackgroundColor(DIVIDER_COLOR) },
-            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
-                topMargin = dp(14)
-            },
-        )
-        return container
-    }
-
-    private fun createRowActions(
-        document: ProfileDocument,
-        phase: SessionPhase,
-        busy: Boolean,
-    ): View? {
-        if (document.error != null) return null
-        val actions = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-        }
-        when (phase) {
-            SessionPhase.STOPPED -> actions.addView(
-                primaryAction("Start", busy) { dispatchFromGui(Command.Session.Run(document.id)) },
-            )
-            SessionPhase.RUNNING -> {
-                actions.addView(
-                    primaryAction("Open", busy) { dispatchFromGui(Command.Session.Open(document.id)) },
-                )
-                actions.addView(
-                    secondaryAction("Stop", busy) { dispatchFromGui(Command.Session.Stop(document.id)) },
-                )
-            }
-            SessionPhase.STARTING, SessionPhase.STOPPING -> actions.addView(
-                primaryAction("…", busy = true) {},
-            )
-        }
-        return actions
-    }
-
-    private fun primaryAction(label: String, busy: Boolean, onClick: () -> Unit) =
-        MaterialButton(this).apply {
-            minWidth = 0
-            text = label
-            isEnabled = !busy
-            setOnClickListener { onClick() }
-        }
-
-    private fun secondaryAction(label: String, busy: Boolean, onClick: () -> Unit) =
-        TextView(this).apply {
-            text = label
-            setTextColor(ERROR_TEXT)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            isClickable = true
-            isFocusable = true
-            isEnabled = !busy
-            alpha = if (busy) 0.4f else 1f
-            setOnClickListener { onClick() }
-        }
-
-    /**
-     * Runs a GUI action through the same core path as the CLI. A runtime start
-     * carries its launch in the outcome's afterReply callback, which the control
-     * socket normally invokes after the client acknowledges; the GUI has no
-     * socket, so it invokes that callback itself.
-     */
-    private fun dispatchFromGui(command: Command) {
-        hideGuiError()
-        core.submit(command) { outcome ->
-            when (outcome) {
-                is CommandOutcome.Failure -> showGuiError(outcome.error.message)
-                is CommandOutcome.Success -> {
-                    if (command is Command.Session.Run || command is Command.Session.Open) {
-                        // Follow the session and let its display host own focus.
-                        hideGuiLayer()
-                    }
-                    outcome.afterReply?.invoke()
-                    if (command !is Command.Session.Run && command !is Command.Session.Open) {
-                        refreshGui()
-                    }
-                }
-            }
-        }
-    }
-
-    private fun showGuiError(message: String) {
-        guiErrorLabel.text = message
-        guiErrorLabel.visibility = View.VISIBLE
-    }
-
-    private fun hideGuiError() {
-        guiErrorLabel.visibility = View.GONE
-    }
-
-    private fun createEmptyState(): View = TextView(this).apply {
-        text = "No environments yet.\n\nCreate one from the terminal:\n\n" +
-            "  trierarch --create arch-demo\n" +
-            "  trierarch --config arch-demo"
-        setTextColor(SECONDARY_TEXT)
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-        typeface = android.graphics.Typeface.MONOSPACE
-        setPadding(0, dp(16), 0, 0)
-    }
-
-    private fun dp(value: Int): Int = TypedValue.applyDimension(
-        TypedValue.COMPLEX_UNIT_DIP,
-        value.toFloat(),
-        resources.displayMetrics,
-    ).toInt()
 
     /**
      * Edge-to-edge desktop windows no longer resize for the IME automatically,
@@ -745,11 +478,12 @@ class MainActivity : AppCompatActivity() {
         Log.i(TAG, "onResume display=$displayedSurface")
         if (displayedSurface == DisplaySurface.WAYLAND) rootKeyboard.start()
         // The CLI may have created or deleted a profile while the GUI was hidden.
-        if (guiLayer.visibility == View.VISIBLE) refreshGui()
+        if (guiLayer.visibility == View.VISIBLE) guiScreen.refresh()
     }
 
     override fun onDestroy() {
         rootKeyboard.stop()
+        if (::guiScreen.isInitialized) guiScreen.release()
         runtimeControlServer?.close()
         runtimeControlServer = null
         super.onDestroy()
