@@ -15,8 +15,8 @@ trierarch --create ID            # create a profile template
 trierarch --config ID            # edit a profile with $EDITOR
 trierarch --delete ID            # delete a profile
 trierarch --run ID               # start a profile
+trierarch --open ID              # open a running session (no restart)
 trierarch --stop [ID]            # stop the current or named session
-trierarch --rerun ID             # restart a profile
 trierarch --import ARCHIVE --name NAME
 trierarch --remove NAME
 ```
@@ -66,8 +66,8 @@ trierarch --status arch-demo
 trierarch --stop arch-demo
 ```
 
-Use `--rerun` after editing a profile if you want to replace a running session.
-Do not edit a profile while its session is running unless you intend to restart
-it afterward.
+Use `--open` to bring a running session back on screen; it does not restart the
+runtime or re-read the profile. To apply profile edits, stop the session and
+start it again.
 
 Next: [Chapter 2 — Deploy a runtime](02-deploy.md).

@@ -117,6 +117,7 @@ class MainActivity : AppCompatActivity() {
                 override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
                     showX11Display(onReady, onFailure)
                 override fun showGui() = openGui()
+                override fun showSession(id: String, display: String) = openSession(id, display)
                 override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
             },
         )
@@ -242,6 +243,30 @@ class MainActivity : AppCompatActivity() {
         waylandSurface?.let {
             it.releasePressedKeys()
             it.visibility = android.view.View.INVISIBLE
+        }
+    }
+
+    /** Re-shows a running session without starting, stopping or restarting it. */
+    private fun openSession(id: String, display: String) {
+        if (!terminalViewModel.showRuntime(id)) return
+        when (display) {
+            ProfileStore.DISPLAY_X11 -> showX11Display(
+                onReady = { attachTerminalSession() },
+                onFailure = { message ->
+                    Toast.makeText(this, "Unable to show X11: $message", Toast.LENGTH_LONG).show()
+                    terminalViewModel.showInternalShell()
+                    showTerminal(DisplaySurface.INTERNAL_SHELL)
+                    attachTerminalSession()
+                },
+            )
+            ProfileStore.DISPLAY_WAYLAND -> {
+                showWaylandSurface()
+                attachTerminalSession()
+            }
+            else -> {
+                showTerminal(DisplaySurface.RUNTIME_SHELL)
+                attachTerminalSession()
+            }
         }
     }
 
@@ -460,9 +485,9 @@ class MainActivity : AppCompatActivity() {
             details,
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
-        createRowAction(document, phase, busy)?.let { action ->
+        createRowActions(document, phase, busy)?.let { actions ->
             line.addView(
-                action,
+                actions,
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -479,29 +504,55 @@ class MainActivity : AppCompatActivity() {
         return container
     }
 
-    private fun createRowAction(
+    private fun createRowActions(
         document: ProfileDocument,
         phase: SessionPhase,
         busy: Boolean,
-    ): MaterialButton? {
+    ): View? {
         if (document.error != null) return null
-        return MaterialButton(this).apply {
-            minWidth = 0
-            text = when (phase) {
-                SessionPhase.STOPPED -> "Start"
-                SessionPhase.RUNNING -> "Stop"
-                SessionPhase.STARTING, SessionPhase.STOPPING -> "…"
-            }
-            isEnabled = !busy && (phase == SessionPhase.STOPPED || phase == SessionPhase.RUNNING)
-            setOnClickListener {
-                when (phase) {
-                    SessionPhase.STOPPED -> dispatchFromGui(RuntimeCommand.Run(document.id))
-                    SessionPhase.RUNNING -> dispatchFromGui(RuntimeCommand.Stop(document.id))
-                    SessionPhase.STARTING, SessionPhase.STOPPING -> Unit
-                }
-            }
+        val actions = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
         }
+        when (phase) {
+            SessionPhase.STOPPED -> actions.addView(
+                primaryAction("Start", busy) { dispatchFromGui(RuntimeCommand.Run(document.id)) },
+            )
+            SessionPhase.RUNNING -> {
+                actions.addView(
+                    primaryAction("Open", busy) { dispatchFromGui(RuntimeCommand.OpenSession(document.id)) },
+                )
+                actions.addView(
+                    secondaryAction("Stop", busy) { dispatchFromGui(RuntimeCommand.Stop(document.id)) },
+                )
+            }
+            SessionPhase.STARTING, SessionPhase.STOPPING -> actions.addView(
+                primaryAction("…", busy = true) {},
+            )
+        }
+        return actions
     }
+
+    private fun primaryAction(label: String, busy: Boolean, onClick: () -> Unit) =
+        MaterialButton(this).apply {
+            minWidth = 0
+            text = label
+            isEnabled = !busy
+            setOnClickListener { onClick() }
+        }
+
+    private fun secondaryAction(label: String, busy: Boolean, onClick: () -> Unit) =
+        TextView(this).apply {
+            text = label
+            setTextColor(ERROR_TEXT)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            isClickable = true
+            isFocusable = true
+            isEnabled = !busy
+            alpha = if (busy) 0.4f else 1f
+            setOnClickListener { onClick() }
+        }
 
     /**
      * Runs a GUI action through the same controller path as the CLI. A runtime
@@ -516,8 +567,8 @@ class MainActivity : AppCompatActivity() {
                 showGuiError(result.message)
                 return@dispatch
             }
-            if (command is RuntimeCommand.Run) {
-                // Follow the new session and let its display host own focus.
+            if (command is RuntimeCommand.Run || command is RuntimeCommand.OpenSession) {
+                // Follow the session and let its display host own focus.
                 hideGuiLayer()
                 result.afterReply?.invoke()
             } else {

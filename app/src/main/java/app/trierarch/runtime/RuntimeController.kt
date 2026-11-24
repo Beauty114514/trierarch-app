@@ -24,6 +24,7 @@ class RuntimeController(
         fun showWayland()
         fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit)
         fun showGui()
+        fun showSession(id: String, display: String)
         fun runOnMain(action: () -> Unit)
     }
 
@@ -32,10 +33,24 @@ class RuntimeController(
             is RuntimeCommand.Status -> status(command.id, completion)
             is RuntimeCommand.Run -> start(command.id, completion)
             is RuntimeCommand.Stop -> stop(command.id, completion)
-            is RuntimeCommand.Rerun -> rerun(command.id, completion)
+            is RuntimeCommand.OpenSession -> openSession(command.id, completion)
             // Switching screens must never start, stop, or rebuild a session.
             is RuntimeCommand.OpenGui -> openGui(completion)
         }
+    }
+
+    /**
+     * Shows an already-running session. It never starts, stops or restarts a
+     * runtime and does not re-read the profile: only the display changes.
+     */
+    private fun openSession(id: String, completion: (RuntimeCommandResult) -> Unit) {
+        val display = terminal.displayOf(id) ?: run {
+            completion(RuntimeCommandResult(false, "profile is not running: $id; use --run $id"))
+            return
+        }
+        completion(RuntimeCommandResult(true, "opening $id") {
+            displayHost.runOnMain { displayHost.showSession(id, display) }
+        })
     }
 
     private fun openGui(completion: (RuntimeCommandResult) -> Unit) {
@@ -85,25 +100,6 @@ class RuntimeController(
         val profile = loadProfile(id, completion) ?: return
         val sourceWasRunning = sourceWasRunning(profile.source, completion) ?: return
         scheduleStart(id, profile, sourceWasRunning, "starting", completion)
-    }
-
-    private fun rerun(id: String, completion: (RuntimeCommandResult) -> Unit) {
-        if (!terminal.isProfileRunning(id)) {
-            completion(RuntimeCommandResult(false, "profile is not running: $id; use --run $id"))
-            return
-        }
-        if (pending != null) {
-            completion(RuntimeCommandResult(false, "runtime action in progress: ${pending?.id}"))
-            return
-        }
-        val profile = loadProfile(id, completion) ?: return
-        pending = Pending(id, "restarting")
-        completion(RuntimeCommandResult(true, "restarting $id") {
-            displayHost.runOnMain {
-                terminal.stopRuntime(id)
-                launch(id, profile, sourceWasRunning = true)
-            }
-        })
     }
 
     private fun stop(id: String?, completion: (RuntimeCommandResult) -> Unit) {

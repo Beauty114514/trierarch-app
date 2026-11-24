@@ -41,11 +41,13 @@ trierarch --status arch-demo
 trierarch --stop arch-demo
 ```
 
-修改 profile 后重启：
+回到已经运行的会话（不重启）：
 
 ```sh
-trierarch --rerun arch-demo
+trierarch --open arch-demo
 ```
+
+修改 profile 后要生效，先 `--stop` 再 `--run`。
 
 ## 样例 profile
 

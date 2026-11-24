@@ -65,9 +65,12 @@ class RuntimeControlServer(
             output.write(result.message)
             output.write('\n'.code)
             output.flush()
-            val lifecycleCommand = command is RuntimeCommand.Run ||
-                command is RuntimeCommand.Stop || command is RuntimeCommand.Rerun
-            if (lifecycleCommand && runCatching { input.readLine() == "ACK" }.getOrDefault(false)) {
+            // These commands reply first and act afterwards, so the CLI always
+            // receives its answer before the app changes the display.
+            val deferredCommand = command is RuntimeCommand.Run ||
+                command is RuntimeCommand.Stop ||
+                command is RuntimeCommand.OpenSession
+            if (deferredCommand && runCatching { input.readLine() == "ACK" }.getOrDefault(false)) {
                 afterReply = result.afterReply
             }
         }
@@ -114,9 +117,9 @@ internal object ControlProtocol {
             "status" if (fields.size == 2) -> RuntimeCommand.Status(null)
             "status" if (fields.size == 3) -> RuntimeCommand.Status(fields[2])
             "run" if (fields.size == 3) -> RuntimeCommand.Run(fields[2])
+            "open" if (fields.size == 3) -> RuntimeCommand.OpenSession(fields[2])
             "stop" if (fields.size == 2) -> RuntimeCommand.Stop(null)
             "stop" if (fields.size == 3) -> RuntimeCommand.Stop(fields[2])
-            "rerun" if (fields.size == 3) -> RuntimeCommand.Rerun(fields[2])
             "gui.open" if (fields.size == 2) -> RuntimeCommand.OpenGui
             else -> null
         }

@@ -130,6 +130,10 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
 
     fun isProfileRunning(id: String): Boolean = runtimeSessions[id]?.session?.isRunning() == true
 
+    /** The display a running session was started with, or null when it is stopped. */
+    fun displayOf(id: String): String? =
+        runtimeSessions[id]?.takeIf { it.session.isRunning() }?.display
+
     fun runningProfileIds(): Set<String> = runtimeSessions
         .filterValues { it.session.isRunning() }
         .keys

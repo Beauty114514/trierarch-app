@@ -30,7 +30,7 @@ class ControlProtocolTest {
         assertEquals(RuntimeCommand.Run("a"), ControlProtocol.parse(token, "$token\trun\ta"))
         assertEquals(RuntimeCommand.Stop(null), ControlProtocol.parse(token, "$token\tstop"))
         assertEquals(RuntimeCommand.Stop("a"), ControlProtocol.parse(token, "$token\tstop\ta"))
-        assertEquals(RuntimeCommand.Rerun("a"), ControlProtocol.parse(token, "$token\trerun\ta"))
+        assertEquals(RuntimeCommand.OpenSession("a"), ControlProtocol.parse(token, "$token\topen\ta"))
     }
 
     @Test
@@ -39,6 +39,7 @@ class ControlProtocolTest {
         assertNull(ControlProtocol.parse(token, ""))
         assertNull(ControlProtocol.parse(token, "$token"))
         assertNull(ControlProtocol.parse(token, "$token\trun"))
+        assertNull(ControlProtocol.parse(token, "$token\topen"))
         assertNull(ControlProtocol.parse(token, "$token\trun\ta\tb"))
     }
 }

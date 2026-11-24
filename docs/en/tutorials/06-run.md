@@ -43,11 +43,13 @@ Stop it with:
 trierarch --stop arch-demo
 ```
 
-If you changed the profile, restart with:
+Bring a running session back on screen without restarting it:
 
 ```sh
-trierarch --rerun arch-demo
+trierarch --open arch-demo
 ```
+
+To apply profile edits, stop it and run it again.
 
 ## Sample profiles
 

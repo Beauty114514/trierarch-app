@@ -15,8 +15,8 @@ trierarch --create ID            # 创建 profile 模板
 trierarch --config ID            # 用 $EDITOR 编辑
 trierarch --delete ID            # 删除 profile
 trierarch --run ID               # 启动
+trierarch --open ID              # 回到已运行的会话（不重启）
 trierarch --stop [ID]            # 停止当前或指定会话
-trierarch --rerun ID             # 重启
 trierarch --import ARCHIVE --name NAME
 trierarch --remove NAME
 ```
@@ -65,7 +65,7 @@ trierarch --status arch-demo
 trierarch --stop arch-demo
 ```
 
-修改 profile 后需要替换运行中的会话时用 `--rerun`。会话运行中不要随意编辑
-profile；如果改了，后续要重启才会生效。
+`--open` 只把已运行的会话重新显示出来，不重启、不重新读 profile。会话运行中不要
+随意编辑 profile；修改后要生效，先 `--stop` 再 `--run`。
 
 下一步：[第二章 — 部署运行环境](02-deploy.md)。
