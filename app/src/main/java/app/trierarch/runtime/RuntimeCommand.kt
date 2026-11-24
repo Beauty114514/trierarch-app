@@ -7,8 +7,8 @@ sealed interface RuntimeCommand {
     data class Stop(val id: String?) : RuntimeCommand
     data class Rerun(val id: String) : RuntimeCommand
 
-    /** Presentation only: brings the in-app UI forward without touching a session. */
-    data object OpenUi : RuntimeCommand
+    /** Presentation only: brings the in-app GUI forward without touching a session. */
+    data object OpenGui : RuntimeCommand
 }
 
 data class RuntimeCommandResult(

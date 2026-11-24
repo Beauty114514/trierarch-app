@@ -8,19 +8,19 @@ class ControlProtocolTest {
     private val token = "token"
 
     @Test
-    fun parsesUiOpen() {
-        assertEquals(RuntimeCommand.OpenUi, ControlProtocol.parse(token, "$token\tui.open"))
+    fun parsesGuiOpen() {
+        assertEquals(RuntimeCommand.OpenGui, ControlProtocol.parse(token, "$token\tgui.open"))
     }
 
     @Test
-    fun rejectsUiOpenWithArguments() {
-        assertNull(ControlProtocol.parse(token, "$token\tui.open\tarch-plasma"))
+    fun rejectsGuiOpenWithArguments() {
+        assertNull(ControlProtocol.parse(token, "$token\tgui.open\tarch-plasma"))
     }
 
     @Test
     fun refusesRequestsWithoutTheToken() {
-        assertNull(ControlProtocol.parse(token, "wrong\tui.open"))
-        assertNull(ControlProtocol.parse("", "$token\tui.open"))
+        assertNull(ControlProtocol.parse(token, "wrong\tgui.open"))
+        assertNull(ControlProtocol.parse("", "$token\tgui.open"))
     }
 
     @Test

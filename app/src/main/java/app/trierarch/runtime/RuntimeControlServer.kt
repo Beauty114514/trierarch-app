@@ -117,7 +117,7 @@ internal object ControlProtocol {
             "stop" if (fields.size == 2) -> RuntimeCommand.Stop(null)
             "stop" if (fields.size == 3) -> RuntimeCommand.Stop(fields[2])
             "rerun" if (fields.size == 3) -> RuntimeCommand.Rerun(fields[2])
-            "ui.open" if (fields.size == 2) -> RuntimeCommand.OpenUi
+            "gui.open" if (fields.size == 2) -> RuntimeCommand.OpenGui
             else -> null
         }
     }

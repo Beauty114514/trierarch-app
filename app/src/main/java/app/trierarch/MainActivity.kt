@@ -45,8 +45,8 @@ class MainActivity : AppCompatActivity() {
     private var waylandSurface: WaylandSurfaceView? = null
     private lateinit var floatingMenu: FloatingActionMenuView
     /** Opaque layer that covers the runtime surfaces; the terminal stays alive underneath. */
-    private lateinit var uiLayer: FrameLayout
-    private lateinit var uiSessionLabel: TextView
+    private lateinit var guiLayer: FrameLayout
+    private lateinit var guiSessionLabel: TextView
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
@@ -107,7 +107,7 @@ class MainActivity : AppCompatActivity() {
                 override fun showWayland() = showWaylandSurface()
                 override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
                     showX11Display(onReady, onFailure)
-                override fun showUi() = openUi()
+                override fun showGui() = openGui()
                 override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
             },
         )
@@ -125,9 +125,9 @@ class MainActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
-        uiLayer = createUiLayer()
+        guiLayer = createGuiLayer()
         terminalContainer.addView(
-            uiLayer,
+            guiLayer,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -148,8 +148,8 @@ class MainActivity : AppCompatActivity() {
         }
         setContentView(terminalContainer)
         onBackPressedDispatcher.addCallback(this) {
-            if (uiLayer.visibility == View.VISIBLE) {
-                closeUi()
+            if (guiLayer.visibility == View.VISIBLE) {
+                closeGui()
             } else {
                 finish()
             }
@@ -159,11 +159,10 @@ class MainActivity : AppCompatActivity() {
 
         attachTerminalSession()
 
-        // Restore the frontend the app was last left in. Only the UI and the
-        // internal terminal are remembered; runtime surfaces never overwrite
-        // this choice.
-        if (uiPreferences.getString(KEY_FRONTEND, FRONTEND_TERMINAL) == FRONTEND_UI) {
-            openUi()
+        // Restore the management frontend the app was last left in. Only the
+        // GUI and the CLI are remembered; runtime displays never overwrite it.
+        if (Frontend.from(uiPreferences.getString(KEY_FRONTEND, null)) == Frontend.GUI) {
+            openGui()
         }
     }
 
@@ -242,31 +241,31 @@ class MainActivity : AppCompatActivity() {
         applySystemBars(surface)
         applyImeMode(surface)
         floatingMenu.setActions(actionsFor(surface))
-        // A runtime surface can appear while the UI layer is open (for example
-        // a CLI-driven run); keyboard focus must stay on the UI.
-        if (uiLayer.visibility == View.VISIBLE) uiLayer.requestFocus()
+        // A runtime surface can appear while the GUI layer is open (for example
+        // a CLI-driven run); keyboard focus must stay on the GUI.
+        if (guiLayer.visibility == View.VISIBLE) guiLayer.requestFocus()
     }
 
     /**
-     * Covers the runtime surface with the in-app UI. The terminal view, its
+     * Covers the runtime surface with the in-app GUI. The terminal view, its
      * session, the shell scrollback and every running runtime stay untouched;
      * only visibility and focus change.
      */
-    private fun openUi() {
-        if (uiLayer.visibility == View.VISIBLE) return
-        rememberFrontend(FRONTEND_UI)
+    private fun openGui() {
+        if (guiLayer.visibility == View.VISIBLE) return
+        rememberFrontend(Frontend.GUI)
         keyboardPanel.hide()
-        uiSessionLabel.text = "Session: ${terminalViewModel.activeProfileId() ?: "Trierarch shell"}"
+        guiSessionLabel.text = "Session: ${terminalViewModel.activeProfileId() ?: "Trierarch shell"}"
         floatingMenu.visibility = View.GONE
-        uiLayer.visibility = View.VISIBLE
-        uiLayer.requestFocus()
+        guiLayer.visibility = View.VISIBLE
+        guiLayer.requestFocus()
     }
 
-    /** Returns to the exact session that was displayed before the UI opened. */
-    private fun closeUi() {
-        if (uiLayer.visibility != View.VISIBLE) return
-        rememberFrontend(FRONTEND_TERMINAL)
-        uiLayer.visibility = View.GONE
+    /** Returns to the exact session that was displayed before the GUI opened. */
+    private fun closeGui() {
+        if (guiLayer.visibility != View.VISIBLE) return
+        rememberFrontend(Frontend.CLI)
+        guiLayer.visibility = View.GONE
         floatingMenu.setActions(actionsFor(displayedSurface))
         when (displayedSurface) {
             DisplaySurface.INTERNAL_SHELL,
@@ -279,42 +278,42 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Persists the frontend the user is looking at. Runtime surfaces (X11,
-     * Wayland, a container shell) deliberately never write this: the restored
-     * value always answers "UI or the internal terminal?".
+     * Persists the management frontend the user is looking at. Runtime displays
+     * deliberately never write this: the restored value only answers
+     * "GUI or CLI?".
      */
-    private fun rememberFrontend(frontend: String) {
-        uiPreferences.edit().putString(KEY_FRONTEND, frontend).apply()
+    private fun rememberFrontend(frontend: Frontend) {
+        uiPreferences.edit().putString(KEY_FRONTEND, frontend.value).apply()
     }
 
     /** Placeholder for the environment list; replaced in the next milestone. */
-    private fun createUiLayer(): FrameLayout {
+    private fun createGuiLayer(): FrameLayout {
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER_HORIZONTAL
             setPadding(dp(32), dp(32), dp(32), dp(32))
             addView(TextView(this@MainActivity).apply {
-                text = "Trierarch UI"
+                text = "Trierarch"
                 setTextColor(android.graphics.Color.WHITE)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
             })
             addView(TextView(this@MainActivity).apply {
                 text = "The environment list will live here."
-                setTextColor(UI_SECONDARY_TEXT)
+                setTextColor(SECONDARY_TEXT)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
                 setPadding(0, dp(8), 0, 0)
             })
-            uiSessionLabel = TextView(this@MainActivity).apply {
+            guiSessionLabel = TextView(this@MainActivity).apply {
                 typeface = android.graphics.Typeface.MONOSPACE
-                setTextColor(UI_SECONDARY_TEXT)
+                setTextColor(SECONDARY_TEXT)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
                 setPadding(0, dp(24), 0, 0)
             }
-            addView(uiSessionLabel)
+            addView(guiSessionLabel)
             addView(
                 MaterialButton(this@MainActivity).apply {
                     text = "Terminal"
-                    setOnClickListener { closeUi() }
+                    setOnClickListener { closeGui() }
                 },
                 LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
@@ -498,13 +497,26 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * The app has two management frontends. Runtime displays (X11, Wayland, a
+     * container shell) are profile output, not a frontend, and never change
+     * this choice.
+     */
+    private enum class Frontend(val value: String) {
+        GUI("gui"),
+        CLI("cli");
+
+        companion object {
+            fun from(value: String?): Frontend =
+                values().firstOrNull { it.value == value } ?: CLI
+        }
+    }
+
     private companion object {
         const val TAG = "TrierarchSurface"
         const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
         const val KEY_FRONTEND = "frontend"
-        const val FRONTEND_TERMINAL = "terminal"
-        const val FRONTEND_UI = "ui"
-        val UI_SECONDARY_TEXT = 0xFF9CA3AF.toInt()
+        val SECONDARY_TEXT = 0xFF9CA3AF.toInt()
     }
 
     private enum class DisplaySurface {
