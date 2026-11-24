@@ -36,6 +36,12 @@ object X11Runtime {
      * Recover it once through the root bridge, then keep it exclusively under
      * the app's control; the container now receives only X0, never this dir.
      */
+    /** Removes a stale X0 socket left behind by a dead server process. */
+    @JvmStatic
+    fun clearServerSocket(context: Context) {
+        File(socketDirectory(context), "X0").delete()
+    }
+
     @JvmStatic
     fun prepareSocketDirectory(context: Context): File = socketDirectory(context).also { directory ->
         check(directory.isDirectory || directory.mkdirs()) { "Unable to create X11 socket directory" }

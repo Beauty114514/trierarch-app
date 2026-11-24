@@ -25,6 +25,7 @@ class SessionService(
         fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit)
         fun showGui()
         fun showSession(id: String, display: String)
+        fun releaseX11()
         fun runOnMain(action: () -> Unit)
     }
 
@@ -174,6 +175,7 @@ class SessionService(
         terminal.stopRuntime(id)
         session?.let { stopSource(it.source) }
         if (wasDisplayed) displayHost.showInternalTerminal()
+        if (session?.display == ProfileService.DISPLAY_X11) displayHost.releaseX11()
         pending = null
         notifySessionsChanged()
     }
@@ -184,6 +186,7 @@ class SessionService(
         session?.let { stopSource(it.source) }
         if (pending?.id == id) pending = null
         if (wasDisplayed) displayHost.showInternalTerminal()
+        if (session?.display == ProfileService.DISPLAY_X11) displayHost.releaseX11()
         notifySessionsChanged()
     }
 
@@ -210,7 +213,7 @@ class SessionService(
             else -> Result.failure(IllegalArgumentException("runtime '${profile.runtime}' cannot be started"))
         }
         action.onFailure { error ->
-            launchFailed(id, error)
+            launchFailed(id, profile.display, error)
         }.onSuccess { start ->
             val started = {
                 start()
@@ -220,29 +223,34 @@ class SessionService(
                 notifySessionsChanged()
             }
             if (profile.display == ProfileService.DISPLAY_X11) {
-                displayHost.showX11(
-                    onReady = { runCatching(started).onFailure { launchFailed(id, it) } },
-                    onFailure = { launchFailed(id, IllegalStateException(it)) },
-                )
+                runCatching {
+                    displayHost.showX11(
+                        onReady = {
+                            runCatching(started).onFailure { launchFailed(id, profile.display, it) }
+                        },
+                        onFailure = { launchFailed(id, profile.display, IllegalStateException(it)) },
+                    )
+                }.onFailure { launchFailed(id, profile.display, it) }
             } else if (profile.display == ProfileService.DISPLAY_WAYLAND) {
                 runCatching {
                     displayHost.showWayland()
                     started()
-                }.onFailure { launchFailed(id, it) }
+                }.onFailure { launchFailed(id, profile.display, it) }
             } else {
                 runCatching {
                     started()
                     displayHost.showRuntimeTerminal()
-                }.onFailure { launchFailed(id, it) }
+                }.onFailure { launchFailed(id, profile.display, it) }
             }
         }
     }
 
-    private fun launchFailed(id: String, error: Throwable) {
+    private fun launchFailed(id: String, display: String, error: Throwable) {
         sessions.remove(id)
         pending = null
         terminal.reportRuntimeLaunchFailure(id, error)
         displayHost.showInternalTerminal()
+        if (display == ProfileService.DISPLAY_X11) displayHost.releaseX11()
         notifySessionsChanged()
     }
 

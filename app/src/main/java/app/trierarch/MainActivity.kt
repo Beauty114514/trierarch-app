@@ -124,6 +124,7 @@ class MainActivity : AppCompatActivity() {
                         showX11Display(onReady, onFailure)
                     override fun showGui() = openGui()
                     override fun showSession(id: String, display: String) = openSession(id, display)
+                    override fun releaseX11() = x11Host.release()
                     override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
                 },
             ),
@@ -501,6 +502,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         rootKeyboard.stop()
         if (::guiScreen.isInitialized) guiScreen.release()
+        x11Host.release()
         runtimeControlServer?.close()
         runtimeControlServer = null
         super.onDestroy()

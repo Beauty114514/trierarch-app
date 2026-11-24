@@ -4,6 +4,7 @@ import android.app.Service;
 import android.content.Intent;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Process;
 import android.os.ParcelFileDescriptor;
 import android.util.Log;
 
@@ -38,12 +39,24 @@ public final class X11ServerService extends Service {
         return binder;
     }
 
+    @Override public void onDestroy() {
+        ready = false;
+        super.onDestroy();
+        // Lorie has no stop API. The dedicated process is the X server's
+        // lifetime, so killing it is the only way to guarantee a fresh server
+        // (and a clean X state) on the next bind.
+        Process.killProcess(Process.myPid());
+    }
+
     private synchronized void startServerOnce() {
         if (started) return;
         started = true;
         new Thread(() -> {
             try {
                 X11Runtime.prepareServerEnvironment(getApplicationContext());
+                // A previous server process may have left X0 behind; the next
+                // readiness check must only see the socket this server creates.
+                X11Runtime.clearServerSocket(getApplicationContext());
                 Looper.prepare();
                 ready = CmdEntryPoint.start(new String[] { ":0", "-ac" });
                 if (!ready) {

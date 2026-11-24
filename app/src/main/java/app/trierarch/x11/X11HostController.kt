@@ -23,6 +23,7 @@ class X11HostController(
     private var retryCount = 0
     private var readyRetryCount = 0
     private var awaitingReady = false
+    private var reconnect = false
     private var onReady: (() -> Unit)? = null
     private var onFailure: ((String) -> Unit)? = null
 
@@ -58,6 +59,28 @@ class X11HostController(
         bindServerIfNeeded()
         connectWhenReady()
         awaitReady()
+    }
+
+    /**
+     * Unbinds the X server for a session teardown. The next [showIn] binds a new
+     * process, waits for a fresh X0 and attaches the reused view to a new fd.
+     */
+    fun release() {
+        awaitingReady = false
+        readyRetryCount = 0
+        onReady = null
+        onFailure = null
+        reconnect = true
+        display?.apply {
+            releasePressedKeys()
+            visibility = android.view.View.INVISIBLE
+        }
+        server = null
+        if (binding) {
+            runCatching { appContext.unbindService(connection) }
+            binding = false
+        }
+        X11Runtime.clearServerSocket(appContext)
     }
 
     /** Leaves the server alive for a later X11 session, but returns the app to its terminal. */
@@ -116,11 +139,13 @@ class X11HostController(
 
     private fun connectWhenReady() {
         val view = display ?: return
-        if (view.isConnected()) return
+        if (view.isConnected() && !reconnect) return
         val currentServer = server ?: return
         val connection = runCatching { currentServer.xConnection }.getOrNull()
         if (connection != null) {
+            // connect() closes the previous fd first, so the view can be reused.
             view.attachConnection(connection.detachFd())
+            reconnect = false
             retryCount = 0
             awaitReady()
             return
