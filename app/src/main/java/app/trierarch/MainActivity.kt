@@ -24,8 +24,11 @@ import app.trierarch.config.ProfileDocument
 import app.trierarch.config.ProfileStore
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
+import app.trierarch.runtime.RuntimeCommand
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.runtime.RuntimeController
+import app.trierarch.runtime.SessionPhase
+import app.trierarch.runtime.SessionSnapshot
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
 import app.trierarch.ui.FloatingActionMenuView
@@ -51,6 +54,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var guiLayer: FrameLayout
     private lateinit var guiRows: LinearLayout
     private lateinit var guiCountLabel: TextView
+    private lateinit var guiErrorLabel: TextView
     private val profileStore by lazy { ProfileStore(this) }
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
@@ -260,6 +264,7 @@ class MainActivity : AppCompatActivity() {
         if (guiLayer.visibility == View.VISIBLE) return
         rememberFrontend(Frontend.GUI)
         keyboardPanel.hide()
+        hideGuiError()
         refreshGui()
         floatingMenu.visibility = View.GONE
         guiLayer.visibility = View.VISIBLE
@@ -270,8 +275,7 @@ class MainActivity : AppCompatActivity() {
     private fun closeGui() {
         if (guiLayer.visibility != View.VISIBLE) return
         rememberFrontend(Frontend.CLI)
-        guiLayer.visibility = View.GONE
-        floatingMenu.setActions(actionsFor(displayedSurface))
+        hideGuiLayer()
         when (displayedSurface) {
             DisplaySurface.INTERNAL_SHELL,
             DisplaySurface.RUNTIME_SHELL,
@@ -280,6 +284,15 @@ class MainActivity : AppCompatActivity() {
             DisplaySurface.X11 -> x11Host.requestFocus()
             DisplaySurface.WAYLAND -> waylandSurface?.requestFocus()
         }
+    }
+
+    /**
+     * Removes the layer without choosing a focus target. Whoever takes over the
+     * display (the session being started, or the caller) owns keyboard focus.
+     */
+    private fun hideGuiLayer() {
+        guiLayer.visibility = View.GONE
+        floatingMenu.setActions(actionsFor(displayedSurface))
     }
 
     /**
@@ -315,12 +328,19 @@ class MainActivity : AppCompatActivity() {
             letterSpacing = 0.08f
             setPadding(0, dp(20), 0, dp(4))
         }
+        guiErrorLabel = TextView(this).apply {
+            setTextColor(ERROR_TEXT)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(0, dp(8), 0, 0)
+            visibility = View.GONE
+        }
         guiRows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(dp(20), dp(16), dp(20), dp(16))
             addView(header)
             addView(guiCountLabel)
+            addView(guiErrorLabel)
             addView(
                 ScrollView(this@MainActivity).apply {
                     isFillViewport = true
@@ -354,26 +374,39 @@ class MainActivity : AppCompatActivity() {
     }
 
     /**
-     * Re-reads the profile directory every time the GUI opens. Documents are
-     * never cached: the CLI can create, edit or delete them at any moment.
+     * Re-reads the profile directory and the runtime state on every refresh.
+     * Nothing is cached: the CLI can change both at any moment.
      */
     private fun refreshGui() {
         val documents = profileStore.listDocuments()
+        val snapshot = runtimeController.snapshot()
+        val busy = snapshot.pending != null
         guiCountLabel.text = "ENVIRONMENTS · ${documents.size}"
         guiRows.removeAllViews()
         if (documents.isEmpty()) {
             guiRows.addView(createEmptyState())
             return
         }
-        documents.forEach { document -> guiRows.addView(createEnvironmentRow(document)) }
+        documents.forEach { document ->
+            guiRows.addView(createEnvironmentRow(document, snapshot.sessions[document.id], busy))
+        }
     }
 
-    private fun createEnvironmentRow(document: ProfileDocument): View {
-        val row = LinearLayout(this).apply {
+    private fun createEnvironmentRow(
+        document: ProfileDocument,
+        session: SessionSnapshot?,
+        busy: Boolean,
+    ): View {
+        val container = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(14), 0, 0)
         }
-        row.addView(TextView(this).apply {
+        val line = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        val details = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        details.addView(TextView(this).apply {
             text = document.id
             setTextColor(android.graphics.Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
@@ -389,28 +422,118 @@ class MainActivity : AppCompatActivity() {
                 .filterNotNull()
                 .filter { it.isNotEmpty() }
                 .joinToString(" · ")
-            row.addView(TextView(this).apply {
+            details.addView(TextView(this).apply {
                 text = badges
                 setTextColor(SECONDARY_TEXT)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 setPadding(0, dp(4), 0, 0)
             })
         }
+        val phase = session?.phase ?: SessionPhase.STOPPED
+        val phaseText = when (phase) {
+            SessionPhase.STOPPED -> "stopped"
+            SessionPhase.STARTING -> "starting"
+            SessionPhase.RUNNING -> "running"
+            SessionPhase.STOPPING -> "stopping"
+        } + if (session?.active == true) " · shown" else ""
+        details.addView(TextView(this).apply {
+            text = phaseText
+            setTextColor(
+                when (phase) {
+                    SessionPhase.STARTING, SessionPhase.STOPPING -> PENDING_TEXT
+                    SessionPhase.RUNNING -> RUNNING_TEXT
+                    SessionPhase.STOPPED -> SECONDARY_TEXT
+                },
+            )
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(0, dp(4), 0, 0)
+        })
         document.error?.let { message ->
-            row.addView(TextView(this).apply {
+            details.addView(TextView(this).apply {
                 text = message
                 setTextColor(ERROR_TEXT)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 setPadding(0, dp(4), 0, 0)
             })
         }
-        row.addView(
+        line.addView(
+            details,
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        createRowAction(document, phase, busy)?.let { action ->
+            line.addView(
+                action,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { marginStart = dp(12) },
+            )
+        }
+        container.addView(line)
+        container.addView(
             View(this).apply { setBackgroundColor(DIVIDER_COLOR) },
             LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
                 topMargin = dp(14)
             },
         )
-        return row
+        return container
+    }
+
+    private fun createRowAction(
+        document: ProfileDocument,
+        phase: SessionPhase,
+        busy: Boolean,
+    ): MaterialButton? {
+        if (document.error != null) return null
+        return MaterialButton(this).apply {
+            minWidth = 0
+            text = when (phase) {
+                SessionPhase.STOPPED -> "Start"
+                SessionPhase.RUNNING -> "Stop"
+                SessionPhase.STARTING, SessionPhase.STOPPING -> "…"
+            }
+            isEnabled = !busy && (phase == SessionPhase.STOPPED || phase == SessionPhase.RUNNING)
+            setOnClickListener {
+                when (phase) {
+                    SessionPhase.STOPPED -> dispatchFromGui(RuntimeCommand.Run(document.id))
+                    SessionPhase.RUNNING -> dispatchFromGui(RuntimeCommand.Stop(document.id))
+                    SessionPhase.STARTING, SessionPhase.STOPPING -> Unit
+                }
+            }
+        }
+    }
+
+    /**
+     * Runs a GUI action through the same controller path as the CLI. A runtime
+     * start carries its launch in the result's afterReply callback, which the
+     * control socket normally invokes after the client acknowledges; the GUI
+     * has no socket, so it invokes that callback itself.
+     */
+    private fun dispatchFromGui(command: RuntimeCommand) {
+        hideGuiError()
+        runtimeController.dispatch(command) { result ->
+            if (!result.success) {
+                showGuiError(result.message)
+                return@dispatch
+            }
+            if (command is RuntimeCommand.Run) {
+                // Follow the new session and let its display host own focus.
+                hideGuiLayer()
+                result.afterReply?.invoke()
+            } else {
+                result.afterReply?.invoke()
+                refreshGui()
+            }
+        }
+    }
+
+    private fun showGuiError(message: String) {
+        guiErrorLabel.text = message
+        guiErrorLabel.visibility = View.VISIBLE
+    }
+
+    private fun hideGuiError() {
+        guiErrorLabel.visibility = View.GONE
     }
 
     private fun createEmptyState(): View = TextView(this).apply {
@@ -604,6 +727,8 @@ class MainActivity : AppCompatActivity() {
         val SECONDARY_TEXT = 0xFF9CA3AF.toInt()
         val ERROR_TEXT = 0xFFF87171.toInt()
         val DIVIDER_COLOR = 0xFF23262B.toInt()
+        val RUNNING_TEXT = 0xFF7CE38B.toInt()
+        val PENDING_TEXT = 0xFFFBBF24.toInt()
     }
 
     private enum class DisplaySurface {

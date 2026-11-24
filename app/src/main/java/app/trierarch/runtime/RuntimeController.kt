@@ -43,6 +43,17 @@ class RuntimeController(
         completion(RuntimeCommandResult(true, "gui opened"))
     }
 
+    /** Structured runtime state for the GUI; the CLI keeps its text status. */
+    fun snapshot(): RuntimeSnapshot {
+        val pendingNow = pending
+        return buildRuntimeSnapshot(
+            running = terminal.runningProfileIds(),
+            active = terminal.activeProfileId(),
+            pendingId = pendingNow?.id,
+            pendingStopping = pendingNow?.state == STATE_STOPPING,
+        )
+    }
+
     private fun status(id: String?, completion: (RuntimeCommandResult) -> Unit) {
         if (id != null && loadProfileSilently(id) == null) {
             completion(RuntimeCommandResult(false, "profile does not exist or is invalid: $id"))
@@ -110,13 +121,17 @@ class RuntimeController(
             completion(RuntimeCommandResult(false, "runtime action in progress: ${pending?.id}"))
             return
         }
-        pending = Pending(target, "stopping")
+        pending = Pending(target, STATE_STOPPING)
         completion(RuntimeCommandResult(true, "stopping $target") {
             displayHost.runOnMain {
                 val source = sourcesByProfile.remove(target) ?: loadProfileSilently(target)?.source
+                // Only fall back to the shell when the stopped session owned the
+                // display; stopping a background session must not yank the
+                // currently shown desktop away.
+                val wasDisplayed = terminal.activeProfileId() == target
                 terminal.stopRuntime(target)
                 source?.let(::stopSourceIfUnused)
-                displayHost.showInternalTerminal()
+                if (wasDisplayed) displayHost.showInternalTerminal()
                 pending = null
             }
         })
@@ -256,5 +271,9 @@ class RuntimeController(
             override val key = "internal"
             override fun state(): String = "internal:session-scoped"
         }
+    }
+
+    private companion object {
+        const val STATE_STOPPING = "stopping"
     }
 }
