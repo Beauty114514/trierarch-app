@@ -158,6 +158,13 @@ class MainActivity : AppCompatActivity() {
         ViewCompat.requestApplyInsets(terminalContainer)
 
         attachTerminalSession()
+
+        // Restore the frontend the app was last left in. Only the UI and the
+        // internal terminal are remembered; runtime surfaces never overwrite
+        // this choice.
+        if (uiPreferences.getString(KEY_FRONTEND, FRONTEND_TERMINAL) == FRONTEND_UI) {
+            openUi()
+        }
     }
 
     private fun attachTerminalSession() {
@@ -247,6 +254,7 @@ class MainActivity : AppCompatActivity() {
      */
     private fun openUi() {
         if (uiLayer.visibility == View.VISIBLE) return
+        rememberFrontend(FRONTEND_UI)
         keyboardPanel.hide()
         uiSessionLabel.text = "Session: ${terminalViewModel.activeProfileId() ?: "Trierarch shell"}"
         floatingMenu.visibility = View.GONE
@@ -257,6 +265,7 @@ class MainActivity : AppCompatActivity() {
     /** Returns to the exact session that was displayed before the UI opened. */
     private fun closeUi() {
         if (uiLayer.visibility != View.VISIBLE) return
+        rememberFrontend(FRONTEND_TERMINAL)
         uiLayer.visibility = View.GONE
         floatingMenu.setActions(actionsFor(displayedSurface))
         when (displayedSurface) {
@@ -267,6 +276,15 @@ class MainActivity : AppCompatActivity() {
             DisplaySurface.X11 -> x11Host.requestFocus()
             DisplaySurface.WAYLAND -> waylandSurface?.requestFocus()
         }
+    }
+
+    /**
+     * Persists the frontend the user is looking at. Runtime surfaces (X11,
+     * Wayland, a container shell) deliberately never write this: the restored
+     * value always answers "UI or the internal terminal?".
+     */
+    private fun rememberFrontend(frontend: String) {
+        uiPreferences.edit().putString(KEY_FRONTEND, frontend).apply()
     }
 
     /** Placeholder for the environment list; replaced in the next milestone. */
@@ -483,6 +501,9 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val TAG = "TrierarchSurface"
         const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
+        const val KEY_FRONTEND = "frontend"
+        const val FRONTEND_TERMINAL = "terminal"
+        const val FRONTEND_UI = "ui"
         val UI_SECONDARY_TEXT = 0xFF9CA3AF.toInt()
     }
 
