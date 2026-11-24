@@ -28,12 +28,15 @@ import app.trierarch.core.ProfileDocument
 import app.trierarch.core.ProfileService
 import app.trierarch.core.SessionPhase
 import app.trierarch.core.SessionSnapshot
-import app.trierarch.update.ApkDownloader
 import app.trierarch.update.ApkInstaller
 import app.trierarch.update.ApkVerifier
 import app.trierarch.update.AppRelease
 import app.trierarch.update.AppState
+import app.trierarch.update.ComponentRelease
 import app.trierarch.update.ComponentState
+import app.trierarch.update.ComponentStatus
+import app.trierarch.update.ComponentStore
+import app.trierarch.update.FileDownloader
 import app.trierarch.update.Manifest
 import app.trierarch.update.UpdateSource
 import app.trierarch.update.UpdateStatus
@@ -85,6 +88,8 @@ class GuiScreen(
     private var imeInset = 0
     private var updatesState: UpdatesState = UpdatesState.NotChecked
     private var apkState: ApkDownloadState = ApkDownloadState.Idle
+    private val componentStore = ComponentStore(File(context.filesDir, "components"))
+    private val componentDownloads = mutableMapOf<String, ComponentDownloadState>()
     private var released = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private val updatesExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -260,7 +265,14 @@ class GuiScreen(
     private fun checkUpdates() {
         if (updatesState is UpdatesState.Checking) return
         if (apkState is ApkDownloadState.Downloading || apkState is ApkDownloadState.Verifying) return
+        if (componentDownloads.values.any {
+                it is ComponentDownloadState.Downloading || it === ComponentDownloadState.Verifying
+            }
+        ) {
+            return
+        }
         apkState = ApkDownloadState.Idle
+        componentDownloads.clear()
         updatesState = UpdatesState.Checking
         render()
         updatesExecutor.execute {
@@ -269,7 +281,10 @@ class GuiScreen(
                 val manifest = Manifest.parse(UpdateSource.fetch())
                 UpdatesState.Ready(
                     manifest = manifest,
-                    status = manifest.check(code, emptyMap()),
+                    status = manifest.check(
+                        code,
+                        componentStore.downloaded().mapValues { it.value.sha256 },
+                    ),
                     installedVersionCode = code,
                     installedVersionName = name,
                     checkedAt = System.currentTimeMillis(),
@@ -330,19 +345,7 @@ class GuiScreen(
                 }
                 content.addView(sectionLabel("COMPONENTS"))
                 state.status.components.forEach { componentStatus ->
-                    val component = componentStatus.release
-                    content.addView(TextView(context).apply {
-                        setText(component.name + (component.version?.let { " · $it" } ?: ""))
-                        setTextColor(Color.WHITE)
-                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-                        setPadding(0, dp(12), 0, 0)
-                    })
-                    content.addView(
-                        statusText(
-                            componentStateText(componentStatus.state),
-                            componentStateColor(componentStatus.state),
-                        ),
-                    )
+                    content.addView(componentRow(componentStatus))
                 }
                 content.addView(TextView(context).apply {
                     setText("Last checked: ${timeText(state.checkedAt)}")
@@ -374,7 +377,7 @@ class GuiScreen(
                 })
             }
             is ApkDownloadState.Downloading -> {
-                box.addView(statusText(downloadText(state), secondaryText))
+                box.addView(statusText(downloadText(state.downloaded, state.total), secondaryText))
             }
             ApkDownloadState.Verifying -> {
                 box.addView(statusText("Verifying…", secondaryText))
@@ -403,9 +406,9 @@ class GuiScreen(
         return box
     }
 
-    private fun downloadText(state: ApkDownloadState.Downloading): String {
-        val percent = if (state.total > 0) ((state.downloaded * 100) / state.total).toInt() else 0
-        return "Downloading… $percent% (${megabytes(state.downloaded)} / ${megabytes(state.total)})"
+    private fun downloadText(downloaded: Long, total: Long): String {
+        val percent = if (total > 0) ((downloaded * 100) / total).toInt() else 0
+        return "Downloading… $percent% (${megabytes(downloaded)} / ${megabytes(total)})"
     }
 
     private fun downloadApk() {
@@ -422,7 +425,7 @@ class GuiScreen(
             )
             var lastPercent = -1
             val result = runCatching {
-                ApkDownloader.download(
+                FileDownloader.download(
                     app.apkUrl,
                     destination,
                     app.apkSize,
@@ -469,6 +472,123 @@ class GuiScreen(
 
     private fun megabytes(bytes: Long): String =
         String.format(Locale.US, "%.1f MB", bytes / 1024.0 / 1024.0)
+
+    private fun componentRow(status: ComponentStatus): View {
+        val component = status.release
+        val box = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(12), 0, 0)
+        }
+        box.addView(TextView(context).apply {
+            setText(component.name + (component.version?.let { " · $it" } ?: ""))
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        })
+        when (val download = componentDownloads[component.id]) {
+            is ComponentDownloadState.Downloading -> {
+                box.addView(
+                    statusText(downloadText(download.downloaded, download.total), secondaryText),
+                )
+            }
+            ComponentDownloadState.Verifying -> {
+                box.addView(statusText("Verifying…", secondaryText))
+            }
+            is ComponentDownloadState.Failed -> {
+                box.addView(statusText(download.message, errorText))
+                box.addView(headerButton("Retry") { downloadComponent(component) })
+            }
+            null -> when (status.state) {
+                ComponentState.NOT_DOWNLOADED, ComponentState.UPDATE_AVAILABLE -> {
+                    box.addView(
+                        statusText(
+                            componentStateText(status.state),
+                            componentStateColor(status.state),
+                        ),
+                    )
+                    box.addView(headerButton("Download") { downloadComponent(component) })
+                }
+                ComponentState.UP_TO_DATE -> {
+                    box.addView(statusText("Downloaded", runningText))
+                    box.addView(TextView(context).apply {
+                        setText("files/components/${component.file}")
+                        setTextColor(secondaryText)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+                        setPadding(0, dp(2), 0, 0)
+                    })
+                }
+            }
+        }
+        return box
+    }
+
+    private fun downloadComponent(component: ComponentRelease) {
+        val current = componentDownloads[component.id]
+        if (current is ComponentDownloadState.Downloading ||
+            current === ComponentDownloadState.Verifying
+        ) {
+            return
+        }
+        componentDownloads[component.id] = ComponentDownloadState.Downloading(0, component.size)
+        render()
+        updatesExecutor.execute {
+            val destination = componentStore.file(component.file)
+            var lastPercent = -1
+            val result = runCatching {
+                FileDownloader.download(
+                    component.url,
+                    destination,
+                    component.size,
+                    component.sha256,
+                ) { downloaded, total ->
+                    val percent = if (total > 0) ((downloaded * 100) / total).toInt() else -1
+                    if (percent == lastPercent) return@download
+                    lastPercent = percent
+                    mainHandler.post {
+                        if (released) return@post
+                        if (componentDownloads[component.id] is ComponentDownloadState.Downloading) {
+                            componentDownloads[component.id] =
+                                ComponentDownloadState.Downloading(downloaded, total)
+                            if (screen is Screen.Updates) render()
+                        }
+                    }
+                }
+                mainHandler.post {
+                    if (released) return@post
+                    componentDownloads[component.id] = ComponentDownloadState.Verifying
+                    if (screen is Screen.Updates) render()
+                }
+                componentStore.record(component.id, component.file, component.sha256)
+                destination
+            }
+            mainHandler.post {
+                if (released) return@post
+                if (result.isSuccess) {
+                    componentDownloads.remove(component.id)
+                    refreshComponentStatuses()
+                    Toast.makeText(
+                        context,
+                        "Saved to files/components/${component.file}",
+                        Toast.LENGTH_LONG,
+                    ).show()
+                } else {
+                    componentDownloads[component.id] = ComponentDownloadState.Failed(
+                        result.exceptionOrNull()?.message ?: "download failed",
+                    )
+                }
+                if (screen is Screen.Updates) render()
+            }
+        }
+    }
+
+    private fun refreshComponentStatuses() {
+        val ready = updatesState as? UpdatesState.Ready ?: return
+        updatesState = ready.copy(
+            status = ready.manifest.check(
+                ready.installedVersionCode,
+                componentStore.downloaded().mapValues { it.value.sha256 },
+            ),
+        )
+    }
 
     private fun installedAppVersion(): Pair<Long, String> {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -1044,6 +1164,12 @@ class GuiScreen(
         data class Editor(val id: String, val revision: String) : Screen
         data class Logs(val id: String) : Screen
         data object Updates : Screen
+    }
+
+    private sealed interface ComponentDownloadState {
+        data class Downloading(val downloaded: Long, val total: Long) : ComponentDownloadState
+        data object Verifying : ComponentDownloadState
+        data class Failed(val message: String) : ComponentDownloadState
     }
 
     private sealed interface ApkDownloadState {

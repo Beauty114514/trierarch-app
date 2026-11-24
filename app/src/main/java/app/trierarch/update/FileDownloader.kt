@@ -5,8 +5,8 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
-/** Downloads an APK to a cache file, then verifies size and SHA-256. */
-internal object ApkDownloader {
+/** Downloads a file to a `.part` file, then verifies size and SHA-256. */
+internal object FileDownloader {
     fun download(
         url: String,
         destination: File,
@@ -43,14 +43,14 @@ internal object ApkDownloader {
                 }
             }
             if (downloaded != expectedSize) {
-                throw IOException("APK size mismatch: $downloaded != $expectedSize")
+                throw IOException("size mismatch: $downloaded != $expectedSize")
             }
             if (!sha256Hex(partial).equals(expectedSha256, ignoreCase = true)) {
-                throw IOException("APK SHA-256 mismatch")
+                throw IOException("SHA-256 mismatch")
             }
             destination.delete()
             if (!partial.renameTo(destination)) {
-                throw IOException("cannot move the downloaded APK")
+                throw IOException("cannot move the downloaded file")
             }
             return destination
         } finally {
