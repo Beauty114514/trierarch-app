@@ -5,6 +5,7 @@ import android.content.DialogInterface
 import android.graphics.Color
 import android.net.Uri
 import android.graphics.Typeface
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.InputType
@@ -27,9 +28,17 @@ import app.trierarch.core.ProfileDocument
 import app.trierarch.core.ProfileService
 import app.trierarch.core.SessionPhase
 import app.trierarch.core.SessionSnapshot
+import app.trierarch.update.AppState
+import app.trierarch.update.ComponentState
+import app.trierarch.update.Manifest
+import app.trierarch.update.UpdateSource
+import app.trierarch.update.UpdateStatus
+import app.trierarch.update.check
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
+import java.util.Date
+import java.util.concurrent.Executors
 
 /**
  * The in-app GUI: a view over [Core]. It never owns sessions or writes profile
@@ -69,7 +78,12 @@ class GuiScreen(
     private var screen: Screen = Screen.List
     private var editor: EditText? = null
     private var imeInset = 0
+    private var updatesState: UpdatesState = UpdatesState.NotChecked
+    private var released = false
     private val mainHandler = Handler(Looper.getMainLooper())
+    private val updatesExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "trierarch-updates").apply { isDaemon = true }
+    }
 
     private val listener: (CoreEvent) -> Unit = { event ->
         if (screen !is Screen.Editor && screen !is Screen.Logs &&
@@ -143,9 +157,17 @@ class GuiScreen(
             render()
             true
         }
+        Screen.Updates -> {
+            hideError()
+            screen = Screen.List
+            render()
+            true
+        }
     }
 
     fun release() {
+        released = true
+        updatesExecutor.shutdownNow()
         core.removeListener(listener)
     }
 
@@ -157,6 +179,7 @@ class GuiScreen(
             is Screen.Details -> renderDetails(current.id)
             is Screen.Editor -> Unit
             is Screen.Logs -> renderLogs(current.id)
+            Screen.Updates -> renderUpdates()
         }
     }
 
@@ -171,6 +194,7 @@ class GuiScreen(
 
         val documents = core.documents()
         val snapshot = core.sessions()
+        content.addView(updatesEntry())
         content.addView(sectionLabel("ENVIRONMENTS · ${documents.size}"))
         if (documents.isEmpty()) {
             content.addView(emptyState())
@@ -181,6 +205,194 @@ class GuiScreen(
             content.addView(environmentRow(document, snapshot.sessions[document.id], busy))
         }
     }
+
+    private fun updatesEntry(): View {
+        val row = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(16), 0, dp(12))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { openUpdates() }
+        }
+        val labels = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
+        labels.addView(TextView(context).apply {
+            setText("Updates")
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+        })
+        labels.addView(TextView(context).apply {
+            setText(updatesSummary())
+            setTextColor(if (updatesHaveAvailable()) pendingText else secondaryText)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(0, dp(4), 0, 0)
+        })
+        row.addView(labels, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        row.addView(TextView(context).apply {
+            setText("›")
+            setTextColor(secondaryText)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+        })
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            addView(row)
+            addView(
+                View(context).apply { setBackgroundColor(dividerColor) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)),
+            )
+        }
+    }
+
+    private fun openUpdates() {
+        hideError()
+        editor = null
+        screen = Screen.Updates
+        render()
+        if (updatesState is UpdatesState.NotChecked) checkUpdates()
+    }
+
+    private fun checkUpdates() {
+        if (updatesState is UpdatesState.Checking) return
+        updatesState = UpdatesState.Checking
+        render()
+        updatesExecutor.execute {
+            val result = runCatching {
+                val (code, name) = installedAppVersion()
+                val manifest = Manifest.parse(UpdateSource.fetch())
+                UpdatesState.Ready(
+                    manifest = manifest,
+                    status = manifest.check(code, emptyMap()),
+                    installedVersionCode = code,
+                    installedVersionName = name,
+                    checkedAt = System.currentTimeMillis(),
+                )
+            }
+            mainHandler.post {
+                if (released) return@post
+                updatesState = result.getOrElse {
+                    UpdatesState.Failed(it.message ?: "update check failed")
+                }
+                if (screen == Screen.List || screen is Screen.Updates) render()
+            }
+        }
+    }
+
+    private fun renderUpdates() {
+        header.addView(
+            title("Updates"),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        header.addView(
+            headerButton(if (updatesState is UpdatesState.Checking) "Checking…" else "Check") {
+                checkUpdates()
+            },
+        )
+        header.addView(headerButton("Back") {
+            screen = Screen.List
+            render()
+        })
+
+        content.addView(sectionLabel("APP"))
+        content.addView(info("current", currentVersionText()))
+        when (val state = updatesState) {
+            UpdatesState.NotChecked -> content.addView(info("latest", "not checked"))
+            UpdatesState.Checking -> content.addView(info("latest", "checking…"))
+            is UpdatesState.Failed -> content.addView(TextView(context).apply {
+                setText(state.message)
+                setTextColor(errorText)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setPadding(0, dp(10), 0, 0)
+            })
+            is UpdatesState.Ready -> {
+                content.addView(
+                    info(
+                        "latest",
+                        "${state.manifest.app.versionName} (${state.manifest.app.versionCode})",
+                    ),
+                )
+                val appState = state.status.app.state
+                content.addView(
+                    statusText(
+                        if (appState == AppState.UPDATE_AVAILABLE) "Update available" else "Up to date",
+                        if (appState == AppState.UPDATE_AVAILABLE) pendingText else runningText,
+                    ),
+                )
+                content.addView(sectionLabel("COMPONENTS"))
+                state.status.components.forEach { componentStatus ->
+                    val component = componentStatus.release
+                    content.addView(TextView(context).apply {
+                        setText(component.name + (component.version?.let { " · $it" } ?: ""))
+                        setTextColor(Color.WHITE)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+                        setPadding(0, dp(12), 0, 0)
+                    })
+                    content.addView(
+                        statusText(
+                            componentStateText(componentStatus.state),
+                            componentStateColor(componentStatus.state),
+                        ),
+                    )
+                }
+                content.addView(TextView(context).apply {
+                    setText("Last checked: ${timeText(state.checkedAt)}")
+                    setTextColor(secondaryText)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    setPadding(0, dp(18), 0, 0)
+                })
+            }
+        }
+    }
+
+    private fun installedAppVersion(): Pair<Long, String> {
+        val info = context.packageManager.getPackageInfo(context.packageName, 0)
+        val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            info.longVersionCode
+        } else {
+            info.versionCode.toLong()
+        }
+        return code to (info.versionName ?: "")
+    }
+
+    private fun currentVersionText(): String = runCatching {
+        val (code, name) = installedAppVersion()
+        "$name ($code)"
+    }.getOrDefault("unknown")
+
+    private fun componentStateText(state: ComponentState): String = when (state) {
+        ComponentState.NOT_DOWNLOADED -> "Not downloaded"
+        ComponentState.UP_TO_DATE -> "Downloaded"
+        ComponentState.UPDATE_AVAILABLE -> "Update available"
+    }
+
+    private fun componentStateColor(state: ComponentState): Int = when (state) {
+        ComponentState.NOT_DOWNLOADED -> secondaryText
+        ComponentState.UP_TO_DATE -> runningText
+        ComponentState.UPDATE_AVAILABLE -> pendingText
+    }
+
+    private fun updatesHaveAvailable(): Boolean {
+        val state = updatesState as? UpdatesState.Ready ?: return false
+        return state.status.app.state == AppState.UPDATE_AVAILABLE ||
+            state.status.components.any { it.state == ComponentState.UPDATE_AVAILABLE }
+    }
+
+    private fun updatesSummary(): String = when (val state = updatesState) {
+        UpdatesState.NotChecked -> "Check for app and component updates"
+        UpdatesState.Checking -> "Checking…"
+        is UpdatesState.Failed -> "Check failed"
+        is UpdatesState.Ready ->
+            if (updatesHaveAvailable()) "Update available" else "Up to date"
+    }
+
+    private fun statusText(message: String, color: Int): TextView = TextView(context).apply {
+        setText(message)
+        setTextColor(color)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+        setPadding(0, dp(4), 0, 0)
+    }
+
+    private fun timeText(millis: Long): String =
+        android.text.format.DateFormat.getTimeFormat(context).format(Date(millis))
 
     private fun renderDetails(id: String) {
         val document = core.documents().firstOrNull { it.id == id }
@@ -704,6 +916,20 @@ class GuiScreen(
         data class Details(val id: String) : Screen
         data class Editor(val id: String, val revision: String) : Screen
         data class Logs(val id: String) : Screen
+        data object Updates : Screen
+    }
+
+    private sealed interface UpdatesState {
+        data object NotChecked : UpdatesState
+        data object Checking : UpdatesState
+        data class Ready(
+            val manifest: Manifest,
+            val status: UpdateStatus,
+            val installedVersionCode: Long,
+            val installedVersionName: String,
+            val checkedAt: Long,
+        ) : UpdatesState
+        data class Failed(val message: String) : UpdatesState
     }
 
     private companion object {
