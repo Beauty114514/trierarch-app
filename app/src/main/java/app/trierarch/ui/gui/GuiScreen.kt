@@ -28,6 +28,10 @@ import app.trierarch.core.ProfileDocument
 import app.trierarch.core.ProfileService
 import app.trierarch.core.SessionPhase
 import app.trierarch.core.SessionSnapshot
+import app.trierarch.update.ApkDownloader
+import app.trierarch.update.ApkInstaller
+import app.trierarch.update.ApkVerifier
+import app.trierarch.update.AppRelease
 import app.trierarch.update.AppState
 import app.trierarch.update.ComponentState
 import app.trierarch.update.Manifest
@@ -38,6 +42,7 @@ import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import java.util.Date
+import java.util.Locale
 import java.util.concurrent.Executors
 
 /**
@@ -79,6 +84,7 @@ class GuiScreen(
     private var editor: EditText? = null
     private var imeInset = 0
     private var updatesState: UpdatesState = UpdatesState.NotChecked
+    private var apkState: ApkDownloadState = ApkDownloadState.Idle
     private var released = false
     private val mainHandler = Handler(Looper.getMainLooper())
     private val updatesExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -253,6 +259,8 @@ class GuiScreen(
 
     private fun checkUpdates() {
         if (updatesState is UpdatesState.Checking) return
+        if (apkState is ApkDownloadState.Downloading || apkState is ApkDownloadState.Verifying) return
+        apkState = ApkDownloadState.Idle
         updatesState = UpdatesState.Checking
         render()
         updatesExecutor.execute {
@@ -317,6 +325,9 @@ class GuiScreen(
                         if (appState == AppState.UPDATE_AVAILABLE) pendingText else runningText,
                     ),
                 )
+                if (appState == AppState.UPDATE_AVAILABLE) {
+                    content.addView(apkControls(state.manifest.app))
+                }
                 content.addView(sectionLabel("COMPONENTS"))
                 state.status.components.forEach { componentStatus ->
                     val component = componentStatus.release
@@ -342,6 +353,122 @@ class GuiScreen(
             }
         }
     }
+
+    private fun apkControls(app: AppRelease): View {
+        val box = LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(10), 0, 0)
+        }
+        when (val state = apkState) {
+            ApkDownloadState.Idle -> {
+                box.addView(MaterialButton(context).apply {
+                    minWidth = 0
+                    text = "Download"
+                    setOnClickListener { downloadApk() }
+                })
+                box.addView(TextView(context).apply {
+                    setText("${megabytes(app.apkSize)} · ${app.versionName}")
+                    setTextColor(secondaryText)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                    setPadding(0, dp(4), 0, 0)
+                })
+            }
+            is ApkDownloadState.Downloading -> {
+                box.addView(statusText(downloadText(state), secondaryText))
+            }
+            ApkDownloadState.Verifying -> {
+                box.addView(statusText("Verifying…", secondaryText))
+            }
+            is ApkDownloadState.Ready -> {
+                box.addView(MaterialButton(context).apply {
+                    minWidth = 0
+                    text = "Install"
+                    setOnClickListener { installApk() }
+                })
+                box.addView(statusText("Downloaded ${state.versionName}", runningText))
+            }
+            is ApkDownloadState.Failed -> {
+                box.addView(TextView(context).apply {
+                    setText(state.message)
+                    setTextColor(errorText)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                })
+                box.addView(MaterialButton(context).apply {
+                    minWidth = 0
+                    text = "Retry"
+                    setOnClickListener { downloadApk() }
+                })
+            }
+        }
+        return box
+    }
+
+    private fun downloadText(state: ApkDownloadState.Downloading): String {
+        val percent = if (state.total > 0) ((state.downloaded * 100) / state.total).toInt() else 0
+        return "Downloading… $percent% (${megabytes(state.downloaded)} / ${megabytes(state.total)})"
+    }
+
+    private fun downloadApk() {
+        val ready = updatesState as? UpdatesState.Ready ?: return
+        val app = ready.manifest.app
+        if (ready.status.app.state != AppState.UPDATE_AVAILABLE) return
+        if (apkState is ApkDownloadState.Downloading || apkState is ApkDownloadState.Verifying) return
+        apkState = ApkDownloadState.Downloading(0, app.apkSize)
+        render()
+        updatesExecutor.execute {
+            val destination = File(
+                context.cacheDir,
+                "updates/Trierarch-${safeName(app.versionName)}.apk",
+            )
+            var lastPercent = -1
+            val result = runCatching {
+                ApkDownloader.download(
+                    app.apkUrl,
+                    destination,
+                    app.apkSize,
+                    app.apkSha256,
+                ) { downloaded, total ->
+                    val percent = if (total > 0) ((downloaded * 100) / total).toInt() else -1
+                    if (percent == lastPercent) return@download
+                    lastPercent = percent
+                    mainHandler.post {
+                        if (released) return@post
+                        if (apkState is ApkDownloadState.Downloading) {
+                            apkState = ApkDownloadState.Downloading(downloaded, total)
+                            if (screen is Screen.Updates) render()
+                        }
+                    }
+                }
+                mainHandler.post {
+                    if (released) return@post
+                    apkState = ApkDownloadState.Verifying
+                    if (screen is Screen.Updates) render()
+                }
+                ApkVerifier.verify(context, destination, app.versionCode)
+                destination
+            }
+            mainHandler.post {
+                if (released) return@post
+                apkState = result.fold(
+                    onSuccess = { ApkDownloadState.Ready(it, app.versionName) },
+                    onFailure = { ApkDownloadState.Failed(it.message ?: "update failed") },
+                )
+                if (screen is Screen.Updates) render()
+            }
+        }
+    }
+
+    private fun installApk() {
+        val ready = apkState as? ApkDownloadState.Ready ?: return
+        runCatching { ApkInstaller.install(context, ready.file) }
+            .onFailure { showError(it.message ?: "unable to start the installer") }
+    }
+
+    private fun safeName(value: String): String =
+        value.replace(Regex("[^A-Za-z0-9._-]"), "_")
+
+    private fun megabytes(bytes: Long): String =
+        String.format(Locale.US, "%.1f MB", bytes / 1024.0 / 1024.0)
 
     private fun installedAppVersion(): Pair<Long, String> {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
@@ -917,6 +1044,14 @@ class GuiScreen(
         data class Editor(val id: String, val revision: String) : Screen
         data class Logs(val id: String) : Screen
         data object Updates : Screen
+    }
+
+    private sealed interface ApkDownloadState {
+        data object Idle : ApkDownloadState
+        data class Downloading(val downloaded: Long, val total: Long) : ApkDownloadState
+        data object Verifying : ApkDownloadState
+        data class Ready(val file: File, val versionName: String) : ApkDownloadState
+        data class Failed(val message: String) : ApkDownloadState
     }
 
     private sealed interface UpdatesState {
