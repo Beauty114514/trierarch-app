@@ -524,14 +524,14 @@ class MainActivity : AppCompatActivity() {
         }
         when (phase) {
             SessionPhase.STOPPED -> actions.addView(
-                primaryAction("Start", busy) { dispatchFromGui(Command.Run(document.id)) },
+                primaryAction("Start", busy) { dispatchFromGui(Command.Session.Run(document.id)) },
             )
             SessionPhase.RUNNING -> {
                 actions.addView(
-                    primaryAction("Open", busy) { dispatchFromGui(Command.Open(document.id)) },
+                    primaryAction("Open", busy) { dispatchFromGui(Command.Session.Open(document.id)) },
                 )
                 actions.addView(
-                    secondaryAction("Stop", busy) { dispatchFromGui(Command.Stop(document.id)) },
+                    secondaryAction("Stop", busy) { dispatchFromGui(Command.Session.Stop(document.id)) },
                 )
             }
             SessionPhase.STARTING, SessionPhase.STOPPING -> actions.addView(
@@ -574,12 +574,12 @@ class MainActivity : AppCompatActivity() {
             when (outcome) {
                 is CommandOutcome.Failure -> showGuiError(outcome.error.message)
                 is CommandOutcome.Success -> {
-                    if (command is Command.Run || command is Command.Open) {
+                    if (command is Command.Session.Run || command is Command.Session.Open) {
                         // Follow the session and let its display host own focus.
                         hideGuiLayer()
                     }
                     outcome.afterReply?.invoke()
-                    if (command !is Command.Run && command !is Command.Open) {
+                    if (command !is Command.Session.Run && command !is Command.Session.Open) {
                         refreshGui()
                     }
                 }

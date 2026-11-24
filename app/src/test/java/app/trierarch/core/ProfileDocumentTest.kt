@@ -63,7 +63,7 @@ class ProfileDocumentTest {
 
         assertEquals("broken", document.id)
         assertNotNull(document.error)
-        assertTrue(document.error!!.contains("id must contain only lowercase letters"))
+        assertTrue(document.error!!.contains("id must start with a lowercase letter"))
     }
 
     @Test

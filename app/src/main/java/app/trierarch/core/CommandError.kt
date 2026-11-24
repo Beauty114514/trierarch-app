@@ -4,7 +4,7 @@ package app.trierarch.core
  * A typed failure from the core.
  *
  * [message] is for humans (the CLI prints it, the GUI shows it); [code] is the
- * stable, machine-readable form the CLI will map to exit codes.
+ * stable, machine-readable form the CLI maps to exit codes.
  */
 sealed interface CommandError {
     val code: String
@@ -20,9 +20,28 @@ sealed interface CommandError {
         override val message = "runtime action in progress: $pendingId"
     }
 
-    data class InvalidDocument(val id: String) : CommandError {
+    data class InvalidDocument(val id: String, val reason: String? = null) : CommandError {
         override val code = "invalid_document"
-        override val message = "profile does not exist or is invalid: $id"
+        override val message = if (reason.isNullOrBlank()) {
+            "profile does not exist or is invalid: $id"
+        } else {
+            "profile is invalid: $id: $reason"
+        }
+    }
+
+    data class AlreadyExists(val id: String) : CommandError {
+        override val code = "already_exists"
+        override val message = "profile already exists: $id"
+    }
+
+    data class NotFound(val id: String) : CommandError {
+        override val code = "not_found"
+        override val message = "profile does not exist: $id"
+    }
+
+    data class RevisionMismatch(val id: String) : CommandError {
+        override val code = "revision_mismatch"
+        override val message = "profile changed on disk: $id"
     }
 
     data class DisplayBusy(val display: String, val by: String) : CommandError {

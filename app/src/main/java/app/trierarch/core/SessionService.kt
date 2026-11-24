@@ -24,13 +24,13 @@ class SessionService(
         fun runOnMain(action: () -> Unit)
     }
 
-    fun dispatch(command: Command, completion: (CommandOutcome) -> Unit) {
+    fun dispatch(command: Command.Session, completion: (CommandOutcome) -> Unit) {
         when (command) {
-            is Command.Run -> start(command.id, completion)
-            is Command.Open -> openSession(command.id, completion)
-            is Command.Stop -> stop(command.id, completion)
+            is Command.Session.Run -> start(command.id, completion)
+            is Command.Session.Open -> openSession(command.id, completion)
+            is Command.Session.Stop -> stop(command.id, completion)
             // Switching screens must never start, stop, or rebuild a session.
-            is Command.OpenGui -> openGui(completion)
+            is Command.Session.OpenGui -> openGui(completion)
         }
     }
 

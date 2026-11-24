@@ -11,7 +11,7 @@ class ControlProtocolTest {
     @Test
     fun parsesGuiOpen() {
         assertEquals(
-            ControlProtocol.Request.Execute(Command.OpenGui),
+            ControlProtocol.Request.Execute(Command.Session.OpenGui),
             ControlProtocol.parse(token, "$token\tgui.open"),
         )
     }
@@ -36,20 +36,49 @@ class ControlProtocolTest {
     @Test
     fun parsesSessionCommands() {
         assertEquals(
-            ControlProtocol.Request.Execute(Command.Run("a")),
+            ControlProtocol.Request.Execute(Command.Session.Run("a")),
             ControlProtocol.parse(token, "$token\trun\ta"),
         )
         assertEquals(
-            ControlProtocol.Request.Execute(Command.Open("a")),
+            ControlProtocol.Request.Execute(Command.Session.Open("a")),
             ControlProtocol.parse(token, "$token\topen\ta"),
         )
         assertEquals(
-            ControlProtocol.Request.Execute(Command.Stop(null)),
+            ControlProtocol.Request.Execute(Command.Session.Stop(null)),
             ControlProtocol.parse(token, "$token\tstop"),
         )
         assertEquals(
-            ControlProtocol.Request.Execute(Command.Stop("a")),
+            ControlProtocol.Request.Execute(Command.Session.Stop("a")),
             ControlProtocol.parse(token, "$token\tstop\ta"),
+        )
+    }
+
+    @Test
+    fun parsesDocumentRequests() {
+        assertEquals(
+            ControlProtocol.Request.ListDocuments,
+            ControlProtocol.parse(token, "$token\tdocuments.list"),
+        )
+        assertEquals(
+            ControlProtocol.Request.ReadDocument("a"),
+            ControlProtocol.parse(token, "$token\tdocuments.read\ta"),
+        )
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Document.Create("a")),
+            ControlProtocol.parse(token, "$token\tdocuments.create\ta"),
+        )
+        assertEquals(
+            ControlProtocol.Request.Execute(
+                Command.Document.Save("a", "text\twith\ttabs\nand newlines", "rev"),
+            ),
+            ControlProtocol.parse(
+                token,
+                "$token\tdocuments.save\ta\trev\ttext\twith\ttabs\nand newlines",
+            ),
+        )
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Document.Delete("a", "rev")),
+            ControlProtocol.parse(token, "$token\tdocuments.delete\ta\trev"),
         )
     }
 
@@ -61,5 +90,7 @@ class ControlProtocolTest {
         assertNull(ControlProtocol.parse(token, "$token\trun"))
         assertNull(ControlProtocol.parse(token, "$token\topen"))
         assertNull(ControlProtocol.parse(token, "$token\trun\ta\tb"))
+        assertNull(ControlProtocol.parse(token, "$token\tdocuments.save\ta\trev"))
+        assertNull(ControlProtocol.parse(token, "$token\tdocuments.delete\ta"))
     }
 }

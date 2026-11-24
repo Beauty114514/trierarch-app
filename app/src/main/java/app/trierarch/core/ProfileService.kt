@@ -4,6 +4,7 @@ import android.content.Context
 import org.tomlj.Toml
 import org.tomlj.TomlParseResult
 import java.io.File
+import java.security.MessageDigest
 
 /** Direct filesystem access for profile documents; no index or database exists. */
 class ProfileService internal constructor(private val directory: File) {
@@ -72,6 +73,86 @@ class ProfileService internal constructor(private val directory: File) {
         check(file.delete()) { "Unable to delete ${file.name}" }
     }
 
+    /** Reads one document by id, or null when it does not exist. */
+    fun readDocument(id: String): DocumentContent? {
+        val file = find(id) ?: return null
+        val text = read(file)
+        return DocumentContent(id, text, revision(text))
+    }
+
+    fun find(id: String): File? = list().firstOrNull { it.nameWithoutExtension == id }
+
+    /** Creates a new profile from the built-in template; fails when it exists. */
+    fun create(id: String): String {
+        if (!ID_PATTERN.matches(id)) {
+            throw ProfileServiceException(
+                CommandError.InvalidDocument(
+                    id,
+                    "id must start with a lowercase letter and contain only lowercase letters, digits, and hyphens",
+                ),
+            )
+        }
+        check(directory.isDirectory || directory.mkdirs()) {
+            "Unable to create profile directory"
+        }
+        val destination = File(directory, "$id.$EXTENSION")
+        if (destination.exists()) {
+            throw ProfileServiceException(CommandError.AlreadyExists(id))
+        }
+        destination.writeText(template(id))
+        return id
+    }
+
+    /**
+     * Saves [text] over the document identified by [id] only when the on-disk
+     * content still has [expectedRevision]. A changed `id` renames the file.
+     */
+    fun save(id: String, text: String, expectedRevision: String): String {
+        val file = find(id) ?: throw ProfileServiceException(CommandError.NotFound(id))
+        if (revision(read(file)) != expectedRevision) {
+            throw ProfileServiceException(CommandError.RevisionMismatch(id))
+        }
+        val newId = try {
+            validate(text)
+        } catch (error: IllegalArgumentException) {
+            throw ProfileServiceException(CommandError.InvalidDocument(id, error.message))
+        }
+        return try {
+            save(text, replacing = file).nameWithoutExtension
+        } catch (error: IllegalArgumentException) {
+            throw ProfileServiceException(CommandError.AlreadyExists(newId))
+        }
+    }
+
+    fun delete(id: String, expectedRevision: String) {
+        val file = find(id) ?: throw ProfileServiceException(CommandError.NotFound(id))
+        if (revision(read(file)) != expectedRevision) {
+            throw ProfileServiceException(CommandError.RevisionMismatch(id))
+        }
+        delete(file)
+    }
+
+    /** Content hash used for optimistic concurrency between the frontends. */
+    fun revision(text: String): String = MessageDigest.getInstance("SHA-256")
+        .digest(text.toByteArray(Charsets.UTF_8))
+        .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
+
+    private fun template(id: String): String = """
+        # Complete this template before running the profile.
+        # Supported runtimes: proot, chroot, droidspaces.
+        id = "$id"
+        runtime = "proot"
+
+        # PRoot and chroot require these absolute guest paths.
+        rootfs = "/absolute/path/to/rootfs"
+        shell = "/bin/bash"
+
+        # DroidSpaces instead requires: container = "container-name"
+
+        [display]
+        type = "none"
+    """.trimIndent() + "\n"
+
     /** Validates TOML syntax plus the stable filename identity required by the book. */
     fun validate(text: String): String {
         val parsed = Toml.parse(text)
@@ -80,7 +161,7 @@ class ProfileService internal constructor(private val directory: File) {
         }
         val id = parsed.getString("id")?.trim().orEmpty()
         require(ID_PATTERN.matches(id)) {
-            "id must contain only lowercase letters, digits, and hyphens"
+            "id must start with a lowercase letter and contain only lowercase letters, digits, and hyphens"
         }
         val runtime = parsed.getString("runtime")?.trim().orEmpty()
         require(runtime.isNotEmpty()) { "runtime is required" }
@@ -453,7 +534,7 @@ class ProfileService internal constructor(private val directory: File) {
 
     companion object {
         private const val EXTENSION = "toml"
-        private val ID_PATTERN = Regex("[a-z0-9]+(?:-[a-z0-9]+)*")
+        private val ID_PATTERN = Regex("[a-z][a-z0-9-]{0,63}")
         const val RUNTIME_INTERNAL_SHELL = "internal-shell"
         const val RUNTIME_PROOT = "proot"
         const val RUNTIME_CHROOT = "chroot"
