@@ -23,6 +23,7 @@ class RuntimeController(
         fun showRuntimeTerminal()
         fun showWayland()
         fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit)
+        fun showUi()
         fun runOnMain(action: () -> Unit)
     }
 
@@ -32,7 +33,14 @@ class RuntimeController(
             is RuntimeCommand.Run -> start(command.id, completion)
             is RuntimeCommand.Stop -> stop(command.id, completion)
             is RuntimeCommand.Rerun -> rerun(command.id, completion)
+            // Switching screens must never start, stop, or rebuild a session.
+            is RuntimeCommand.OpenUi -> openUi(completion)
         }
+    }
+
+    private fun openUi(completion: (RuntimeCommandResult) -> Unit) {
+        displayHost.showUi()
+        completion(RuntimeCommandResult(true, "ui opened"))
     }
 
     private fun status(id: String?, completion: (RuntimeCommandResult) -> Unit) {

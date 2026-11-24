@@ -74,19 +74,8 @@ class RuntimeControlServer(
         afterReply?.invoke()
     }
 
-    private fun parseRequest(request: String?): RuntimeCommand? {
-        val fields = request?.split('\t') ?: return null
-        if (fields.size !in 2..4 || fields[0] != token) return null
-        return when (fields[1]) {
-            "status" if (fields.size == 2) -> RuntimeCommand.Status(null)
-            "status" if (fields.size == 3) -> RuntimeCommand.Status(fields[2])
-            "run" if (fields.size == 3) -> RuntimeCommand.Run(fields[2])
-            "stop" if (fields.size == 2) -> RuntimeCommand.Stop(null)
-            "stop" if (fields.size == 3) -> RuntimeCommand.Stop(fields[2])
-            "rerun" if (fields.size == 3) -> RuntimeCommand.Rerun(fields[2])
-            else -> null
-        }
-    }
+    private fun parseRequest(request: String?): RuntimeCommand? =
+        ControlProtocol.parse(token, request)
 
     private fun awaitDispatch(command: RuntimeCommand): RuntimeCommandResult {
         var result: RuntimeCommandResult? = null
@@ -109,5 +98,27 @@ class RuntimeControlServer(
 
     private companion object {
         const val DISPATCH_TIMEOUT_SECONDS = 30L
+    }
+}
+
+/**
+ * The tab-separated, token-prefixed wire protocol spoken by the app's own
+ * shell children. It lives outside the socket so the request surface can be
+ * unit tested without Android.
+ */
+internal object ControlProtocol {
+    fun parse(token: String, request: String?): RuntimeCommand? {
+        val fields = request?.split('\t') ?: return null
+        if (fields.size !in 2..4 || fields[0] != token) return null
+        return when (fields[1]) {
+            "status" if (fields.size == 2) -> RuntimeCommand.Status(null)
+            "status" if (fields.size == 3) -> RuntimeCommand.Status(fields[2])
+            "run" if (fields.size == 3) -> RuntimeCommand.Run(fields[2])
+            "stop" if (fields.size == 2) -> RuntimeCommand.Stop(null)
+            "stop" if (fields.size == 3) -> RuntimeCommand.Stop(fields[2])
+            "rerun" if (fields.size == 3) -> RuntimeCommand.Rerun(fields[2])
+            "ui.open" if (fields.size == 2) -> RuntimeCommand.OpenUi
+            else -> null
+        }
     }
 }

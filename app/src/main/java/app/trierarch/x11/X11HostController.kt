@@ -78,6 +78,11 @@ class X11HostController(
         display?.showAndroidKeyboard()
     }
 
+    /** Returns keyboard focus to the X11 display after another screen covered it. */
+    fun requestFocus() {
+        display?.requestFocus()
+    }
+
     /** Shrinks the X11 surface above the Android IME without changing the window. */
     fun setBottomInset(inset: Int) {
         val view = display ?: return

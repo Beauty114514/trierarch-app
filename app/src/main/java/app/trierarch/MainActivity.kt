@@ -4,26 +4,32 @@ import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import android.util.TypedValue
+import android.view.Gravity
+import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
-import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.addCallback
 import androidx.activity.viewModels
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import app.trierarch.runtime.RuntimeControlServer
-import app.trierarch.runtime.RuntimeController
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
+import app.trierarch.runtime.RuntimeControlServer
+import app.trierarch.runtime.RuntimeController
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
-import app.trierarch.ui.FloatingMenuAction
 import app.trierarch.ui.FloatingActionMenuView
+import app.trierarch.ui.FloatingMenuAction
 import app.trierarch.wayland.WaylandSurfaceView
 import app.trierarch.x11.X11HostController
+import com.google.android.material.button.MaterialButton
 import com.termux.view.TerminalView
 
 /** The first Trierarch profile: a shell using the app's private files directory as its home. */
@@ -38,6 +44,9 @@ class MainActivity : AppCompatActivity() {
     private var x11Starting = false
     private var waylandSurface: WaylandSurfaceView? = null
     private lateinit var floatingMenu: FloatingActionMenuView
+    /** Opaque layer that covers the runtime surfaces; the terminal stays alive underneath. */
+    private lateinit var uiLayer: FrameLayout
+    private lateinit var uiSessionLabel: TextView
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
@@ -98,6 +107,7 @@ class MainActivity : AppCompatActivity() {
                 override fun showWayland() = showWaylandSurface()
                 override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
                     showX11Display(onReady, onFailure)
+                override fun showUi() = openUi()
                 override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
             },
         )
@@ -110,6 +120,14 @@ class MainActivity : AppCompatActivity() {
         )
         terminalContainer.addView(
             floatingMenu,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT,
+            ),
+        )
+        uiLayer = createUiLayer()
+        terminalContainer.addView(
+            uiLayer,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -129,6 +147,13 @@ class MainActivity : AppCompatActivity() {
             insets
         }
         setContentView(terminalContainer)
+        onBackPressedDispatcher.addCallback(this) {
+            if (uiLayer.visibility == View.VISIBLE) {
+                closeUi()
+            } else {
+                finish()
+            }
+        }
         applyImeMode(displayedSurface)
         ViewCompat.requestApplyInsets(terminalContainer)
 
@@ -210,7 +235,99 @@ class MainActivity : AppCompatActivity() {
         applySystemBars(surface)
         applyImeMode(surface)
         floatingMenu.setActions(actionsFor(surface))
+        // A runtime surface can appear while the UI layer is open (for example
+        // a CLI-driven run); keyboard focus must stay on the UI.
+        if (uiLayer.visibility == View.VISIBLE) uiLayer.requestFocus()
     }
+
+    /**
+     * Covers the runtime surface with the in-app UI. The terminal view, its
+     * session, the shell scrollback and every running runtime stay untouched;
+     * only visibility and focus change.
+     */
+    private fun openUi() {
+        if (uiLayer.visibility == View.VISIBLE) return
+        keyboardPanel.hide()
+        uiSessionLabel.text = "Session: ${terminalViewModel.activeProfileId() ?: "Trierarch shell"}"
+        floatingMenu.visibility = View.GONE
+        uiLayer.visibility = View.VISIBLE
+        uiLayer.requestFocus()
+    }
+
+    /** Returns to the exact session that was displayed before the UI opened. */
+    private fun closeUi() {
+        if (uiLayer.visibility != View.VISIBLE) return
+        uiLayer.visibility = View.GONE
+        floatingMenu.setActions(actionsFor(displayedSurface))
+        when (displayedSurface) {
+            DisplaySurface.INTERNAL_SHELL,
+            DisplaySurface.RUNTIME_SHELL,
+            -> terminalView?.requestFocus()
+
+            DisplaySurface.X11 -> x11Host.requestFocus()
+            DisplaySurface.WAYLAND -> waylandSurface?.requestFocus()
+        }
+    }
+
+    /** Placeholder for the environment list; replaced in the next milestone. */
+    private fun createUiLayer(): FrameLayout {
+        val column = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+            setPadding(dp(32), dp(32), dp(32), dp(32))
+            addView(TextView(this@MainActivity).apply {
+                text = "Trierarch UI"
+                setTextColor(android.graphics.Color.WHITE)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
+            })
+            addView(TextView(this@MainActivity).apply {
+                text = "The environment list will live here."
+                setTextColor(UI_SECONDARY_TEXT)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
+                setPadding(0, dp(8), 0, 0)
+            })
+            uiSessionLabel = TextView(this@MainActivity).apply {
+                typeface = android.graphics.Typeface.MONOSPACE
+                setTextColor(UI_SECONDARY_TEXT)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+                setPadding(0, dp(24), 0, 0)
+            }
+            addView(uiSessionLabel)
+            addView(
+                MaterialButton(this@MainActivity).apply {
+                    text = "Terminal"
+                    setOnClickListener { closeUi() }
+                },
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                ).apply { topMargin = dp(24) },
+            )
+        }
+        return FrameLayout(this).apply {
+            visibility = View.GONE
+            setBackgroundColor(android.graphics.Color.BLACK)
+            // Opaque and clickable: neither touches nor keys may reach the
+            // runtime surface underneath.
+            isClickable = true
+            isFocusable = true
+            isFocusableInTouchMode = true
+            addView(
+                column,
+                FrameLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    Gravity.CENTER,
+                ),
+            )
+        }
+    }
+
+    private fun dp(value: Int): Int = TypedValue.applyDimension(
+        TypedValue.COMPLEX_UNIT_DIP,
+        value.toFloat(),
+        resources.displayMetrics,
+    ).toInt()
 
     /**
      * Edge-to-edge desktop windows no longer resize for the IME automatically,
@@ -366,6 +483,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val TAG = "TrierarchSurface"
         const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
+        val UI_SECONDARY_TEXT = 0xFF9CA3AF.toInt()
     }
 
     private enum class DisplaySurface {
