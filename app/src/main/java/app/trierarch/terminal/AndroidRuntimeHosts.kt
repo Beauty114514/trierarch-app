@@ -4,7 +4,7 @@ import android.app.Application
 import app.trierarch.audio.PipeWireHostController
 import app.trierarch.compat.GbmShimRuntime
 import app.trierarch.compat.GuestCompatibilityRuntime
-import app.trierarch.config.ProfileStore
+import app.trierarch.core.ProfileService
 import app.trierarch.virgl.VirglHostController
 import app.trierarch.wayland.WaylandBridge
 import app.trierarch.wayland.WaylandImeBridgeRuntime
@@ -37,16 +37,16 @@ internal class AndroidRuntimeHosts(private val app: Application) : RuntimeHosts 
 internal class AndroidRuntimePaths(private val app: Application) : RuntimePaths {
     override fun x11SocketDirectory(display: String): String? =
         X11Runtime.socketDirectory(app).absolutePath.takeIf {
-            display == ProfileStore.DISPLAY_X11
+            display == ProfileService.DISPLAY_X11
         }
 
     override fun waylandRuntimeDirectory(display: String): String? =
         File(app.filesDir, "wayland/runtime").also { it.mkdirs() }.absolutePath.takeIf {
-            display == ProfileStore.DISPLAY_WAYLAND
+            display == ProfileService.DISPLAY_WAYLAND
         }
 
     override fun waylandImeBridge(display: String): String? =
-        if (display == ProfileStore.DISPLAY_WAYLAND) {
+        if (display == ProfileService.DISPLAY_WAYLAND) {
             WaylandImeBridgeRuntime.executable(app).absolutePath
         } else {
             null

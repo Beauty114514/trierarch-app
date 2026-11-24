@@ -1,18 +1,14 @@
-package app.trierarch.runtime
+package app.trierarch.core
 
-import android.content.Context
-import app.trierarch.config.ProfileStore
 import app.trierarch.nativebridge.NativePtyBridge
 import app.trierarch.terminal.DefaultTerminalViewModel
-import app.trierarch.wayland.WaylandBridge
 
-/** Controls profile sessions separately from the containers/rootfs they enter. */
-class RuntimeController(
-    context: Context,
+/** Owns profile sessions separately from the containers/rootfs they enter. */
+class SessionService(
+    private val profiles: ProfileService,
     private val terminal: DefaultTerminalViewModel,
     private val displayHost: DisplayHost,
 ) {
-    private val store = ProfileStore(context.applicationContext)
     private var pending: Pending? = null
     private val sourcesByProfile = mutableMapOf<String, LaunchSource>()
     private val sourcesStartedByTrierarch = mutableSetOf<String>()
@@ -28,14 +24,13 @@ class RuntimeController(
         fun runOnMain(action: () -> Unit)
     }
 
-    fun dispatch(command: RuntimeCommand, completion: (RuntimeCommandResult) -> Unit) {
+    fun dispatch(command: Command, completion: (CommandOutcome) -> Unit) {
         when (command) {
-            is RuntimeCommand.Status -> status(command.id, completion)
-            is RuntimeCommand.Run -> start(command.id, completion)
-            is RuntimeCommand.Stop -> stop(command.id, completion)
-            is RuntimeCommand.OpenSession -> openSession(command.id, completion)
+            is Command.Run -> start(command.id, completion)
+            is Command.Open -> openSession(command.id, completion)
+            is Command.Stop -> stop(command.id, completion)
             // Switching screens must never start, stop, or rebuild a session.
-            is RuntimeCommand.OpenGui -> openGui(completion)
+            is Command.OpenGui -> openGui(completion)
         }
     }
 
@@ -43,19 +38,21 @@ class RuntimeController(
      * Shows an already-running session. It never starts, stops or restarts a
      * runtime and does not re-read the profile: only the display changes.
      */
-    private fun openSession(id: String, completion: (RuntimeCommandResult) -> Unit) {
+    private fun openSession(id: String, completion: (CommandOutcome) -> Unit) {
         val display = terminal.displayOf(id) ?: run {
-            completion(RuntimeCommandResult(false, "profile is not running: $id; use --run $id"))
+            completion(CommandOutcome.Failure(CommandError.NotRunning(id, useRunHint = true)))
             return
         }
-        completion(RuntimeCommandResult(true, "opening $id") {
-            displayHost.runOnMain { displayHost.showSession(id, display) }
-        })
+        completion(
+            CommandOutcome.Success("opening $id") {
+                displayHost.runOnMain { displayHost.showSession(id, display) }
+            },
+        )
     }
 
-    private fun openGui(completion: (RuntimeCommandResult) -> Unit) {
+    private fun openGui(completion: (CommandOutcome) -> Unit) {
         displayHost.showGui()
-        completion(RuntimeCommandResult(true, "gui opened"))
+        completion(CommandOutcome.Success("gui opened"))
     }
 
     /** Structured runtime state for the GUI; the CLI keeps its text status. */
@@ -69,17 +66,14 @@ class RuntimeController(
         )
     }
 
-    private fun status(id: String?, completion: (RuntimeCommandResult) -> Unit) {
+    /** The CLI's text view of the session table; also a query for the adapter. */
+    fun status(id: String?): CommandOutcome {
         if (id != null && loadProfileSilently(id) == null) {
-            completion(RuntimeCommandResult(false, "profile does not exist or is invalid: $id"))
-            return
+            return CommandOutcome.Failure(CommandError.InvalidDocument(id))
         }
-        val profiles = if (id == null) store.list().map { it.nameWithoutExtension } else listOf(id)
-        if (profiles.isEmpty()) {
-            completion(RuntimeCommandResult(true, "No profiles."))
-            return
-        }
-        completion(RuntimeCommandResult(true, profiles.joinToString("\n") { profile -> statusLine(profile) }))
+        val ids = if (id == null) profiles.list().map { it.nameWithoutExtension } else listOf(id)
+        if (ids.isEmpty()) return CommandOutcome.Success("No profiles.")
+        return CommandOutcome.Success(ids.joinToString("\n") { statusLine(it) })
     }
 
     private fun statusLine(id: String): String {
@@ -88,13 +82,13 @@ class RuntimeController(
         return "$id\t${stateOf(id)}$sourceState"
     }
 
-    private fun start(id: String, completion: (RuntimeCommandResult) -> Unit) {
+    private fun start(id: String, completion: (CommandOutcome) -> Unit) {
         if (terminal.isProfileRunning(id)) {
-            completion(RuntimeCommandResult(false, "profile is already running: $id"))
+            completion(CommandOutcome.Failure(CommandError.AlreadyRunning(id)))
             return
         }
         if (pending != null) {
-            completion(RuntimeCommandResult(false, "runtime action in progress: ${pending?.id}"))
+            completion(CommandOutcome.Failure(CommandError.Busy(pending?.id)))
             return
         }
         val profile = loadProfile(id, completion) ?: return
@@ -102,35 +96,35 @@ class RuntimeController(
         // first one on screen, so refuse instead of lying about what is shown.
         val conflict = findDisplayConflict(terminal.runningDisplays(), id, profile.display)
         if (conflict != null) {
-            completion(
-                RuntimeCommandResult(
-                    false,
-                    "another ${profile.display} session is running: $conflict; stop it first",
-                ),
-            )
+            completion(CommandOutcome.Failure(CommandError.DisplayBusy(profile.display, conflict)))
             return
         }
         val sourceWasRunning = sourceWasRunning(profile.source, completion) ?: return
         scheduleStart(id, profile, sourceWasRunning, "starting", completion)
     }
 
-    private fun stop(id: String?, completion: (RuntimeCommandResult) -> Unit) {
+    private fun stop(id: String?, completion: (CommandOutcome) -> Unit) {
         val running = terminal.runningProfileIds()
         val target = id ?: terminal.activeProfileId() ?: running.singleOrNull()
         if (target == null) {
-            completion(RuntimeCommandResult(false, if (running.isEmpty()) "no runtime is running" else "multiple profiles are running; specify an ID"))
+            val error = if (running.isEmpty()) {
+                CommandError.NoSession
+            } else {
+                CommandError.Ambiguous(running.toList())
+            }
+            completion(CommandOutcome.Failure(error))
             return
         }
         if (!terminal.isProfileRunning(target)) {
-            completion(RuntimeCommandResult(false, "profile is not running: $target"))
+            completion(CommandOutcome.Failure(CommandError.NotRunning(target)))
             return
         }
         if (pending != null) {
-            completion(RuntimeCommandResult(false, "runtime action in progress: ${pending?.id}"))
+            completion(CommandOutcome.Failure(CommandError.Busy(pending?.id)))
             return
         }
         pending = Pending(target, STATE_STOPPING)
-        completion(RuntimeCommandResult(true, "stopping $target") {
+        completion(CommandOutcome.Success("stopping $target") {
             displayHost.runOnMain {
                 val source = sourcesByProfile.remove(target) ?: loadProfileSilently(target)?.source
                 // Only fall back to the shell when the stopped session owned the
@@ -150,22 +144,22 @@ class RuntimeController(
         profile: LoadedProfile,
         sourceWasRunning: Boolean,
         state: String,
-        completion: (RuntimeCommandResult) -> Unit,
+        completion: (CommandOutcome) -> Unit,
     ) {
         pending = Pending(id, state)
-        completion(RuntimeCommandResult(true, "$state $id") {
+        completion(CommandOutcome.Success("$state $id") {
             displayHost.runOnMain { launch(id, profile, sourceWasRunning) }
         })
     }
 
     private fun launch(id: String, profile: LoadedProfile, sourceWasRunning: Boolean) {
         val action = when (profile.runtime) {
-            ProfileStore.RUNTIME_INTERNAL_SHELL -> Result.success { terminal.restartInternalShell() }
-            ProfileStore.RUNTIME_PROOT -> runCatching { store.prootProfile(profile.content) }
+            ProfileService.RUNTIME_INTERNAL_SHELL -> Result.success { terminal.restartInternalShell() }
+            ProfileService.RUNTIME_PROOT -> runCatching { profiles.prootProfile(profile.content) }
                 .map { typed -> { terminal.restartProot(typed) } }
-            ProfileStore.RUNTIME_CHROOT -> runCatching { store.chrootProfile(profile.content) }
+            ProfileService.RUNTIME_CHROOT -> runCatching { profiles.chrootProfile(profile.content) }
                 .map { typed -> { terminal.restartChroot(typed) } }
-            ProfileStore.RUNTIME_DROIDSPACES -> runCatching { store.droidspacesProfile(profile.content) }
+            ProfileService.RUNTIME_DROIDSPACES -> runCatching { profiles.droidspacesProfile(profile.content) }
                 .map { typed -> { terminal.restartDroidspaces(typed) } }
             else -> Result.failure(IllegalArgumentException("runtime '${profile.runtime}' cannot be started"))
         }
@@ -181,12 +175,12 @@ class RuntimeController(
                 pending = null
                 displayHost.attachTerminal()
             }
-            if (profile.display == ProfileStore.DISPLAY_X11) {
+            if (profile.display == ProfileService.DISPLAY_X11) {
                 displayHost.showX11(
                     onReady = { runCatching(started).onFailure { launchFailed(id, it) } },
                     onFailure = { launchFailed(id, IllegalStateException(it)) },
                 )
-            } else if (profile.display == ProfileStore.DISPLAY_WAYLAND) {
+            } else if (profile.display == ProfileService.DISPLAY_WAYLAND) {
                 runCatching {
                     displayHost.showWayland()
                     started()
@@ -194,7 +188,7 @@ class RuntimeController(
             } else {
                 runCatching {
                     started()
-                    if (profile.runtime == ProfileStore.RUNTIME_INTERNAL_SHELL) {
+                    if (profile.runtime == ProfileService.RUNTIME_INTERNAL_SHELL) {
                         displayHost.showInternalTerminal()
                     } else {
                         displayHost.showRuntimeTerminal()
@@ -218,33 +212,46 @@ class RuntimeController(
         }
     }
 
-    private fun sourceWasRunning(source: LaunchSource, completion: (RuntimeCommandResult) -> Unit): Boolean? =
-        if (source !is LaunchSource.Droidspaces) true else runCatching {
+    private fun sourceWasRunning(
+        source: LaunchSource,
+        completion: (CommandOutcome) -> Unit,
+    ): Boolean? = if (source !is LaunchSource.Droidspaces) {
+        true
+    } else {
+        runCatching {
             NativePtyBridge.isDroidspacesRunning(source.container)
         }.getOrElse {
-            completion(RuntimeCommandResult(false, it.message ?: "unable to inspect source ${source.key}"))
+            completion(
+                CommandOutcome.Failure(
+                    CommandError.Failed(it.message ?: "unable to inspect source ${source.key}"),
+                ),
+            )
             return null
         }
+    }
 
-    private fun loadProfile(id: String, completion: (RuntimeCommandResult) -> Unit): LoadedProfile? =
+    private fun loadProfile(id: String, completion: (CommandOutcome) -> Unit): LoadedProfile? =
         loadProfileSilently(id) ?: run {
-            completion(RuntimeCommandResult(false, "profile does not exist or is invalid: $id"))
+            completion(CommandOutcome.Failure(CommandError.InvalidDocument(id)))
             null
         }
 
     private fun loadProfileSilently(id: String): LoadedProfile? = runCatching {
-        val file = store.list().firstOrNull { it.nameWithoutExtension == id } ?: return null
-        val content = store.read(file)
-        store.validate(content)
-        val runtime = store.runtime(content)
+        val file = profiles.list().firstOrNull { it.nameWithoutExtension == id } ?: return null
+        val content = profiles.read(file)
+        profiles.validate(content)
+        val runtime = profiles.runtime(content)
         val source = when (runtime) {
-            ProfileStore.RUNTIME_DROIDSPACES -> LaunchSource.Droidspaces(store.droidspacesProfile(content).container)
-            ProfileStore.RUNTIME_PROOT -> LaunchSource.Proot(store.prootProfile(content).rootfs.absolutePath)
-            ProfileStore.RUNTIME_CHROOT -> LaunchSource.Chroot(store.chrootProfile(content).rootfs)
-            ProfileStore.RUNTIME_INTERNAL_SHELL -> LaunchSource.Internal
+            ProfileService.RUNTIME_DROIDSPACES ->
+                LaunchSource.Droidspaces(profiles.droidspacesProfile(content).container)
+            ProfileService.RUNTIME_PROOT ->
+                LaunchSource.Proot(profiles.prootProfile(content).rootfs.absolutePath)
+            ProfileService.RUNTIME_CHROOT ->
+                LaunchSource.Chroot(profiles.chrootProfile(content).rootfs)
+            ProfileService.RUNTIME_INTERNAL_SHELL -> LaunchSource.Internal
             else -> throw IllegalArgumentException("unknown runtime '$runtime'")
         }
-        LoadedProfile(runtime, store.display(content), content, source)
+        LoadedProfile(runtime, profiles.display(content), content, source)
     }.getOrNull()
 
     private fun stateOf(id: String): String = pending?.takeIf { it.id == id }?.state

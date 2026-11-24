@@ -3,10 +3,17 @@ package app.trierarch.runtime
 import android.content.Context
 import android.net.LocalServerSocket
 import android.net.LocalSocket
+import android.os.Handler
+import android.os.Looper
 import android.util.Base64
+import app.trierarch.core.Command
+import app.trierarch.core.CommandError
+import app.trierarch.core.CommandOutcome
+import app.trierarch.core.Core
 import java.io.Closeable
 import java.io.File
 import java.security.SecureRandom
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
@@ -19,7 +26,7 @@ import java.util.concurrent.TimeUnit
  */
 class RuntimeControlServer(
     context: Context,
-    private val dispatch: (RuntimeCommand, (RuntimeCommandResult) -> Unit) -> Unit,
+    private val core: Core,
 ) : Closeable {
     private val endpointFile = File(context.filesDir, "runtime/control")
     private val socketName = "trierarch-control-${randomToken()}"
@@ -27,6 +34,7 @@ class RuntimeControlServer(
     private val server = LocalServerSocket(socketName)
     private val clients = Executors.newCachedThreadPool()
     private val acceptThread = Thread(::acceptClients, "trierarch-runtime-control")
+    private val main = Handler(Looper.getMainLooper())
     @Volatile private var closed = false
 
     init {
@@ -54,44 +62,65 @@ class RuntimeControlServer(
         var afterReply: (() -> Unit)? = null
         client.use { socket ->
             val input = socket.inputStream.bufferedReader()
-            val request = input.readLine()
-            val command = parseRequest(request)
-            val result = command?.let { awaitDispatch(it) }
-                ?: RuntimeCommandResult(false, "invalid control request")
+            val request = ControlProtocol.parse(token, input.readLine())
+            val outcome = when (request) {
+                is ControlProtocol.Request.Status -> awaitStatus(request.id)
+                is ControlProtocol.Request.Execute -> awaitCommand(request.command)
+                null -> CommandOutcome.Failure(CommandError.Failed("invalid control request"))
+            }
             val output = socket.outputStream.bufferedWriter()
-            val kind = if (result.success) "OK" else "ERR"
+            val kind = if (outcome is CommandOutcome.Success) "OK" else "ERR"
+            val message = when (outcome) {
+                is CommandOutcome.Success -> outcome.message
+                is CommandOutcome.Failure -> outcome.error.message
+            }
             output.write(kind)
             output.write('\t'.code)
-            output.write(result.message)
+            output.write(message)
             output.write('\n'.code)
             output.flush()
             // These commands reply first and act afterwards, so the CLI always
             // receives its answer before the app changes the display.
-            val deferredCommand = command is RuntimeCommand.Run ||
-                command is RuntimeCommand.Stop ||
-                command is RuntimeCommand.OpenSession
-            if (deferredCommand && runCatching { input.readLine() == "ACK" }.getOrDefault(false)) {
-                afterReply = result.afterReply
+            val deferred = request is ControlProtocol.Request.Execute &&
+                request.command.isDeferred()
+            if (deferred && runCatching { input.readLine() == "ACK" }.getOrDefault(false)) {
+                afterReply = (outcome as? CommandOutcome.Success)?.afterReply
             }
         }
         afterReply?.invoke()
     }
 
-    private fun parseRequest(request: String?): RuntimeCommand? =
-        ControlProtocol.parse(token, request)
-
-    private fun awaitDispatch(command: RuntimeCommand): RuntimeCommandResult {
-        var result: RuntimeCommandResult? = null
-        val completion = java.util.concurrent.CountDownLatch(1)
-        dispatch(command) {
-            result = it
-            completion.countDown()
+    private fun awaitStatus(id: String?): CommandOutcome {
+        var result: CommandOutcome? = null
+        val latch = CountDownLatch(1)
+        main.post {
+            result = core.status(id)
+            latch.countDown()
         }
-        if (!completion.await(DISPATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
-            return RuntimeCommandResult(false, "runtime control timed out")
-        }
-        return checkNotNull(result)
+        return await(latch) { result }
     }
+
+    private fun awaitCommand(command: Command): CommandOutcome {
+        var result: CommandOutcome? = null
+        val latch = CountDownLatch(1)
+        main.post {
+            core.submit(command) { outcome ->
+                result = outcome
+                latch.countDown()
+            }
+        }
+        return await(latch) { result }
+    }
+
+    private fun await(latch: CountDownLatch, result: () -> CommandOutcome?): CommandOutcome {
+        if (!latch.await(DISPATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+            return CommandOutcome.Failure(CommandError.Failed("runtime control timed out"))
+        }
+        return checkNotNull(result())
+    }
+
+    private fun Command.isDeferred(): Boolean =
+        this is Command.Run || this is Command.Stop || this is Command.Open
 
     private fun randomToken(): String {
         val bytes = ByteArray(18)
@@ -110,17 +139,22 @@ class RuntimeControlServer(
  * unit tested without Android.
  */
 internal object ControlProtocol {
-    fun parse(token: String, request: String?): RuntimeCommand? {
+    sealed interface Request {
+        data class Status(val id: String?) : Request
+        data class Execute(val command: Command) : Request
+    }
+
+    fun parse(token: String, request: String?): Request? {
         val fields = request?.split('\t') ?: return null
         if (fields.size !in 2..4 || fields[0] != token) return null
         return when (fields[1]) {
-            "status" if (fields.size == 2) -> RuntimeCommand.Status(null)
-            "status" if (fields.size == 3) -> RuntimeCommand.Status(fields[2])
-            "run" if (fields.size == 3) -> RuntimeCommand.Run(fields[2])
-            "open" if (fields.size == 3) -> RuntimeCommand.OpenSession(fields[2])
-            "stop" if (fields.size == 2) -> RuntimeCommand.Stop(null)
-            "stop" if (fields.size == 3) -> RuntimeCommand.Stop(fields[2])
-            "gui.open" if (fields.size == 2) -> RuntimeCommand.OpenGui
+            "status" if (fields.size == 2) -> Request.Status(null)
+            "status" if (fields.size == 3) -> Request.Status(fields[2])
+            "run" if (fields.size == 3) -> Request.Execute(Command.Run(fields[2]))
+            "open" if (fields.size == 3) -> Request.Execute(Command.Open(fields[2]))
+            "stop" if (fields.size == 2) -> Request.Execute(Command.Stop(null))
+            "stop" if (fields.size == 3) -> Request.Execute(Command.Stop(fields[2]))
+            "gui.open" if (fields.size == 2) -> Request.Execute(Command.OpenGui)
             else -> null
         }
     }

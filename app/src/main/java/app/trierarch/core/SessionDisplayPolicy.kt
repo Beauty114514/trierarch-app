@@ -1,6 +1,5 @@
-package app.trierarch.runtime
+package app.trierarch.core
 
-import app.trierarch.config.ProfileStore
 
 /**
  * X11 and Wayland are host-side singletons: one X server and one Wayland host
@@ -15,7 +14,7 @@ internal fun findDisplayConflict(
     id: String,
     display: String,
 ): String? {
-    if (display == ProfileStore.DISPLAY_NONE) return null
+    if (display == ProfileService.DISPLAY_NONE) return null
     return running.entries.firstOrNull { (otherId, otherDisplay) ->
         otherId != id && otherDisplay == display
     }?.key

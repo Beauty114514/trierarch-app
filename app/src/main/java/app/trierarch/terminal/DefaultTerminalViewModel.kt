@@ -2,7 +2,7 @@ package app.trierarch.terminal
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
-import app.trierarch.config.ProfileStore
+import app.trierarch.core.ProfileService
 import app.trierarch.runtime.InternalShellLaunchSpec
 import app.trierarch.wayland.WaylandImeBridgeRuntime
 import java.io.File
@@ -43,7 +43,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
         )
     }
 
-    fun restartProot(profile: ProfileStore.ProotProfile) {
+    fun restartProot(profile: ProfileService.ProotProfile) {
         launchRuntime(
             RuntimeLaunchSpec(
                 profileId = profile.id,
@@ -71,7 +71,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
         }
     }
 
-    fun restartChroot(profile: ProfileStore.ChrootProfile) {
+    fun restartChroot(profile: ProfileService.ChrootProfile) {
         launchRuntime(
             RuntimeLaunchSpec(
                 profileId = profile.id,
@@ -99,7 +99,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
         }
     }
 
-    fun restartDroidspaces(profile: ProfileStore.DroidspacesProfile) {
+    fun restartDroidspaces(profile: ProfileService.DroidspacesProfile) {
         launchRuntime(
             RuntimeLaunchSpec(
                 profileId = profile.id,
@@ -186,7 +186,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
     private fun closeRuntime(id: String) {
         runtimeSessions.remove(id)?.session?.close()
         if (displayedProfileId == id) displayedProfileId = null
-        if (runtimeSessions.values.none { it.display == ProfileStore.DISPLAY_WAYLAND }) {
+        if (runtimeSessions.values.none { it.display == ProfileService.DISPLAY_WAYLAND }) {
             runtimeBootstrap.stopWayland()
         }
         if (runtimeSessions.values.none { usesVtestTransport(it.renderer) }) {
@@ -206,8 +206,8 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
         val next = try {
             val sessionResources = runtimeBootstrap.finishResources(spec, resources)
             createSession(sessionResources).also { session ->
-                if (spec.display == ProfileStore.DISPLAY_X11 ||
-                    spec.display == ProfileStore.DISPLAY_WAYLAND
+                if (spec.display == ProfileService.DISPLAY_X11 ||
+                    spec.display == ProfileService.DISPLAY_WAYLAND
                 ) {
                     session.start()
                 }
@@ -220,7 +220,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
             next,
             spec.display,
             spec.renderer,
-            spec.audioBackend == ProfileStore.AUDIO_PIPEWIRE,
+            spec.audioBackend == ProfileService.AUDIO_PIPEWIRE,
         )
         displayedProfileId = spec.profileId
         session = next
@@ -234,7 +234,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
     )
 
     private fun usesVtestTransport(renderer: String): Boolean =
-        renderer == ProfileStore.GRAPHICS_VIRGL || renderer == ProfileStore.GRAPHICS_VENUS
+        renderer == ProfileService.GRAPHICS_VIRGL || renderer == ProfileService.GRAPHICS_VENUS
 
     private fun sessionDiagnosticLog(profileId: String): File =
         File(app.filesDir, "logs/sessions/$profileId.log")

@@ -1,6 +1,6 @@
 package app.trierarch.terminal
 
-import app.trierarch.config.ProfileStore
+import app.trierarch.core.ProfileService
 import java.io.File
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -64,21 +64,21 @@ class JniSessionConfigTest {
 
     @Test
     fun droidspacesConfigUsesProfileValues() {
-        val profile = ProfileStore.DroidspacesProfile(
+        val profile = ProfileService.DroidspacesProfile(
             id = "droid",
             container = "trierarch",
             user = "root",
-            display = ProfileStore.DISPLAY_WAYLAND,
-            desktopScale = ProfileStore.DESKTOP_SCALE_DEFAULT,
+            display = ProfileService.DISPLAY_WAYLAND,
+            desktopScale = ProfileService.DESKTOP_SCALE_DEFAULT,
             launchArgv = listOf("startplasma-wayland"),
-            graphics = ProfileStore.GraphicsProfile(
-                renderer = ProfileStore.GRAPHICS_ADRENO,
-                qtQuickBackend = ProfileStore.QT_QUICK_SOFTWARE,
+            graphics = ProfileService.GraphicsProfile(
+                renderer = ProfileService.GRAPHICS_ADRENO,
+                qtQuickBackend = ProfileService.QT_QUICK_SOFTWARE,
             ),
-            compatibility = ProfileStore.CompatibilityProfile(
-                udevMonitor = ProfileStore.COMPAT_OFF,
+            compatibility = ProfileService.CompatibilityProfile(
+                udevMonitor = ProfileService.COMPAT_OFF,
             ),
-            audioBackend = ProfileStore.AUDIO_OFF,
+            audioBackend = ProfileService.AUDIO_OFF,
         )
 
         val fields = fields(

@@ -1,4 +1,4 @@
-package app.trierarch.runtime
+package app.trierarch.core
 
 /** Lifecycle phase the GUI shows for one profile. */
 enum class SessionPhase {

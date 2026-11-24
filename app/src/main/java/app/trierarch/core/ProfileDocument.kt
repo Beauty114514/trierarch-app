@@ -1,4 +1,4 @@
-package app.trierarch.config
+package app.trierarch.core
 
 import java.io.File
 

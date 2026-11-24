@@ -1,6 +1,6 @@
 package app.trierarch.terminal
 
-import app.trierarch.config.ProfileStore
+import app.trierarch.core.ProfileService
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -42,23 +42,23 @@ class RuntimeBootstrapTest {
 
     private class FakePaths : RuntimePaths {
         override fun x11SocketDirectory(display: String): String? =
-            if (display == ProfileStore.DISPLAY_X11) "/x11" else null
+            if (display == ProfileService.DISPLAY_X11) "/x11" else null
 
         override fun waylandRuntimeDirectory(display: String): String? =
-            if (display == ProfileStore.DISPLAY_WAYLAND) "/wayland" else null
+            if (display == ProfileService.DISPLAY_WAYLAND) "/wayland" else null
 
         override fun waylandImeBridge(display: String): String? =
-            if (display == ProfileStore.DISPLAY_WAYLAND) "/ime" else null
+            if (display == ProfileService.DISPLAY_WAYLAND) "/ime" else null
 
         override fun udevCompatibilityLibrary(enabled: Boolean): String =
             if (enabled) "/compat" else ""
     }
 
     private fun spec(
-        display: String = ProfileStore.DISPLAY_WAYLAND,
-        renderer: String = ProfileStore.GRAPHICS_VIRGL,
-        bufferMode: String = ProfileStore.BUFFER_DMABUF,
-        audioBackend: String = ProfileStore.AUDIO_PIPEWIRE,
+        display: String = ProfileService.DISPLAY_WAYLAND,
+        renderer: String = ProfileService.GRAPHICS_VIRGL,
+        bufferMode: String = ProfileService.BUFFER_DMABUF,
+        audioBackend: String = ProfileService.AUDIO_PIPEWIRE,
         installGbmShim: Boolean = true,
         desktopScalePercent: Int = 100,
     ) = RuntimeLaunchSpec(
@@ -105,10 +105,10 @@ class RuntimeBootstrapTest {
 
         val resources = bootstrap.prepareHosts(
             spec(
-                display = ProfileStore.DISPLAY_X11,
-                renderer = ProfileStore.GRAPHICS_LLVMPIPE,
-                bufferMode = ProfileStore.BUFFER_SHM,
-                audioBackend = ProfileStore.AUDIO_OFF,
+                display = ProfileService.DISPLAY_X11,
+                renderer = ProfileService.GRAPHICS_LLVMPIPE,
+                bufferMode = ProfileService.BUFFER_SHM,
+                audioBackend = ProfileService.AUDIO_OFF,
             ),
         )
 

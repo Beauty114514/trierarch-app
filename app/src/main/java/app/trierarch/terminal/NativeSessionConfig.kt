@@ -1,6 +1,6 @@
 package app.trierarch.terminal
 
-import app.trierarch.config.ProfileStore
+import app.trierarch.core.ProfileService
 import app.trierarch.runtime.TerminalLaunchSpec
 import java.io.File
 
@@ -39,7 +39,7 @@ data class ChrootSessionConfig(
 )
 
 data class DroidspacesSessionConfig(
-    val profile: ProfileStore.DroidspacesProfile,
+    val profile: ProfileService.DroidspacesProfile,
     val environment: SessionEnvironment,
     val droidspacesSupervisor: File,
 )

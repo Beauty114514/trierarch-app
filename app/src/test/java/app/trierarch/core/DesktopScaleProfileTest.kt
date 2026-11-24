@@ -1,4 +1,4 @@
-package app.trierarch.config
+package app.trierarch.core
 
 import android.content.ContextWrapper
 import java.io.File
@@ -55,11 +55,11 @@ class DesktopScaleProfileTest {
         appendLine("renderer = \"adreno\"")
     }
 
-    private fun profileStore(): ProfileStore {
+    private fun profileStore(): ProfileService {
         val files = temporaryFolder.newFolder("files")
         val context = object : ContextWrapper(null) {
             override fun getFilesDir(): File = files
         }
-        return ProfileStore(context)
+        return ProfileService(context)
     }
 }

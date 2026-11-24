@@ -1,4 +1,4 @@
-package app.trierarch.config
+package app.trierarch.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -8,9 +8,9 @@ import org.junit.Test
 class GraphicsProfileTest {
     @Test
     fun adrenoKeepsOnlyTheKgslHintsSharedByFreedrenoAndZink() {
-        val environment = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_ADRENO,
-            qtQuickBackend = ProfileStore.QT_QUICK_SOFTWARE,
+        val environment = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_ADRENO,
+            qtQuickBackend = ProfileService.QT_QUICK_SOFTWARE,
         ).environment()
 
         assertTrue(environment.contains("TURNIP_KMD=kgsl"))
@@ -27,9 +27,9 @@ class GraphicsProfileTest {
 
     @Test
     fun venusSelectsTheVtestTransportWithoutForcingAGalliumDriver() {
-        val environment = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_VENUS,
-            qtQuickBackend = ProfileStore.GRAPHICS_AUTO,
+        val environment = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_VENUS,
+            qtQuickBackend = ProfileService.GRAPHICS_AUTO,
         ).environment()
 
         assertTrue(environment.contains("VN_DEBUG=vtest"))
@@ -40,9 +40,9 @@ class GraphicsProfileTest {
 
     @Test
     fun virglUsesTheSoftwareDriFrontendAndNeverTheLoaderOverride() {
-        val profile = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_VIRGL,
-            qtQuickBackend = ProfileStore.GRAPHICS_AUTO,
+        val profile = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_VIRGL,
+            qtQuickBackend = ProfileService.GRAPHICS_AUTO,
         )
         val environment = profile.environment()
 
@@ -60,13 +60,13 @@ class GraphicsProfileTest {
 
     @Test
     fun virglDmabufPocLoadsTheBufferShim() {
-        val profile = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_VIRGL,
-            qtQuickBackend = ProfileStore.GRAPHICS_AUTO,
-            buffer = ProfileStore.BUFFER_DMABUF,
+        val profile = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_VIRGL,
+            qtQuickBackend = ProfileService.GRAPHICS_AUTO,
+            buffer = ProfileService.BUFFER_DMABUF,
         )
 
-        assertEquals(ProfileStore.BUFFER_DMABUF, profile.resolvedBuffer)
+        assertEquals(ProfileService.BUFFER_DMABUF, profile.resolvedBuffer)
         assertTrue(profile.environment().contains(
             "LD_PRELOAD=/tmp/trierarch-wayland/libgbm-shim.so"
         ))
@@ -74,38 +74,38 @@ class GraphicsProfileTest {
 
     @Test
     fun vtestTransportsResolveToShmAndAskForSoftwareCompositors() {
-        val virgl = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_VIRGL,
-            qtQuickBackend = ProfileStore.GRAPHICS_AUTO,
+        val virgl = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_VIRGL,
+            qtQuickBackend = ProfileService.GRAPHICS_AUTO,
         )
-        assertEquals(ProfileStore.BUFFER_SHM, virgl.resolvedBuffer)
+        assertEquals(ProfileService.BUFFER_SHM, virgl.resolvedBuffer)
         assertTrue(virgl.environment().contains("KWIN_COMPOSE=Q"))
         assertTrue(virgl.environment().contains("WLR_RENDERER=pixman"))
         assertTrue(virgl.environment().contains("TRIERARCH_BUFFER=shm"))
         assertTrue(virgl.environment().contains("TRIERARCH_RENDERER=virgl"))
 
-        val venus = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_VENUS,
-            qtQuickBackend = ProfileStore.GRAPHICS_AUTO,
+        val venus = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_VENUS,
+            qtQuickBackend = ProfileService.GRAPHICS_AUTO,
         )
-        assertEquals(ProfileStore.BUFFER_SHM, venus.resolvedBuffer)
+        assertEquals(ProfileService.BUFFER_SHM, venus.resolvedBuffer)
     }
 
     @Test
     fun deviceBackedRenderersKeepDmabufUnlessOverridden() {
-        val auto = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_LLVMPIPE,
-            qtQuickBackend = ProfileStore.QT_QUICK_SOFTWARE,
+        val auto = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_LLVMPIPE,
+            qtQuickBackend = ProfileService.QT_QUICK_SOFTWARE,
         )
-        assertEquals(ProfileStore.BUFFER_DMABUF, auto.resolvedBuffer)
+        assertEquals(ProfileService.BUFFER_DMABUF, auto.resolvedBuffer)
         assertFalse(auto.environment().contains("KWIN_COMPOSE=Q"))
 
-        val shm = ProfileStore.GraphicsProfile(
-            renderer = ProfileStore.GRAPHICS_LLVMPIPE,
-            qtQuickBackend = ProfileStore.QT_QUICK_SOFTWARE,
-            buffer = ProfileStore.BUFFER_SHM,
+        val shm = ProfileService.GraphicsProfile(
+            renderer = ProfileService.GRAPHICS_LLVMPIPE,
+            qtQuickBackend = ProfileService.QT_QUICK_SOFTWARE,
+            buffer = ProfileService.BUFFER_SHM,
         )
-        assertEquals(ProfileStore.BUFFER_SHM, shm.resolvedBuffer)
+        assertEquals(ProfileService.BUFFER_SHM, shm.resolvedBuffer)
         assertTrue(shm.environment().contains("KWIN_COMPOSE=Q"))
         assertTrue(shm.environment().contains("WLR_RENDERER=pixman"))
     }

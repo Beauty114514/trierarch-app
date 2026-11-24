@@ -20,15 +20,17 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import app.trierarch.config.ProfileDocument
-import app.trierarch.config.ProfileStore
+import app.trierarch.core.Command
+import app.trierarch.core.CommandOutcome
+import app.trierarch.core.Core
+import app.trierarch.core.ProfileDocument
+import app.trierarch.core.ProfileService
+import app.trierarch.core.SessionPhase
+import app.trierarch.core.SessionService
+import app.trierarch.core.SessionSnapshot
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
-import app.trierarch.runtime.RuntimeCommand
 import app.trierarch.runtime.RuntimeControlServer
-import app.trierarch.runtime.RuntimeController
-import app.trierarch.runtime.SessionPhase
-import app.trierarch.runtime.SessionSnapshot
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
 import app.trierarch.ui.FloatingActionMenuView
@@ -41,7 +43,7 @@ import com.termux.view.TerminalView
 /** The first Trierarch profile: a shell using the app's private files directory as its home. */
 class MainActivity : AppCompatActivity() {
     private val terminalViewModel: DefaultTerminalViewModel by viewModels()
-    private lateinit var runtimeController: RuntimeController
+    private lateinit var core: Core
     private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
     private lateinit var terminalContainer: FrameLayout
@@ -55,7 +57,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var guiRows: LinearLayout
     private lateinit var guiCountLabel: TextView
     private lateinit var guiErrorLabel: TextView
-    private val profileStore by lazy { ProfileStore(this) }
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
@@ -106,24 +107,26 @@ class MainActivity : AppCompatActivity() {
             )
         }
         keyboardPanel = KeyboardPanelController(terminalContainer)
-        runtimeController = RuntimeController(
-            context = this,
-            terminal = terminalViewModel,
-            displayHost = object : RuntimeController.DisplayHost {
-                override fun attachTerminal() = attachTerminalSession()
-                override fun showInternalTerminal() = showTerminal(DisplaySurface.INTERNAL_SHELL)
-                override fun showRuntimeTerminal() = showTerminal(DisplaySurface.RUNTIME_SHELL)
-                override fun showWayland() = showWaylandSurface()
-                override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
-                    showX11Display(onReady, onFailure)
-                override fun showGui() = openGui()
-                override fun showSession(id: String, display: String) = openSession(id, display)
-                override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
-            },
+        val profiles = ProfileService(this)
+        core = Core(
+            profiles = profiles,
+            sessionService = SessionService(
+                profiles = profiles,
+                terminal = terminalViewModel,
+                displayHost = object : SessionService.DisplayHost {
+                    override fun attachTerminal() = attachTerminalSession()
+                    override fun showInternalTerminal() = showTerminal(DisplaySurface.INTERNAL_SHELL)
+                    override fun showRuntimeTerminal() = showTerminal(DisplaySurface.RUNTIME_SHELL)
+                    override fun showWayland() = showWaylandSurface()
+                    override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
+                        showX11Display(onReady, onFailure)
+                    override fun showGui() = openGui()
+                    override fun showSession(id: String, display: String) = openSession(id, display)
+                    override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
+                },
+            ),
         )
-        runtimeControlServer = RuntimeControlServer(this) { command, completion ->
-            runOnUiThread { runtimeController.dispatch(command, completion) }
-        }
+        runtimeControlServer = RuntimeControlServer(this, core)
         floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
@@ -255,7 +258,7 @@ class MainActivity : AppCompatActivity() {
     private fun openSession(id: String, display: String) {
         if (!terminalViewModel.showRuntime(id)) return
         when (display) {
-            ProfileStore.DISPLAY_X11 -> showX11Display(
+            ProfileService.DISPLAY_X11 -> showX11Display(
                 onReady = { attachTerminalSession() },
                 onFailure = { message ->
                     Toast.makeText(this, "Unable to show X11: $message", Toast.LENGTH_LONG).show()
@@ -264,7 +267,7 @@ class MainActivity : AppCompatActivity() {
                     attachTerminalSession()
                 },
             )
-            ProfileStore.DISPLAY_WAYLAND -> {
+            ProfileService.DISPLAY_WAYLAND -> {
                 showWaylandSurface()
                 attachTerminalSession()
             }
@@ -408,8 +411,8 @@ class MainActivity : AppCompatActivity() {
      * Nothing is cached: the CLI can change both at any moment.
      */
     private fun refreshGui() {
-        val documents = profileStore.listDocuments()
-        val snapshot = runtimeController.snapshot()
+        val documents = core.documents()
+        val snapshot = core.sessions()
         val busy = snapshot.pending != null
         guiCountLabel.text = "ENVIRONMENTS · ${documents.size}"
         guiRows.removeAllViews()
@@ -443,7 +446,7 @@ class MainActivity : AppCompatActivity() {
             typeface = android.graphics.Typeface.MONOSPACE
         })
         if (document.error == null) {
-            val display = if (document.display == ProfileStore.DISPLAY_NONE) {
+            val display = if (document.display == ProfileService.DISPLAY_NONE) {
                 "terminal"
             } else {
                 document.display
@@ -521,14 +524,14 @@ class MainActivity : AppCompatActivity() {
         }
         when (phase) {
             SessionPhase.STOPPED -> actions.addView(
-                primaryAction("Start", busy) { dispatchFromGui(RuntimeCommand.Run(document.id)) },
+                primaryAction("Start", busy) { dispatchFromGui(Command.Run(document.id)) },
             )
             SessionPhase.RUNNING -> {
                 actions.addView(
-                    primaryAction("Open", busy) { dispatchFromGui(RuntimeCommand.OpenSession(document.id)) },
+                    primaryAction("Open", busy) { dispatchFromGui(Command.Open(document.id)) },
                 )
                 actions.addView(
-                    secondaryAction("Stop", busy) { dispatchFromGui(RuntimeCommand.Stop(document.id)) },
+                    secondaryAction("Stop", busy) { dispatchFromGui(Command.Stop(document.id)) },
                 )
             }
             SessionPhase.STARTING, SessionPhase.STOPPING -> actions.addView(
@@ -560,25 +563,26 @@ class MainActivity : AppCompatActivity() {
         }
 
     /**
-     * Runs a GUI action through the same controller path as the CLI. A runtime
-     * start carries its launch in the result's afterReply callback, which the
-     * control socket normally invokes after the client acknowledges; the GUI
-     * has no socket, so it invokes that callback itself.
+     * Runs a GUI action through the same core path as the CLI. A runtime start
+     * carries its launch in the outcome's afterReply callback, which the control
+     * socket normally invokes after the client acknowledges; the GUI has no
+     * socket, so it invokes that callback itself.
      */
-    private fun dispatchFromGui(command: RuntimeCommand) {
+    private fun dispatchFromGui(command: Command) {
         hideGuiError()
-        runtimeController.dispatch(command) { result ->
-            if (!result.success) {
-                showGuiError(result.message)
-                return@dispatch
-            }
-            if (command is RuntimeCommand.Run || command is RuntimeCommand.OpenSession) {
-                // Follow the session and let its display host own focus.
-                hideGuiLayer()
-                result.afterReply?.invoke()
-            } else {
-                result.afterReply?.invoke()
-                refreshGui()
+        core.submit(command) { outcome ->
+            when (outcome) {
+                is CommandOutcome.Failure -> showGuiError(outcome.error.message)
+                is CommandOutcome.Success -> {
+                    if (command is Command.Run || command is Command.Open) {
+                        // Follow the session and let its display host own focus.
+                        hideGuiLayer()
+                    }
+                    outcome.afterReply?.invoke()
+                    if (command !is Command.Run && command !is Command.Open) {
+                        refreshGui()
+                    }
+                }
             }
         }
     }

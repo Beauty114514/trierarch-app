@@ -1,5 +1,6 @@
 package app.trierarch.runtime
 
+import app.trierarch.core.Command
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -9,12 +10,15 @@ class ControlProtocolTest {
 
     @Test
     fun parsesGuiOpen() {
-        assertEquals(RuntimeCommand.OpenGui, ControlProtocol.parse(token, "$token\tgui.open"))
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.OpenGui),
+            ControlProtocol.parse(token, "$token\tgui.open"),
+        )
     }
 
     @Test
     fun rejectsGuiOpenWithArguments() {
-        assertNull(ControlProtocol.parse(token, "$token\tgui.open\tarch-plasma"))
+        assertNull(ControlProtocol.parse(token, "$token\tgui.open\tarch"))
     }
 
     @Test
@@ -24,13 +28,29 @@ class ControlProtocolTest {
     }
 
     @Test
-    fun keepsTheExistingCommands() {
-        assertEquals(RuntimeCommand.Status(null), ControlProtocol.parse(token, "$token\tstatus"))
-        assertEquals(RuntimeCommand.Status("a"), ControlProtocol.parse(token, "$token\tstatus\ta"))
-        assertEquals(RuntimeCommand.Run("a"), ControlProtocol.parse(token, "$token\trun\ta"))
-        assertEquals(RuntimeCommand.Stop(null), ControlProtocol.parse(token, "$token\tstop"))
-        assertEquals(RuntimeCommand.Stop("a"), ControlProtocol.parse(token, "$token\tstop\ta"))
-        assertEquals(RuntimeCommand.OpenSession("a"), ControlProtocol.parse(token, "$token\topen\ta"))
+    fun parsesStatusAsAQuery() {
+        assertEquals(ControlProtocol.Request.Status(null), ControlProtocol.parse(token, "$token\tstatus"))
+        assertEquals(ControlProtocol.Request.Status("a"), ControlProtocol.parse(token, "$token\tstatus\ta"))
+    }
+
+    @Test
+    fun parsesSessionCommands() {
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Run("a")),
+            ControlProtocol.parse(token, "$token\trun\ta"),
+        )
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Open("a")),
+            ControlProtocol.parse(token, "$token\topen\ta"),
+        )
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Stop(null)),
+            ControlProtocol.parse(token, "$token\tstop"),
+        )
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Stop("a")),
+            ControlProtocol.parse(token, "$token\tstop\ta"),
+        )
     }
 
     @Test

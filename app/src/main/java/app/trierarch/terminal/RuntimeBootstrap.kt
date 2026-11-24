@@ -1,6 +1,6 @@
 package app.trierarch.terminal
 
-import app.trierarch.config.ProfileStore
+import app.trierarch.core.ProfileService
 
 /**
  * Host-side services whose lifetime is shared by every runtime session.
@@ -57,14 +57,14 @@ class RuntimeBootstrap(
 ) {
     internal fun prepareHosts(spec: RuntimeLaunchSpec): RuntimeResources {
         val virglRuntimeDirectory = if (usesVtestTransport(spec.renderer)) {
-            hosts.startVirgl(spec.renderer == ProfileStore.GRAPHICS_VENUS)
+            hosts.startVirgl(spec.renderer == ProfileService.GRAPHICS_VENUS)
         } else {
             ""
         }
-        if (spec.display == ProfileStore.DISPLAY_WAYLAND) {
+        if (spec.display == ProfileService.DISPLAY_WAYLAND) {
             hosts.startWayland(spec.bufferMode, spec.desktopScalePercent)
         }
-        val pipewireRuntimeDirectory = if (spec.audioBackend == ProfileStore.AUDIO_PIPEWIRE) {
+        val pipewireRuntimeDirectory = if (spec.audioBackend == ProfileService.AUDIO_PIPEWIRE) {
             hosts.startPipeWire()
         } else {
             ""
@@ -72,8 +72,8 @@ class RuntimeBootstrap(
         val waylandRuntime = paths.waylandRuntimeDirectory(spec.display)
         if (spec.installGbmShim &&
             waylandRuntime != null &&
-            spec.renderer == ProfileStore.GRAPHICS_VIRGL &&
-            spec.bufferMode == ProfileStore.BUFFER_DMABUF
+            spec.renderer == ProfileService.GRAPHICS_VIRGL &&
+            spec.bufferMode == ProfileService.BUFFER_DMABUF
         ) {
             hosts.installGbmShim(waylandRuntime)
         }
@@ -100,5 +100,5 @@ class RuntimeBootstrap(
     internal fun stopPipeWire() = hosts.stopPipeWire()
 
     private fun usesVtestTransport(renderer: String): Boolean =
-        renderer == ProfileStore.GRAPHICS_VIRGL || renderer == ProfileStore.GRAPHICS_VENUS
+        renderer == ProfileService.GRAPHICS_VIRGL || renderer == ProfileService.GRAPHICS_VENUS
 }

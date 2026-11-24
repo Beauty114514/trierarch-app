@@ -1,4 +1,4 @@
-package app.trierarch.config
+package app.trierarch.core
 
 import android.content.ContextWrapper
 import java.io.File
@@ -18,14 +18,14 @@ class ProotAudioProfileTest {
         val store = profileStore()
 
         assertEquals("proot-audio", store.validate(profile))
-        assertEquals(ProfileStore.AUDIO_PIPEWIRE, store.prootProfile(profile).audioBackend)
+        assertEquals(ProfileService.AUDIO_PIPEWIRE, store.prootProfile(profile).audioBackend)
     }
 
     @Test
     fun audioRemainsDisabledByDefaultForProotProfiles() {
         val profile = profile(rootfs())
 
-        assertEquals(ProfileStore.AUDIO_OFF, profileStore().prootProfile(profile).audioBackend)
+        assertEquals(ProfileService.AUDIO_OFF, profileStore().prootProfile(profile).audioBackend)
     }
 
     private fun rootfs(): File = temporaryFolder.newFolder("rootfs").apply {
@@ -43,11 +43,11 @@ class ProotAudioProfileTest {
         $audio
     """.trimIndent()
 
-    private fun profileStore(): ProfileStore {
+    private fun profileStore(): ProfileService {
         val files = temporaryFolder.newFolder("files")
         val context = object : ContextWrapper(null) {
             override fun getFilesDir(): File = files
         }
-        return ProfileStore(context)
+        return ProfileService(context)
     }
 }

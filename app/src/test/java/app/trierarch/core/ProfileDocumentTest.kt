@@ -1,4 +1,4 @@
-package app.trierarch.config
+package app.trierarch.core
 
 import java.io.File
 import org.junit.After
@@ -42,11 +42,11 @@ class ProfileDocumentTest {
         )
         write("a-terminal.toml", "id = \"a-terminal\"\nruntime = \"internal-shell\"\n")
 
-        val documents = ProfileStore(directory).listDocuments()
+        val documents = ProfileService(directory).listDocuments()
 
         assertEquals(listOf("a-terminal", "b-wayland"), documents.map { it.id })
         assertEquals("internal-shell", documents[0].runtime)
-        assertEquals(ProfileStore.DISPLAY_NONE, documents[0].display)
+        assertEquals(ProfileService.DISPLAY_NONE, documents[0].display)
         assertNull(documents[0].renderer)
         assertNull(documents[0].error)
         assertEquals("proot", documents[1].runtime)
@@ -59,7 +59,7 @@ class ProfileDocumentTest {
     fun reportsValidationErrorsWithoutThrowing() {
         write("broken.toml", "runtime = \"proot\"\n")
 
-        val document = ProfileStore(directory).listDocuments().single()
+        val document = ProfileService(directory).listDocuments().single()
 
         assertEquals("broken", document.id)
         assertNotNull(document.error)
@@ -68,7 +68,7 @@ class ProfileDocumentTest {
 
     @Test
     fun anEmptyDirectoryProducesNoDocuments() {
-        assertTrue(ProfileStore(directory).listDocuments().isEmpty())
+        assertTrue(ProfileService(directory).listDocuments().isEmpty())
     }
 
     private fun write(name: String, text: String) {

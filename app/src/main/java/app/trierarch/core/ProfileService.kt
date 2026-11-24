@@ -1,4 +1,4 @@
-package app.trierarch.config
+package app.trierarch.core
 
 import android.content.Context
 import org.tomlj.Toml
@@ -6,7 +6,7 @@ import org.tomlj.TomlParseResult
 import java.io.File
 
 /** Direct filesystem access for profile documents; no index or database exists. */
-class ProfileStore internal constructor(private val directory: File) {
+class ProfileService internal constructor(private val directory: File) {
     constructor(context: Context) : this(File(context.filesDir, "config/profiles"))
 
     fun list(): List<File> = directory

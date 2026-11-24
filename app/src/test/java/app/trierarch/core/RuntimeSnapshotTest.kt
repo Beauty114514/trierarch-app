@@ -1,4 +1,4 @@
-package app.trierarch.runtime
+package app.trierarch.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
