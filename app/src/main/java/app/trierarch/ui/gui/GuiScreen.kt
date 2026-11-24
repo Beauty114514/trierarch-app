@@ -515,10 +515,34 @@ class GuiScreen(
                         setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                         setPadding(0, dp(2), 0, 0)
                     })
+                    box.addView(textAction("Delete", errorText) {
+                        confirmRemoveComponent(component)
+                    })
                 }
             }
         }
         return box
+    }
+
+    private fun confirmRemoveComponent(component: ComponentRelease) {
+        MaterialAlertDialogBuilder(context)
+            .setTitle("Delete ${component.name}?")
+            .setMessage(
+                "Removes files/components/${component.file}. " +
+                    "A copy already placed in a rootfs is not touched.",
+            )
+            .setPositiveButton("Delete") { _, _ ->
+                val removed = componentStore.remove(component.id)
+                if (removed == null) {
+                    showError("nothing to delete for ${component.id}")
+                    return@setPositiveButton
+                }
+                Toast.makeText(context, "Deleted ${removed.file}", Toast.LENGTH_SHORT).show()
+                refreshComponentStatuses()
+                if (screen is Screen.Updates) render()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun downloadComponent(component: ComponentRelease) {

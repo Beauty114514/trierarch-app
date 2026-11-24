@@ -15,7 +15,35 @@ data class DownloadedComponent(
  * what was downloaded. It deliberately does not touch a rootfs.
  */
 class ComponentStore(private val directory: File) {
-    fun downloaded(): Map<String, DownloadedComponent> {
+    @Synchronized
+    fun downloaded(): Map<String, DownloadedComponent> =
+        readEntries().filterValues { entry -> File(directory, entry.file).isFile }
+
+    @Synchronized
+    fun record(
+        id: String,
+        file: String,
+        sha256: String,
+        downloadedAt: Long = System.currentTimeMillis(),
+    ) {
+        val entries = downloaded().toMutableMap()
+        entries[id] = DownloadedComponent(id, file, sha256, downloadedAt)
+        write(entries)
+    }
+
+    /** Deletes both the downloaded file and its index entry; rootfs copies are untouched. */
+    @Synchronized
+    fun remove(id: String): DownloadedComponent? {
+        val entries = readEntries().toMutableMap()
+        val removed = entries.remove(id) ?: return null
+        File(directory, removed.file).delete()
+        write(entries)
+        return removed
+    }
+
+    fun file(name: String): File = File(directory, name)
+
+    private fun readEntries(): Map<String, DownloadedComponent> {
         val index = File(directory, INDEX)
         if (!index.isFile) return emptyMap()
         return runCatching {
@@ -33,18 +61,11 @@ class ComponentStore(private val directory: File) {
                     sha256 = sha256,
                     downloadedAt = entry.getLong("downloadedAt") ?: 0L,
                 )
-            }.filter { (_, entry) -> File(directory, entry.file).isFile }.toMap()
+            }.toMap()
         }.getOrDefault(emptyMap())
     }
 
-    fun record(
-        id: String,
-        file: String,
-        sha256: String,
-        downloadedAt: Long = System.currentTimeMillis(),
-    ) {
-        val entries = downloaded().toMutableMap()
-        entries[id] = DownloadedComponent(id, file, sha256, downloadedAt)
+    private fun write(entries: Map<String, DownloadedComponent>) {
         check(directory.isDirectory || directory.mkdirs()) {
             "cannot create ${directory.absolutePath}"
         }
@@ -61,8 +82,6 @@ class ComponentStore(private val directory: File) {
         }
         File(directory, INDEX).writeText(text)
     }
-
-    fun file(name: String): File = File(directory, name)
 
     private fun tomlString(value: String): String =
         "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""

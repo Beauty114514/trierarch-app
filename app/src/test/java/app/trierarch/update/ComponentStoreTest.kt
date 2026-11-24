@@ -45,6 +45,35 @@ class ComponentStoreTest {
     }
 
     @Test
+    fun removeDeletesTheFileAndItsEntry() {
+        val store = store()
+        val file = store.file("kwin.tar.zst").apply { writeText("component") }
+        store.record("kwin-compat", "kwin.tar.zst", sha)
+
+        val removed = store.remove("kwin-compat")
+
+        assertEquals("kwin.tar.zst", removed?.file)
+        assertTrue(!file.exists())
+        assertTrue(store.downloaded().isEmpty())
+    }
+
+    @Test
+    fun removeUnknownReturnsNull() {
+        assertNull(store().remove("missing"))
+    }
+
+    @Test
+    fun removeAlsoDropsAnEntryWhoseFileIsGone() {
+        val store = store()
+        val file = store.file("kwin.tar.zst").apply { writeText("component") }
+        store.record("kwin-compat", "kwin.tar.zst", sha)
+        file.delete()
+
+        assertEquals("kwin.tar.zst", store.remove("kwin-compat")?.file)
+        assertTrue(store.downloaded().isEmpty())
+    }
+
+    @Test
     fun aMissingOrCorruptIndexIsEmpty() {
         val store = store()
         assertTrue(store.downloaded().isEmpty())
