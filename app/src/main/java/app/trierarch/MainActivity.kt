@@ -104,7 +104,10 @@ class MainActivity : AppCompatActivity() {
                 terminal = terminalViewModel,
                 displayHost = object : SessionService.DisplayHost {
                     override fun attachTerminal() = attachTerminalSession()
-                    override fun showInternalTerminal() = showTerminal(DisplaySurface.INTERNAL_SHELL)
+                    override fun showInternalTerminal() {
+                        attachTerminalSession()
+                        showTerminal(DisplaySurface.INTERNAL_SHELL)
+                    }
                     override fun showRuntimeTerminal() = showTerminal(DisplaySurface.RUNTIME_SHELL)
                     override fun showWayland() = showWaylandSurface()
                     override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =

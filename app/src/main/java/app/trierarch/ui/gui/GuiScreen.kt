@@ -65,7 +65,11 @@ class GuiScreen(
     private var imeInset = 0
 
     private val listener: (CoreEvent) -> Unit = { event ->
-        if (event == CoreEvent.DocumentsChanged && screen !is Screen.Editor) render()
+        if (screen !is Screen.Editor &&
+            (event == CoreEvent.DocumentsChanged || event == CoreEvent.SessionsChanged)
+        ) {
+            render()
+        }
     }
 
     init {
@@ -483,7 +487,6 @@ class GuiScreen(
                     }
                     outcome.afterReply?.invoke()
                     afterSuccess?.invoke()
-                    if (command is Command.Session.Stop) render()
                 }
             }
         }

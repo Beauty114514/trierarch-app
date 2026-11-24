@@ -10,8 +10,12 @@ class SessionService(
     private val displayHost: DisplayHost,
 ) {
     private var pending: Pending? = null
-    private val sourcesByProfile = mutableMapOf<String, LaunchSource>()
-    private val sourcesStartedByTrierarch = mutableSetOf<String>()
+    private val sessions = LinkedHashMap<String, ManagedSession>()
+    private var onSessionsChanged: (() -> Unit)? = null
+
+    init {
+        terminal.setRuntimeExitListener(::handleRuntimeExit)
+    }
 
     interface DisplayHost {
         fun attachTerminal()
@@ -22,6 +26,10 @@ class SessionService(
         fun showGui()
         fun showSession(id: String, display: String)
         fun runOnMain(action: () -> Unit)
+    }
+
+    fun setSessionsChangedListener(listener: (() -> Unit)?) {
+        onSessionsChanged = listener
     }
 
     fun dispatch(command: Command.Session, completion: (CommandOutcome) -> Unit) {
@@ -77,84 +85,119 @@ class SessionService(
     }
 
     private fun statusLine(id: String): String {
-        val source = sourcesByProfile[id] ?: loadProfileSilently(id)?.source
+        val source = sessions[id]?.source ?: loadProfileSilently(id)?.source
         val sourceState = source?.state()?.let { " source=$it" }.orEmpty()
         return "$id\t${stateOf(id)}$sourceState"
     }
 
     private fun start(id: String, completion: (CommandOutcome) -> Unit) {
+        // A pending action owns the lifecycle; report that before any conflict.
+        if (pending != null) {
+            completion(CommandOutcome.Failure(CommandError.Busy(pending?.id)))
+            return
+        }
         if (terminal.isProfileRunning(id)) {
             completion(CommandOutcome.Failure(CommandError.AlreadyRunning(id)))
             return
         }
-        if (pending != null) {
-            completion(CommandOutcome.Failure(CommandError.Busy(pending?.id)))
+        val profile = loadProfile(id, completion) ?: return
+        // The internal-shell profile is the app's own management shell, not a
+        // runtime: showing it must not stop whatever is already running.
+        if (profile.runtime == ProfileService.RUNTIME_INTERNAL_SHELL) {
+            completion(
+                CommandOutcome.Success("starting $id") {
+                    displayHost.runOnMain {
+                        terminal.showInternalShell()
+                        displayHost.showInternalTerminal()
+                    }
+                },
+            )
             return
         }
-        val profile = loadProfile(id, completion) ?: return
+
+        // One container/rootfs can back at most one session, in any display mode.
+        val slots = sessions.values.map { SessionSlot(it.profileId, it.display, it.source.key) }
+        findSourceConflict(slots, id, profile.source.key)?.let { other ->
+            completion(
+                CommandOutcome.Failure(
+                    CommandError.SourceBusy(profile.source.label(), other.profileId),
+                ),
+            )
+            return
+        }
         // X11 and Wayland are single hosts; a second session would show the
         // first one on screen, so refuse instead of lying about what is shown.
-        val conflict = findDisplayConflict(terminal.runningDisplays(), id, profile.display)
-        if (conflict != null) {
-            completion(CommandOutcome.Failure(CommandError.DisplayBusy(profile.display, conflict)))
+        findDisplayConflict(slots, id, profile.display)?.let { other ->
+            completion(
+                CommandOutcome.Failure(CommandError.DisplayBusy(profile.display, other.profileId)),
+            )
             return
         }
-        val sourceWasRunning = sourceWasRunning(profile.source, completion) ?: return
-        scheduleStart(id, profile, sourceWasRunning, "starting", completion)
+        scheduleStart(id, profile, "starting", completion)
     }
 
     private fun stop(id: String?, completion: (CommandOutcome) -> Unit) {
-        val running = terminal.runningProfileIds()
-        val target = id ?: terminal.activeProfileId() ?: running.singleOrNull()
-        if (target == null) {
-            val error = if (running.isEmpty()) {
-                CommandError.NoSession
-            } else {
-                CommandError.Ambiguous(running.toList())
-            }
-            completion(CommandOutcome.Failure(error))
-            return
-        }
-        if (!terminal.isProfileRunning(target)) {
-            completion(CommandOutcome.Failure(CommandError.NotRunning(target)))
-            return
-        }
+        // A pending launch/stop owns the lifecycle; do not report "stopped"
+        // for a session that is still starting behind it.
         if (pending != null) {
             completion(CommandOutcome.Failure(CommandError.Busy(pending?.id)))
+            return
+        }
+        val running = terminal.runningProfileIds()
+        if (id == null && running.size > 1) {
+            completion(CommandOutcome.Failure(CommandError.Ambiguous(running.toList())))
+            return
+        }
+        val target = id ?: running.singleOrNull()
+        if (target == null || !terminal.isProfileRunning(target)) {
+            // Stop is idempotent: nothing to do is a successful outcome.
+            completion(CommandOutcome.Success("already stopped"))
             return
         }
         pending = Pending(target, STATE_STOPPING)
         completion(CommandOutcome.Success("stopping $target") {
-            displayHost.runOnMain {
-                val source = sourcesByProfile.remove(target) ?: loadProfileSilently(target)?.source
-                // Only fall back to the shell when the stopped session owned the
-                // display; stopping a background session must not yank the
-                // currently shown desktop away.
-                val wasDisplayed = terminal.activeProfileId() == target
-                terminal.stopRuntime(target)
-                source?.let(::stopSourceIfUnused)
-                if (wasDisplayed) displayHost.showInternalTerminal()
-                pending = null
-            }
+            displayHost.runOnMain { teardown(target) }
         })
+    }
+
+    /**
+     * Ends one session and the whole environment behind it: the PTY, the
+     * display host if it was showing it, and the container (whether Trierarch
+     * started the container or merely attached to it).
+     */
+    private fun teardown(id: String) {
+        val wasDisplayed = terminal.activeProfileId() == id
+        val session = sessions.remove(id)
+        terminal.stopRuntime(id)
+        session?.let { stopSource(it.source) }
+        if (wasDisplayed) displayHost.showInternalTerminal()
+        pending = null
+        notifySessionsChanged()
+    }
+
+    /** A guest process exited on its own; reuse the stop path's cleanup. */
+    private fun handleRuntimeExit(id: String, wasDisplayed: Boolean) {
+        val session = sessions.remove(id)
+        session?.let { stopSource(it.source) }
+        if (pending?.id == id) pending = null
+        if (wasDisplayed) displayHost.showInternalTerminal()
+        notifySessionsChanged()
     }
 
     private fun scheduleStart(
         id: String,
         profile: LoadedProfile,
-        sourceWasRunning: Boolean,
         state: String,
         completion: (CommandOutcome) -> Unit,
     ) {
         pending = Pending(id, state)
         completion(CommandOutcome.Success("$state $id") {
-            displayHost.runOnMain { launch(id, profile, sourceWasRunning) }
+            displayHost.runOnMain { launch(id, profile) }
         })
     }
 
-    private fun launch(id: String, profile: LoadedProfile, sourceWasRunning: Boolean) {
+    private fun launch(id: String, profile: LoadedProfile) {
         val action = when (profile.runtime) {
-            ProfileService.RUNTIME_INTERNAL_SHELL -> Result.success { terminal.restartInternalShell() }
             ProfileService.RUNTIME_PROOT -> runCatching { profiles.prootProfile(profile.content) }
                 .map { typed -> { terminal.restartProot(typed) } }
             ProfileService.RUNTIME_CHROOT -> runCatching { profiles.chrootProfile(profile.content) }
@@ -168,12 +211,10 @@ class SessionService(
         }.onSuccess { start ->
             val started = {
                 start()
-                sourcesByProfile[id] = profile.source
-                if (!sourceWasRunning && profile.source is LaunchSource.Droidspaces) {
-                    sourcesStartedByTrierarch += profile.source.key
-                }
+                sessions[id] = ManagedSession(id, profile.display, profile.source)
                 pending = null
                 displayHost.attachTerminal()
+                notifySessionsChanged()
             }
             if (profile.display == ProfileService.DISPLAY_X11) {
                 displayHost.showX11(
@@ -188,45 +229,24 @@ class SessionService(
             } else {
                 runCatching {
                     started()
-                    if (profile.runtime == ProfileService.RUNTIME_INTERNAL_SHELL) {
-                        displayHost.showInternalTerminal()
-                    } else {
-                        displayHost.showRuntimeTerminal()
-                    }
+                    displayHost.showRuntimeTerminal()
                 }.onFailure { launchFailed(id, it) }
             }
         }
     }
 
     private fun launchFailed(id: String, error: Throwable) {
-        sourcesByProfile.remove(id)
+        sessions.remove(id)
         pending = null
         terminal.reportRuntimeLaunchFailure(id, error)
         displayHost.showInternalTerminal()
+        notifySessionsChanged()
     }
 
-    private fun stopSourceIfUnused(source: LaunchSource) {
-        if (terminal.runningProfileIds().any { sourcesByProfile[it]?.key == source.key }) return
-        if (source is LaunchSource.Droidspaces && sourcesStartedByTrierarch.remove(source.key)) {
+    /** The session owned the source; stopping it owns tearing the container down. */
+    private fun stopSource(source: LaunchSource) {
+        if (source is LaunchSource.Droidspaces) {
             runCatching { NativePtyBridge.stopDroidspaces(source.container) }
-        }
-    }
-
-    private fun sourceWasRunning(
-        source: LaunchSource,
-        completion: (CommandOutcome) -> Unit,
-    ): Boolean? = if (source !is LaunchSource.Droidspaces) {
-        true
-    } else {
-        runCatching {
-            NativePtyBridge.isDroidspacesRunning(source.container)
-        }.getOrElse {
-            completion(
-                CommandOutcome.Failure(
-                    CommandError.Failed(it.message ?: "unable to inspect source ${source.key}"),
-                ),
-            )
-            return null
         }
     }
 
@@ -257,10 +277,20 @@ class SessionService(
     private fun stateOf(id: String): String = pending?.takeIf { it.id == id }?.state
         ?: if (terminal.isProfileRunning(id)) "running" else "stopped"
 
+    private fun notifySessionsChanged() {
+        onSessionsChanged?.invoke()
+    }
+
     private data class LoadedProfile(
         val runtime: String,
         val display: String,
         val content: String,
+        val source: LaunchSource,
+    )
+
+    private data class ManagedSession(
+        val profileId: String,
+        val display: String,
         val source: LaunchSource,
     )
 
@@ -269,22 +299,27 @@ class SessionService(
     private sealed interface LaunchSource {
         val key: String
         fun state(): String
+        fun label(): String
 
         data class Droidspaces(val container: String) : LaunchSource {
             override val key = "droidspaces:$container"
             override fun state(): String = "$key:${if (runCatching { NativePtyBridge.isDroidspacesRunning(container) }.getOrDefault(false)) "running" else "stopped"}"
+            override fun label(): String = "container '$container'"
         }
         data class Proot(val rootfs: String) : LaunchSource {
             override val key = "proot:$rootfs"
             override fun state(): String = "$key:session-scoped"
+            override fun label(): String = "rootfs '$rootfs'"
         }
         data class Chroot(val rootfs: String) : LaunchSource {
             override val key = "chroot:$rootfs"
             override fun state(): String = "$key:session-scoped"
+            override fun label(): String = "rootfs '$rootfs'"
         }
         data object Internal : LaunchSource {
             override val key = "internal"
             override fun state(): String = "internal:session-scoped"
+            override fun label(): String = "internal shell"
         }
     }
 

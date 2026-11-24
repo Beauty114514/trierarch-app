@@ -12,7 +12,7 @@ sealed interface CommandError {
 
     data class AlreadyRunning(val id: String) : CommandError {
         override val code = "already_running"
-        override val message = "profile is already running: $id"
+        override val message = "profile is already running: $id; use --open $id to show it"
     }
 
     data class Busy(val pendingId: String?) : CommandError {
@@ -44,19 +44,19 @@ sealed interface CommandError {
         override val message = "profile changed on disk: $id"
     }
 
+    data class SourceBusy(val source: String, val by: String) : CommandError {
+        override val code = "source_busy"
+        override val message = "$source is already in use by '$by'; stop '$by' first"
+    }
+
     data class DisplayBusy(val display: String, val by: String) : CommandError {
         override val code = "display_busy"
-        override val message = "another $display session is running: $by; stop it first"
+        override val message = "the $display display is already in use by '$by'; stop '$by' first"
     }
 
     data class NotRunning(val id: String, val useRunHint: Boolean = false) : CommandError {
         override val code = "not_running"
         override val message = "profile is not running: $id" + if (useRunHint) "; use --run $id" else ""
-    }
-
-    data object NoSession : CommandError {
-        override val code = "no_session"
-        override val message = "no runtime is running"
     }
 
     data class Ambiguous(val ids: List<String> = emptyList()) : CommandError {

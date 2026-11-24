@@ -85,6 +85,7 @@ class NativePtySession private constructor(
     private var sessionId = 0L
     private var closed = false
     private var onScreenChanged: (() -> Unit)? = null
+    private var onExited: (() -> Unit)? = null
     private val diagnosticsLock = Any()
     private var diagnostics: FileOutputStream? = diagnosticLog?.let(::openDiagnostics)
 
@@ -105,6 +106,11 @@ class NativePtySession private constructor(
 
     fun setScreenChangedListener(listener: (() -> Unit)?) {
         onScreenChanged = listener
+    }
+
+    /** Called after the guest process exits on its own; not called by [close]. */
+    fun setExitListener(listener: (() -> Unit)?) {
+        onExited = listener
     }
 
     /** Called by the view whenever its pixel size or font metrics change. */
@@ -157,6 +163,7 @@ class NativePtySession private constructor(
         if (id != 0L) NativePtyBridge.close(id)
         closeDiagnostics()
         onScreenChanged = null
+        onExited = null
     }
 
     override fun write(data: ByteArray, offset: Int, count: Int) {
@@ -207,6 +214,7 @@ class NativePtySession private constructor(
             closeDiagnostics()
             outputRelay.offer(message.toByteArray())
             screenChanged()
+            onExited?.invoke()
         }
     }
 

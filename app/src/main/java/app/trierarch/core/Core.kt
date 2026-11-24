@@ -13,6 +13,12 @@ class Core(
 ) {
     private val listeners = CopyOnWriteArrayList<(CoreEvent) -> Unit>()
 
+    init {
+        sessionService.setSessionsChangedListener {
+            notify(CoreEvent.SessionsChanged)
+        }
+    }
+
     fun addListener(listener: (CoreEvent) -> Unit) {
         listeners += listener
     }
@@ -35,12 +41,14 @@ class Core(
             is Command.Document -> {
                 val outcome = apply(command)
                 onDone(outcome)
-                if (outcome is CommandOutcome.Success) {
-                    listeners.forEach { listener ->
-                        runCatching { listener(CoreEvent.DocumentsChanged) }
-                    }
-                }
+                if (outcome is CommandOutcome.Success) notify(CoreEvent.DocumentsChanged)
             }
+        }
+    }
+
+    private fun notify(event: CoreEvent) {
+        listeners.forEach { listener ->
+            runCatching { listener(event) }
         }
     }
 

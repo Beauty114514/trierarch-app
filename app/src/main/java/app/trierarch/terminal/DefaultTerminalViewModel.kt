@@ -1,6 +1,8 @@
 package app.trierarch.terminal
 
 import android.app.Application
+import android.os.Handler
+import android.os.Looper
 import androidx.lifecycle.AndroidViewModel
 import app.trierarch.core.ProfileService
 import app.trierarch.runtime.InternalShellLaunchSpec
@@ -19,14 +21,16 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
     private var internalSession: NativePtySession = createInternalShell()
     private val runtimeSessions = linkedMapOf<String, RuntimeSession>()
     private var displayedProfileId: String? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private var onRuntimeExited: ((String, Boolean) -> Unit)? = null
 
     /** The PTY currently displayed by the terminal surface. */
     var session: NativePtySession = internalSession
         private set
 
-    fun restartInternalShell() {
-        stopRuntime()
-        session = usableInternalSession()
+    /** Called on the main thread after a guest exits and its resources are released. */
+    fun setRuntimeExitListener(listener: ((String, Boolean) -> Unit)?) {
+        onRuntimeExited = listener
     }
 
     /** Shows the persistent management shell without stopping a profile runtime. */
@@ -156,10 +160,12 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
     fun stopRuntime(id: String? = null) {
         if (id == null) {
             runtimeSessions.keys.toList().forEach(::closeRuntime)
-        } else {
-            closeRuntime(id)
+            session = usableInternalSession()
+            return
         }
-        session = usableInternalSession()
+        val wasDisplayed = displayedProfileId == id
+        closeRuntime(id)
+        if (wasDisplayed) session = usableInternalSession()
     }
 
     override fun onCleared() {
@@ -184,8 +190,14 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
     }
 
     private fun closeRuntime(id: String) {
-        runtimeSessions.remove(id)?.session?.close()
+        val runtime = runtimeSessions.remove(id) ?: return
+        runtime.session.setExitListener(null)
+        runtime.session.close()
         if (displayedProfileId == id) displayedProfileId = null
+        stopUnusedHosts()
+    }
+
+    private fun stopUnusedHosts() {
         if (runtimeSessions.values.none { it.display == ProfileService.DISPLAY_WAYLAND }) {
             runtimeBootstrap.stopWayland()
         }
@@ -197,15 +209,33 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
         }
     }
 
+    private fun handleRuntimeExit(id: String, exited: NativePtySession) {
+        mainHandler.post {
+            val runtime = runtimeSessions[id] ?: return@post
+            if (runtime.session !== exited) return@post
+            val wasDisplayed = displayedProfileId == id
+            runtimeSessions.remove(id)
+            exited.setExitListener(null)
+            exited.close()
+            if (displayedProfileId == id) displayedProfileId = null
+            stopUnusedHosts()
+            if (wasDisplayed) {
+                session = usableInternalSession()
+                session.appendStatus("\r\n[Trierarch session '$id' exited]\r\n")
+            }
+            onRuntimeExited?.invoke(id, wasDisplayed)
+        }
+    }
+
     private fun launchRuntime(
         spec: RuntimeLaunchSpec,
         createSession: (RuntimeResources) -> NativePtySession,
     ) {
-        closeRuntime(spec.profileId)
         val resources = runtimeBootstrap.prepareHosts(spec)
         val next = try {
             val sessionResources = runtimeBootstrap.finishResources(spec, resources)
             createSession(sessionResources).also { session ->
+                session.setExitListener { handleRuntimeExit(spec.profileId, session) }
                 if (spec.display == ProfileService.DISPLAY_X11 ||
                     spec.display == ProfileService.DISPLAY_WAYLAND
                 ) {
