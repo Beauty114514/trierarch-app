@@ -74,6 +74,9 @@ class SessionService(
         )
     }
 
+    /** The tail of the last session transcript for [id], or null when none exists. */
+    fun logs(id: String, lines: Int): String? = terminal.readSessionLog(id, lines)
+
     /** The CLI's text view of the session table; also a query for the adapter. */
     fun status(id: String?): CommandOutcome {
         if (id != null && loadProfileSilently(id) == null) {

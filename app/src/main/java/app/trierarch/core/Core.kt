@@ -33,6 +33,8 @@ class Core(
 
     fun sessions(): RuntimeSnapshot = sessionService.snapshot()
 
+    fun logs(id: String, lines: Int): String? = sessionService.logs(id, lines)
+
     fun status(id: String?): CommandOutcome = sessionService.status(id)
 
     fun submit(command: Command, onDone: (CommandOutcome) -> Unit) {

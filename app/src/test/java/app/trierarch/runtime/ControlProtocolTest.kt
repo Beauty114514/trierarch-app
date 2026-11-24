@@ -83,6 +83,17 @@ class ControlProtocolTest {
     }
 
     @Test
+    fun parsesLogRequests() {
+        assertEquals(
+            ControlProtocol.Request.Logs("a", 200),
+            ControlProtocol.parse(token, "$token\tlogs.tail\ta\t200"),
+        )
+        assertNull(ControlProtocol.parse(token, "$token\tlogs.tail\ta"))
+        assertNull(ControlProtocol.parse(token, "$token\tlogs.tail\ta\t0"))
+        assertNull(ControlProtocol.parse(token, "$token\tlogs.tail\ta\tmany"))
+    }
+
+    @Test
     fun rejectsMalformedRequests() {
         assertNull(ControlProtocol.parse(token, null))
         assertNull(ControlProtocol.parse(token, ""))

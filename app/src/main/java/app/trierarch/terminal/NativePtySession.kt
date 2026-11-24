@@ -25,6 +25,7 @@ class NativePtySession private constructor(
         private const val INITIAL_ROWS = 24
         private const val INITIAL_CELL_WIDTH_PIXELS = 1
         private const val INITIAL_CELL_HEIGHT_PIXELS = 1
+        private const val MAX_DIAGNOSTIC_BYTES = 4L * 1024 * 1024
 
         fun command(config: CommandSessionConfig, clipboard: TerminalClipboard): NativePtySession =
             NativePtySession(
@@ -50,6 +51,7 @@ class NativePtySession private constructor(
                     )
                 },
                 clipboard = clipboard,
+                diagnosticLog = config.diagnosticLog,
             )
 
         fun chroot(config: ChrootSessionConfig, clipboard: TerminalClipboard): NativePtySession =
@@ -79,6 +81,7 @@ class NativePtySession private constructor(
                 )
             },
             clipboard = clipboard,
+            diagnosticLog = config.diagnosticLog,
         )
     }
 
@@ -87,6 +90,7 @@ class NativePtySession private constructor(
     private var onScreenChanged: (() -> Unit)? = null
     private var onExited: (() -> Unit)? = null
     private val diagnosticsLock = Any()
+    private var diagnosticsBytes = 0L
     private var diagnostics: FileOutputStream? = diagnosticLog?.let(::openDiagnostics)
 
     private val emulator = TerminalEmulator(
@@ -232,9 +236,16 @@ class NativePtySession private constructor(
     private fun appendDiagnostic(bytes: ByteArray) {
         synchronized(diagnosticsLock) {
             val output = diagnostics ?: return
+            if (diagnosticsBytes + bytes.size > MAX_DIAGNOSTIC_BYTES) {
+                // The log is a forensics aid, not an archive: cap it so a
+                // chatty session cannot fill the app's storage.
+                closeDiagnostics()
+                return
+            }
             runCatching {
                 output.write(bytes)
                 output.flush()
+                diagnosticsBytes += bytes.size
             }.onFailure {
                 Log.e("NativePtySession", "Unable to write session diagnostics", it)
                 runCatching { output.close() }

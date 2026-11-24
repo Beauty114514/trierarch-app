@@ -71,6 +71,7 @@ class RuntimeControlServer(
                 is ControlProtocol.Request.Status -> statusReply(request.id)
                 ControlProtocol.Request.ListDocuments -> listReply()
                 is ControlProtocol.Request.ReadDocument -> readReply(request.id)
+                is ControlProtocol.Request.Logs -> logsReply(request.id, request.lines)
                 is ControlProtocol.Request.Execute -> Reply(awaitCommand(request.command))
                 null -> Reply(CommandOutcome.Failure(CommandError.Failed("invalid control request")))
             }
@@ -110,6 +111,18 @@ class RuntimeControlServer(
         Reply(CommandOutcome.Success(document.revision), document.text)
     }.getOrElse {
         Reply(CommandOutcome.Failure(CommandError.Failed(it.message ?: "unable to read profile $id")))
+    }
+
+    private fun logsReply(id: String, lines: Int): Reply = runCatching {
+        val text = core.logs(id, lines)
+            ?: return@runCatching Reply(CommandOutcome.Failure(CommandError.LogNotFound(id)))
+        Reply(CommandOutcome.Success(text))
+    }.getOrElse {
+        Reply(
+            CommandOutcome.Failure(
+                CommandError.Failed(it.message ?: "unable to read session log $id"),
+            ),
+        )
     }
 
     private fun awaitCommand(command: Command): CommandOutcome {
@@ -201,10 +214,12 @@ class RuntimeControlServer(
  * Response: `OK\t<message>[\t<text>]` or `ERR\t<code>\t<message>`
  */
 internal object ControlProtocol {
+    private const val MAX_LOG_LINES = 1000
     sealed interface Request {
         data class Status(val id: String?) : Request
         data object ListDocuments : Request
         data class ReadDocument(val id: String) : Request
+        data class Logs(val id: String, val lines: Int) : Request
         data class Execute(val command: Command) : Request
     }
 
@@ -224,6 +239,14 @@ internal object ControlProtocol {
             "gui.open" if (fields.size == 2) -> Request.Execute(Command.Session.OpenGui)
             "documents.list" if (fields.size == 2) -> Request.ListDocuments
             "documents.read" if (fields.size == 3) -> Request.ReadDocument(fields[2])
+            "logs.tail" if (fields.size == 4) -> {
+                val lines = fields[3].toIntOrNull()
+                if (lines == null || lines !in 1..MAX_LOG_LINES) {
+                    null
+                } else {
+                    Request.Logs(fields[2], lines)
+                }
+            }
             "documents.create" if (fields.size == 3) ->
                 Request.Execute(Command.Document.Create(fields[2]))
             "documents.save" if (fields.size == 5) -> Request.Execute(

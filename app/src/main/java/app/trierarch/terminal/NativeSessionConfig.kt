@@ -26,6 +26,7 @@ data class ProotSessionConfig(
     val environment: SessionEnvironment,
     val launchArgv: List<String>,
     val graphicsEnvironment: List<String>,
+    val diagnosticLog: File? = null,
 )
 
 data class ChrootSessionConfig(
@@ -42,6 +43,7 @@ data class DroidspacesSessionConfig(
     val profile: ProfileService.DroidspacesProfile,
     val environment: SessionEnvironment,
     val droidspacesSupervisor: File,
+    val diagnosticLog: File? = null,
 )
 
 internal fun String?.toFileOrNull(): File? =

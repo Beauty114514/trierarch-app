@@ -69,6 +69,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
                     environment = resources.toSessionEnvironment(),
                     launchArgv = profile.launchArgv.orEmpty(),
                     graphicsEnvironment = profile.graphics.environment(),
+                    diagnosticLog = sessionDiagnosticLog(profile.id),
                 ),
                 clipboard = AndroidTerminalClipboard(app),
             )
@@ -121,6 +122,7 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
                     profile = profile,
                     environment = resources.toSessionEnvironment(),
                     droidspacesSupervisor = WaylandImeBridgeRuntime.droidspacesSupervisor(app),
+                    diagnosticLog = sessionDiagnosticLog(profile.id),
                 ),
                 clipboard = AndroidTerminalClipboard(app),
             )
@@ -133,6 +135,10 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
     fun activeProfileId(): String? = displayedProfileId?.takeIf { isProfileRunning(it) }
 
     fun isProfileRunning(id: String): Boolean = runtimeSessions[id]?.session?.isRunning() == true
+
+    /** The tail of the last session transcript, or null when it never wrote one. */
+    fun readSessionLog(id: String, lines: Int): String? =
+        tailSessionLog(sessionDiagnosticLog(id), lines)
 
     /** The display a running session was started with, or null when it is stopped. */
     fun displayOf(id: String): String? =

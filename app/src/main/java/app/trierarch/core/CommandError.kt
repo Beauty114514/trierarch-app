@@ -39,6 +39,11 @@ sealed interface CommandError {
         override val message = "profile does not exist: $id"
     }
 
+    data class LogNotFound(val id: String) : CommandError {
+        override val code = "not_found"
+        override val message = "no session log for: $id"
+    }
+
     data class RevisionMismatch(val id: String) : CommandError {
         override val code = "revision_mismatch"
         override val message = "profile changed on disk: $id"

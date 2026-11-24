@@ -65,7 +65,7 @@ class GuiScreen(
     private var imeInset = 0
 
     private val listener: (CoreEvent) -> Unit = { event ->
-        if (screen !is Screen.Editor &&
+        if (screen !is Screen.Editor && screen !is Screen.Logs &&
             (event == CoreEvent.DocumentsChanged || event == CoreEvent.SessionsChanged)
         ) {
             render()
@@ -130,6 +130,12 @@ class GuiScreen(
             render()
             true
         }
+        is Screen.Logs -> {
+            hideError()
+            screen = Screen.Details(current.id)
+            render()
+            true
+        }
     }
 
     fun release() {
@@ -143,6 +149,7 @@ class GuiScreen(
             Screen.List -> renderList()
             is Screen.Details -> renderDetails(current.id)
             is Screen.Editor -> Unit
+            is Screen.Logs -> renderLogs(current.id)
         }
     }
 
@@ -236,6 +243,7 @@ class GuiScreen(
             setPadding(0, dp(4), 0, 0)
         }
         manage.addView(textAction("Edit") { openEditor(document.id) })
+        manage.addView(textAction("Logs") { openLogs(document.id) })
         manage.addView(textAction("Delete", errorText) { confirmDelete(document) })
         content.addView(manage)
     }
@@ -407,6 +415,34 @@ class GuiScreen(
         }
         screen = Screen.Editor(id, document.revision)
         renderEditor(document)
+    }
+
+    private fun openLogs(id: String) {
+        hideError()
+        editor = null
+        screen = Screen.Logs(id)
+        render()
+    }
+
+    private fun renderLogs(id: String) {
+        header.addView(
+            title("Logs · $id"),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+        )
+        header.addView(headerButton("Refresh") { render() })
+        header.addView(headerButton("Back") {
+            screen = Screen.Details(id)
+            render()
+        })
+        val text = core.logs(id, 400)
+        content.addView(TextView(context).apply {
+            setText(text ?: "No session log yet.")
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            typeface = Typeface.MONOSPACE
+            setTextIsSelectable(true)
+            setPadding(0, dp(14), 0, 0)
+        })
     }
 
     private fun saveEditor() {
@@ -601,6 +637,7 @@ class GuiScreen(
         data object List : Screen
         data class Details(val id: String) : Screen
         data class Editor(val id: String, val revision: String) : Screen
+        data class Logs(val id: String) : Screen
     }
 
     private companion object {
