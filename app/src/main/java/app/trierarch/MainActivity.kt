@@ -10,6 +10,7 @@ import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.LinearLayout
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.addCallback
@@ -19,6 +20,8 @@ import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import app.trierarch.config.ProfileDocument
+import app.trierarch.config.ProfileStore
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
 import app.trierarch.runtime.RuntimeControlServer
@@ -46,7 +49,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var floatingMenu: FloatingActionMenuView
     /** Opaque layer that covers the runtime surfaces; the terminal stays alive underneath. */
     private lateinit var guiLayer: FrameLayout
-    private lateinit var guiSessionLabel: TextView
+    private lateinit var guiRows: LinearLayout
+    private lateinit var guiCountLabel: TextView
+    private val profileStore by lazy { ProfileStore(this) }
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
@@ -255,7 +260,7 @@ class MainActivity : AppCompatActivity() {
         if (guiLayer.visibility == View.VISIBLE) return
         rememberFrontend(Frontend.GUI)
         keyboardPanel.hide()
-        guiSessionLabel.text = "Session: ${terminalViewModel.activeProfileId() ?: "Trierarch shell"}"
+        refreshGui()
         floatingMenu.visibility = View.GONE
         guiLayer.visibility = View.VISIBLE
         guiLayer.requestFocus()
@@ -286,39 +291,48 @@ class MainActivity : AppCompatActivity() {
         uiPreferences.edit().putString(KEY_FRONTEND, frontend.value).apply()
     }
 
-    /** Placeholder for the environment list; replaced in the next milestone. */
+    /** Read-only environment list; the profile directory is the only data source. */
     private fun createGuiLayer(): FrameLayout {
+        val header = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            addView(
+                TextView(this@MainActivity).apply {
+                    text = "Trierarch"
+                    setTextColor(android.graphics.Color.WHITE)
+                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
+                },
+                LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
+            )
+            addView(MaterialButton(this@MainActivity).apply {
+                text = "Terminal"
+                setOnClickListener { closeGui() }
+            })
+        }
+        guiCountLabel = TextView(this).apply {
+            setTextColor(SECONDARY_TEXT)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            letterSpacing = 0.08f
+            setPadding(0, dp(20), 0, dp(4))
+        }
+        guiRows = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         val column = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPadding(dp(32), dp(32), dp(32), dp(32))
-            addView(TextView(this@MainActivity).apply {
-                text = "Trierarch"
-                setTextColor(android.graphics.Color.WHITE)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 26f)
-            })
-            addView(TextView(this@MainActivity).apply {
-                text = "The environment list will live here."
-                setTextColor(SECONDARY_TEXT)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
-                setPadding(0, dp(8), 0, 0)
-            })
-            guiSessionLabel = TextView(this@MainActivity).apply {
-                typeface = android.graphics.Typeface.MONOSPACE
-                setTextColor(SECONDARY_TEXT)
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
-                setPadding(0, dp(24), 0, 0)
-            }
-            addView(guiSessionLabel)
+            setPadding(dp(20), dp(16), dp(20), dp(16))
+            addView(header)
+            addView(guiCountLabel)
             addView(
-                MaterialButton(this@MainActivity).apply {
-                    text = "Terminal"
-                    setOnClickListener { closeGui() }
+                ScrollView(this@MainActivity).apply {
+                    isFillViewport = true
+                    addView(
+                        guiRows,
+                        FrameLayout.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.WRAP_CONTENT,
+                        ),
+                    )
                 },
-                LinearLayout.LayoutParams(
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                ).apply { topMargin = dp(24) },
+                LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, 0, 1f),
             )
         }
         return FrameLayout(this).apply {
@@ -333,11 +347,80 @@ class MainActivity : AppCompatActivity() {
                 column,
                 FrameLayout.LayoutParams(
                     ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.WRAP_CONTENT,
-                    Gravity.CENTER,
+                    ViewGroup.LayoutParams.MATCH_PARENT,
                 ),
             )
         }
+    }
+
+    /**
+     * Re-reads the profile directory every time the GUI opens. Documents are
+     * never cached: the CLI can create, edit or delete them at any moment.
+     */
+    private fun refreshGui() {
+        val documents = profileStore.listDocuments()
+        guiCountLabel.text = "ENVIRONMENTS · ${documents.size}"
+        guiRows.removeAllViews()
+        if (documents.isEmpty()) {
+            guiRows.addView(createEmptyState())
+            return
+        }
+        documents.forEach { document -> guiRows.addView(createEnvironmentRow(document)) }
+    }
+
+    private fun createEnvironmentRow(document: ProfileDocument): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(0, dp(14), 0, 0)
+        }
+        row.addView(TextView(this).apply {
+            text = document.id
+            setTextColor(android.graphics.Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 17f)
+            typeface = android.graphics.Typeface.MONOSPACE
+        })
+        if (document.error == null) {
+            val display = if (document.display == ProfileStore.DISPLAY_NONE) {
+                "terminal"
+            } else {
+                document.display
+            }
+            val badges = listOf(document.runtime, display, document.renderer)
+                .filterNotNull()
+                .filter { it.isNotEmpty() }
+                .joinToString(" · ")
+            row.addView(TextView(this).apply {
+                text = badges
+                setTextColor(SECONDARY_TEXT)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setPadding(0, dp(4), 0, 0)
+            })
+        }
+        document.error?.let { message ->
+            row.addView(TextView(this).apply {
+                text = message
+                setTextColor(ERROR_TEXT)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setPadding(0, dp(4), 0, 0)
+            })
+        }
+        row.addView(
+            View(this).apply { setBackgroundColor(DIVIDER_COLOR) },
+            LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dp(1)).apply {
+                topMargin = dp(14)
+            },
+        )
+        return row
+    }
+
+    private fun createEmptyState(): View = TextView(this).apply {
+        text = "No environments yet.\n\nCreate one from the terminal:\n\n" +
+            "  trierarch --create arch-demo\n" +
+            "  trierarch --config arch-demo"
+        setTextColor(SECONDARY_TEXT)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        typeface = android.graphics.Typeface.MONOSPACE
+        setPadding(0, dp(16), 0, 0)
     }
 
     private fun dp(value: Int): Int = TypedValue.applyDimension(
@@ -478,6 +561,8 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         Log.i(TAG, "onResume display=$displayedSurface")
         if (displayedSurface == DisplaySurface.WAYLAND) rootKeyboard.start()
+        // The CLI may have created or deleted a profile while the GUI was hidden.
+        if (guiLayer.visibility == View.VISIBLE) refreshGui()
     }
 
     override fun onDestroy() {
@@ -517,6 +602,8 @@ class MainActivity : AppCompatActivity() {
         const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
         const val KEY_FRONTEND = "frontend"
         val SECONDARY_TEXT = 0xFF9CA3AF.toInt()
+        val ERROR_TEXT = 0xFFF87171.toInt()
+        val DIVIDER_COLOR = 0xFF23262B.toInt()
     }
 
     private enum class DisplaySurface {

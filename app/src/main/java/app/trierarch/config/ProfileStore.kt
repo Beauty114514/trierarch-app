@@ -6,8 +6,8 @@ import org.tomlj.TomlParseResult
 import java.io.File
 
 /** Direct filesystem access for profile documents; no index or database exists. */
-class ProfileStore(context: Context) {
-    private val directory = File(context.filesDir, "config/profiles")
+class ProfileStore internal constructor(private val directory: File) {
+    constructor(context: Context) : this(File(context.filesDir, "config/profiles"))
 
     fun list(): List<File> = directory
         .listFiles { file -> file.isFile && file.extension == EXTENSION }
@@ -15,6 +15,38 @@ class ProfileStore(context: Context) {
         .orEmpty()
 
     fun read(file: File): String = file.readText()
+
+    /**
+     * Read-only projection of the profile directory for the GUI.
+     *
+     * It never writes and never throws: an invalid document is reported through
+     * [ProfileDocument.error] with the same text the CLI prints.
+     */
+    fun listDocuments(): List<ProfileDocument> = list().map { file ->
+        val id = file.nameWithoutExtension
+        try {
+            val text = read(file)
+            validate(text)
+            val parsed = Toml.parse(text)
+            ProfileDocument(
+                file = file,
+                id = id,
+                runtime = parsed.getString("runtime")?.trim().orEmpty(),
+                display = parsed.getString("display.type")?.trim().orEmpty().ifEmpty { DISPLAY_NONE },
+                renderer = parsed.getString("graphics.renderer")?.trim()?.ifEmpty { null },
+                error = null,
+            )
+        } catch (error: Exception) {
+            ProfileDocument(
+                file = file,
+                id = id,
+                runtime = "",
+                display = DISPLAY_NONE,
+                renderer = null,
+                error = error.message ?: error.javaClass.simpleName,
+            )
+        }
+    }
 
     fun save(text: String, replacing: File? = null): File {
         val id = validate(text)
