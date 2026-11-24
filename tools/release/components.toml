@@ -1,0 +1,25 @@
+# Companion files published on the app's GitHub releases.
+# `tag` is optional and defaults to the release passed to manifest.py.
+
+[[components]]
+id = "kwin-compat"
+name = "KWin compatibility"
+version = "6.8.3-1"
+file = "kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst"
+
+[[components]]
+id = "mesa-26"
+name = "Mesa 26.0 (no root)"
+version = "26.0"
+file = "mesa-26.0-noroot.tar.zst"
+
+[[components]]
+id = "mesa-27"
+name = "Mesa 27.0 (root)"
+version = "27.0.0-91"
+file = "mesa-27.0.0-91-root.tar.xz"
+
+[[components]]
+id = "aquamarine"
+name = "Aquamarine compatibility"
+file = "libaquamarine-compat.so"
