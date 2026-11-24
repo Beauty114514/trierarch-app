@@ -98,6 +98,18 @@ class RuntimeController(
             return
         }
         val profile = loadProfile(id, completion) ?: return
+        // X11 and Wayland are single hosts; a second session would show the
+        // first one on screen, so refuse instead of lying about what is shown.
+        val conflict = findDisplayConflict(terminal.runningDisplays(), id, profile.display)
+        if (conflict != null) {
+            completion(
+                RuntimeCommandResult(
+                    false,
+                    "another ${profile.display} session is running: $conflict; stop it first",
+                ),
+            )
+            return
+        }
         val sourceWasRunning = sourceWasRunning(profile.source, completion) ?: return
         scheduleStart(id, profile, sourceWasRunning, "starting", completion)
     }

@@ -186,6 +186,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun showWaylandSurface() {
         Log.i(TAG, "showWaylandSurface current=$displayedSurface wayland=${waylandSurface != null}")
+        // Switching between two display hosts must not leave the other surface
+        // visible: it sits above this one in the view order.
+        x11Starting = false
+        x11Host.hide()
         if (waylandSurface == null) {
             val surface = WaylandSurfaceView(this)
             waylandSurface = surface
@@ -218,6 +222,7 @@ class MainActivity : AppCompatActivity() {
             onReady = {
                 onReady()
                 if (x11Starting) {
+                    hideWaylandSurface()
                     terminalView?.visibility = android.view.View.INVISIBLE
                     setDisplayedSurface(DisplaySurface.X11)
                 }

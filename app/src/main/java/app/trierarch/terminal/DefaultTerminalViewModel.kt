@@ -134,6 +134,11 @@ class DefaultTerminalViewModel @JvmOverloads constructor(
     fun displayOf(id: String): String? =
         runtimeSessions[id]?.takeIf { it.session.isRunning() }?.display
 
+    /** Running sessions keyed by profile id, valued by their display type. */
+    fun runningDisplays(): Map<String, String> = runtimeSessions
+        .filterValues { it.session.isRunning() }
+        .mapValues { (_, runtime) -> runtime.display }
+
     fun runningProfileIds(): Set<String> = runtimeSessions
         .filterValues { it.session.isRunning() }
         .keys
