@@ -1,6 +1,9 @@
 package app.trierarch.core
 
+import android.os.Handler
+import android.os.Looper
 import java.util.concurrent.CopyOnWriteArrayList
+import java.util.concurrent.Executors
 
 /**
  * The single entry point both frontends use: the GUI in-process, the CLI
@@ -10,8 +13,13 @@ import java.util.concurrent.CopyOnWriteArrayList
 class Core(
     private val profiles: ProfileService,
     private val sessionService: SessionService,
+    private val rootfs: RootfsService,
 ) {
     private val listeners = CopyOnWriteArrayList<(CoreEvent) -> Unit>()
+    private val main = Handler(Looper.getMainLooper())
+    private val rootfsExecutor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "trierarch-rootfs").apply { isDaemon = true }
+    }
 
     init {
         sessionService.setSessionsChangedListener {
@@ -41,12 +49,29 @@ class Core(
         when (command) {
             is Command.Session -> sessionService.dispatch(command, onDone)
             is Command.Document -> {
-                val outcome = apply(command)
-                onDone(outcome)
-                if (outcome is CommandOutcome.Success) notify(CoreEvent.DocumentsChanged)
+                if (command.isRootfs()) {
+                    // Extraction can take minutes; keep the UI and the socket
+                    // handler's main-thread wait out of it.
+                    rootfsExecutor.execute {
+                        val outcome = apply(command)
+                        main.post {
+                            onDone(outcome)
+                            if (outcome is CommandOutcome.Success) {
+                                notify(CoreEvent.DocumentsChanged)
+                            }
+                        }
+                    }
+                } else {
+                    val outcome = apply(command)
+                    onDone(outcome)
+                    if (outcome is CommandOutcome.Success) notify(CoreEvent.DocumentsChanged)
+                }
             }
         }
     }
+
+    private fun Command.Document.isRootfs(): Boolean =
+        this is Command.Document.Import || this is Command.Document.Remove
 
     private fun notify(event: CoreEvent) {
         listeners.forEach { listener ->
@@ -66,6 +91,14 @@ class Core(
             is Command.Document.Delete -> {
                 profiles.delete(command.id, command.expectedRevision)
                 CommandOutcome.Success("Deleted profile: ${command.id}")
+            }
+            is Command.Document.Import -> CommandOutcome.Success(
+                "Imported PRoot environment: " +
+                    rootfs.import(command.archivePath, command.name),
+            )
+            is Command.Document.Remove -> {
+                rootfs.remove(command.name)
+                CommandOutcome.Success("Removed PRoot environment: ${command.name}")
             }
         }
     } catch (error: ProfileServiceException) {

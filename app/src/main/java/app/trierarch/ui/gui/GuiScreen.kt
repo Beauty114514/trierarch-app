@@ -3,7 +3,10 @@ package app.trierarch.ui.gui
 import android.content.Context
 import android.content.DialogInterface
 import android.graphics.Color
+import android.net.Uri
 import android.graphics.Typeface
+import android.os.Handler
+import android.os.Looper
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
@@ -14,6 +17,7 @@ import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import app.trierarch.core.Command
 import app.trierarch.core.CommandOutcome
 import app.trierarch.core.Core
@@ -25,6 +29,7 @@ import app.trierarch.core.SessionPhase
 import app.trierarch.core.SessionSnapshot
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import java.io.File
 
 /**
  * The in-app GUI: a view over [Core]. It never owns sessions or writes profile
@@ -35,6 +40,7 @@ class GuiScreen(
     private val core: Core,
     private val onClose: () -> Unit,
     private val onFollowSession: () -> Unit,
+    private val onPickArchive: (String) -> Unit,
 ) {
     private val root = FrameLayout(context).apply {
         setBackgroundColor(Color.BLACK)
@@ -63,6 +69,7 @@ class GuiScreen(
     private var screen: Screen = Screen.List
     private var editor: EditText? = null
     private var imeInset = 0
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     private val listener: (CoreEvent) -> Unit = { event ->
         if (screen !is Screen.Editor && screen !is Screen.Logs &&
@@ -159,6 +166,7 @@ class GuiScreen(
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
         header.addView(headerButton("Create") { promptCreate() })
+        header.addView(headerButton("Import") { promptImport() })
         header.addView(headerButton("Terminal") { onClose() })
 
         val documents = core.documents()
@@ -492,6 +500,57 @@ class GuiScreen(
         dialog.show()
     }
 
+    private fun promptImport() {
+        val input = EditText(context).apply {
+            hint = "rootfs name"
+            setSingleLine()
+            typeface = Typeface.MONOSPACE
+        }
+        MaterialAlertDialogBuilder(context)
+            .setTitle("Import rootfs")
+            .setMessage("Choose a .tar.xz archive next. The name becomes files/rootfs/<name>.")
+            .setView(input)
+            .setPositiveButton("Choose archive") { _, _ ->
+                val name = input.text.toString().trim()
+                if (name.isEmpty()) {
+                    showError("rootfs name is empty")
+                } else {
+                    onPickArchive(name)
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    /** Copies the SAF stream to a real .xz file, then hands it to the core. */
+    fun importArchive(uri: Uri, name: String) {
+        showStatus("Reading archive…")
+        Thread {
+            val archive = File(context.cacheDir, "import-${System.nanoTime()}.tar.xz")
+            val copied = runCatching {
+                context.contentResolver.openInputStream(uri)?.use { input ->
+                    archive.outputStream().use { output -> input.copyTo(output) }
+                } ?: error("unable to open archive")
+                archive
+            }
+            mainHandler.post {
+                copied.onSuccess { file ->
+                    showStatus("Importing $name…")
+                    core.submit(Command.Document.Import(file.absolutePath, name)) { outcome ->
+                        file.delete()
+                        when (outcome) {
+                            is CommandOutcome.Failure -> showError(outcome.error.message)
+                            is CommandOutcome.Success -> {
+                                hideError()
+                                Toast.makeText(context, outcome.message, Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                }.onFailure { showError(it.message ?: "unable to read archive") }
+            }
+        }.start()
+    }
+
     private fun confirmDelete(document: ProfileDocument) {
         MaterialAlertDialogBuilder(context)
             .setTitle("Delete ${document.id}?")
@@ -528,7 +587,14 @@ class GuiScreen(
         }
     }
 
+    private fun showStatus(message: String) {
+        errorLabel.setTextColor(secondaryText)
+        errorLabel.text = message
+        errorLabel.visibility = View.VISIBLE
+    }
+
     private fun showError(message: String) {
+        errorLabel.setTextColor(errorText)
         errorLabel.text = message
         errorLabel.visibility = View.VISIBLE
     }

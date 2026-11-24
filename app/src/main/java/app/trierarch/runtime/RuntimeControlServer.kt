@@ -134,7 +134,8 @@ class RuntimeControlServer(
                 latch.countDown()
             }
         }
-        if (!latch.await(DISPATCH_TIMEOUT_SECONDS, TimeUnit.SECONDS)) {
+        val seconds = if (command.isSlow()) SLOW_TIMEOUT_SECONDS else DISPATCH_TIMEOUT_SECONDS
+        if (!latch.await(seconds, TimeUnit.SECONDS)) {
             return CommandOutcome.Failure(CommandError.Failed("runtime control timed out"))
         }
         return checkNotNull(outcome)
@@ -147,6 +148,10 @@ class RuntimeControlServer(
         is Command.Session.Run, is Command.Session.Stop, is Command.Session.Open -> true
         else -> false
     }
+
+    /** Rootfs extraction is the only command allowed to block for minutes. */
+    private fun Command.isSlow(): Boolean =
+        this is Command.Document.Import || this is Command.Document.Remove
 
     private fun encode(reply: Reply): String = when (val outcome = reply.outcome) {
         is CommandOutcome.Success -> buildString {
@@ -199,6 +204,7 @@ class RuntimeControlServer(
 
     private companion object {
         const val DISPATCH_TIMEOUT_SECONDS = 30L
+        const val SLOW_TIMEOUT_SECONDS = 600L
         const val MAX_FRAME_BYTES = 1 shl 20
         const val MAX_LINE_BYTES = 64
     }
@@ -258,6 +264,12 @@ internal object ControlProtocol {
             )
             "documents.delete" if (fields.size == 4) -> Request.Execute(
                 Command.Document.Delete(fields[2], fields[3]),
+            )
+            "documents.import" if (fields.size == 4) -> Request.Execute(
+                Command.Document.Import(fields[2], fields[3]),
+            )
+            "documents.remove" if (fields.size == 3) -> Request.Execute(
+                Command.Document.Remove(fields[2]),
             )
             else -> null
         }

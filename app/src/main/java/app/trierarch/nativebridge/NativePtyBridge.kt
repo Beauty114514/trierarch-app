@@ -59,6 +59,12 @@ object NativePtyBridge {
     /** Restores ownership of the private X11 socket directory after a legacy directory bind. */
     external fun repairX11SocketDirectory(directory: String, appUid: Int)
 
+    /** Imports a `.tar.xz` rootfs and returns the installed path. */
+    external fun importRootfs(archivePath: String, filesDirectory: String, name: String): String
+
+    /** Removes an imported rootfs and returns the removed path. */
+    external fun removeRootfs(filesDirectory: String, name: String): String
+
     external fun isDroidspacesRunning(container: String): Boolean
 
     external fun stopDroidspaces(container: String)

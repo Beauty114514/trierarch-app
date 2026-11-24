@@ -83,6 +83,20 @@ class ControlProtocolTest {
     }
 
     @Test
+    fun parsesRootfsRequests() {
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Document.Import("/tmp/rootfs.tar.xz", "arch")),
+            ControlProtocol.parse(token, "$token\tdocuments.import\t/tmp/rootfs.tar.xz\tarch"),
+        )
+        assertEquals(
+            ControlProtocol.Request.Execute(Command.Document.Remove("arch")),
+            ControlProtocol.parse(token, "$token\tdocuments.remove\tarch"),
+        )
+        assertNull(ControlProtocol.parse(token, "$token\tdocuments.import\t/tmp/rootfs.tar.xz"))
+        assertNull(ControlProtocol.parse(token, "$token\tdocuments.remove"))
+    }
+
+    @Test
     fun parsesLogRequests() {
         assertEquals(
             ControlProtocol.Request.Logs("a", 200),

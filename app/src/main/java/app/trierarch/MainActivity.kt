@@ -10,6 +10,7 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.addCallback
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -18,6 +19,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import app.trierarch.core.Core
 import app.trierarch.core.ProfileService
+import app.trierarch.core.RootfsService
 import app.trierarch.core.SessionService
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
@@ -46,6 +48,13 @@ class MainActivity : AppCompatActivity() {
     /** Opaque layer that covers the runtime surfaces; the terminal stays alive underneath. */
     private lateinit var guiLayer: FrameLayout
     private lateinit var guiScreen: GuiScreen
+    private var pendingImportName: String? = null
+    private val archivePicker =
+        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+            val name = pendingImportName ?: return@registerForActivityResult
+            pendingImportName = null
+            if (uri != null) guiScreen.importArchive(uri, name)
+        }
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
@@ -99,6 +108,7 @@ class MainActivity : AppCompatActivity() {
         val profiles = ProfileService(this)
         core = Core(
             profiles = profiles,
+            rootfs = RootfsService(filesDir),
             sessionService = SessionService(
                 profiles = profiles,
                 terminal = terminalViewModel,
@@ -135,6 +145,10 @@ class MainActivity : AppCompatActivity() {
             core = core,
             onClose = { closeGui() },
             onFollowSession = { hideGuiLayer() },
+            onPickArchive = { name ->
+                pendingImportName = name
+                archivePicker.launch(arrayOf("*/*"))
+            },
         )
         guiLayer = FrameLayout(this).apply {
             visibility = View.GONE
