@@ -42,6 +42,7 @@ internal class GuiScreen(
     private val onFollowSession: () -> Unit,
     private val onPickArchive: (String) -> Unit,
 ) {
+    private var showNewProfile by mutableStateOf(false)
     private var showRootfs by mutableStateOf(false)
     private var showUpdates by mutableStateOf(false)
     private var imeBottomInset by mutableIntStateOf(0)
@@ -53,6 +54,7 @@ internal class GuiScreen(
                     profilesController = profilesController,
                     updatesViewModel = updatesViewModel,
                     rootfsController = rootfsController,
+                    showNewProfile = showNewProfile,
                     showRootfs = showRootfs,
                     showUpdates = showUpdates,
                     imeInset = imeBottomInset,
@@ -71,6 +73,18 @@ internal class GuiScreen(
                         rootfsController.load(false)
                     },
                     onCloseRootfs = { showRootfs = false },
+                    onOpenNewProfile = {
+                        profilesController.clearError()
+                        rootfsController.refreshInstalled()
+                        showNewProfile = true
+                    },
+                    onCloseNewProfile = { showNewProfile = false },
+                    onProfileCreated = { showNewProfile = false },
+                    onOpenRootfsFromNewProfile = {
+                        showNewProfile = false
+                        showRootfs = true
+                        rootfsController.load(false)
+                    },
                 )
             }
         }
@@ -87,6 +101,10 @@ internal class GuiScreen(
     }
 
     fun handleBack(): Boolean {
+        if (showNewProfile) {
+            showNewProfile = false
+            return true
+        }
         if (showRootfs) {
             showRootfs = false
             return true
@@ -108,6 +126,7 @@ private fun GuiRoot(
     profilesController: ProfilesController,
     updatesViewModel: UpdatesViewModel,
     rootfsController: RootfsController,
+    showNewProfile: Boolean,
     showRootfs: Boolean,
     showUpdates: Boolean,
     imeInset: Int,
@@ -118,6 +137,10 @@ private fun GuiRoot(
     onCloseUpdates: () -> Unit,
     onOpenRootfs: () -> Unit,
     onCloseRootfs: () -> Unit,
+    onOpenNewProfile: () -> Unit,
+    onCloseNewProfile: () -> Unit,
+    onProfileCreated: () -> Unit,
+    onOpenRootfsFromNewProfile: () -> Unit,
 ) {
     val context = LocalContext.current
     val profiles by profilesController.state.collectAsState()
@@ -128,6 +151,7 @@ private fun GuiRoot(
         profilesController.events.collect { event ->
             when (event) {
                 ProfilesEvent.FollowSession -> onFollowSession()
+                ProfilesEvent.ProfileCreated -> onProfileCreated()
                 is ProfilesEvent.Message ->
                     Toast.makeText(context, event.text, Toast.LENGTH_LONG).show()
             }
@@ -162,7 +186,15 @@ private fun GuiRoot(
                     bottom = 16.dp + imeDp,
                 ),
         ) {
-            if (showRootfs) {
+            if (showNewProfile) {
+                NewProfileScreen(
+                    profilesController = profilesController,
+                    profilesError = profiles.error,
+                    installedRootfs = rootfs.installed,
+                    onBack = onCloseNewProfile,
+                    onOpenRootfs = onOpenRootfsFromNewProfile,
+                )
+            } else if (showRootfs) {
                 RootfsCatalogScreen(
                     state = rootfs,
                     controller = rootfsController,
@@ -185,6 +217,7 @@ private fun GuiRoot(
                         onOpenUpdates = onOpenUpdates,
                         onOpenRootfs = onOpenRootfs,
                         onPickArchive = onPickArchive,
+                        onCreate = onOpenNewProfile,
                     )
                     is ProfileScreen.Details -> ProfileDetailsScreen(
                         profiles = profiles,

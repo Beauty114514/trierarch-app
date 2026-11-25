@@ -12,6 +12,9 @@ data class ProfilesState(
     val editorRevision: String = "",
     val logText: String? = null,
     val error: String? = null,
+    val droidspacesContainers: List<String> = emptyList(),
+    val droidspacesLoading: Boolean = false,
+    val droidspacesError: String? = null,
 )
 
 sealed interface ProfileScreen {
@@ -24,6 +27,9 @@ sealed interface ProfileScreen {
 sealed interface ProfilesEvent {
     /** A Run/Open command succeeded; the GUI should get out of the way. */
     data object FollowSession : ProfilesEvent
+
+    /** A profile was created from the New profile form. */
+    data object ProfileCreated : ProfilesEvent
 
     data class Message(val text: String) : ProfilesEvent
 }

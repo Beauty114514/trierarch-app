@@ -6,6 +6,7 @@ import app.trierarch.core.Command
 import app.trierarch.core.CommandOutcome
 import app.trierarch.core.CoreApi
 import app.trierarch.core.CoreEvent
+import app.trierarch.nativebridge.NativePtyBridge
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +28,13 @@ class ProfilesController(
     private val context: Context,
     private val core: CoreApi,
     private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
+    private val listDroidspacesContainers: () -> List<String> = {
+        NativePtyBridge.listDroidspacesContainers()
+            .lineSequence()
+            .map(String::trim)
+            .filter(String::isNotEmpty)
+            .toList()
+    },
 ) {
     private val mutableState = MutableStateFlow(ProfilesState())
     private val mutableEvents = MutableSharedFlow<ProfilesEvent>(extraBufferCapacity = 8)
@@ -118,6 +126,74 @@ class ProfilesController(
                     navigate(ProfileScreen.List)
                     refresh()
                 }
+            }
+        }
+    }
+
+    fun create(draft: ProfileDraft) {
+        val invalid = validateProfileDraft(draft)
+        if (invalid != null) {
+            setError(invalid)
+            return
+        }
+        core.submit(Command.Document.Create(draft.id)) { outcome ->
+            when (outcome) {
+                is CommandOutcome.Failure -> setError(outcome.error.message)
+                is CommandOutcome.Success -> {
+                    val document = core.read(draft.id)
+                    if (document == null) {
+                        setError("profile was created but cannot be read: ${draft.id}")
+                        return@submit
+                    }
+                    core.submit(
+                        Command.Document.Save(draft.id, draft.toToml(), document.revision),
+                    ) { saved ->
+                        when (saved) {
+                            is CommandOutcome.Failure -> {
+                                setError(saved.error.message)
+                                // Do not leave the empty template behind.
+                                core.submit(
+                                    Command.Document.Delete(draft.id, document.revision),
+                                ) { }
+                            }
+                            is CommandOutcome.Success -> {
+                                navigate(ProfileScreen.List)
+                                refresh()
+                                mutableEvents.tryEmit(ProfilesEvent.ProfileCreated)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun clearError() {
+        mutableState.value = mutableState.value.copy(error = null)
+    }
+
+    fun refreshDroidspacesContainers() {
+        if (mutableState.value.droidspacesLoading) return
+        mutableState.value = mutableState.value.copy(
+            droidspacesLoading = true,
+            droidspacesError = null,
+        )
+        scope.launch {
+            val result = runCatching {
+                withContext(Dispatchers.IO) { listDroidspacesContainers() }
+            }
+            val current = mutableState.value
+            result.onSuccess { containers ->
+                mutableState.value = current.copy(
+                    droidspacesLoading = false,
+                    droidspacesContainers = containers.distinct().sorted(),
+                    droidspacesError = null,
+                )
+            }.onFailure { error ->
+                mutableState.value = current.copy(
+                    droidspacesLoading = false,
+                    droidspacesError = error.message ?: "unable to list DroidSpaces containers",
+                )
             }
         }
     }

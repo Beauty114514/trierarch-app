@@ -23,63 +23,6 @@ import app.trierarch.feature.rootfs.validateRootfsName
 import app.trierarch.update.ComponentRelease
 
 @Composable
-internal fun CreateProfileDialog(
-    onDismiss: () -> Unit,
-    onCreate: (String) -> Unit,
-) {
-    var id by remember { mutableStateOf("") }
-    var error by remember { mutableStateOf<String?>(null) }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("New environment") },
-        text = {
-            Column {
-                Text(
-                    "Creates the profile template; edit it before running.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = GuiColors.Secondary,
-                )
-                OutlinedTextField(
-                    value = id,
-                    onValueChange = {
-                        id = it
-                        error = null
-                    },
-                    label = { Text("profile id") },
-                    singleLine = true,
-                    textStyle = TextStyle(fontFamily = FontFamily.Monospace),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 8.dp),
-                )
-                error?.let {
-                    Text(
-                        text = it,
-                        color = GuiColors.Error,
-                        style = MaterialTheme.typography.bodySmall,
-                        modifier = Modifier.padding(top = 4.dp),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                val trimmed = id.trim()
-                if (trimmed.isEmpty()) {
-                    error = "profile id is empty"
-                } else {
-                    onCreate(trimmed)
-                    onDismiss()
-                }
-            }) { Text("Create") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        },
-    )
-}
-
-@Composable
 internal fun ImportProfileDialog(
     onDismiss: () -> Unit,
     onChoose: (String) -> Unit,

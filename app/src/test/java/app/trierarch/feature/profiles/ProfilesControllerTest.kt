@@ -18,15 +18,21 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Before
+import org.junit.Rule
 import org.junit.Test
+import org.junit.rules.TemporaryFolder
 
 class ProfilesControllerTest {
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
+
     private lateinit var core: FakeCore
     private val scope = CoroutineScope(Job() + Dispatchers.Unconfined)
 
@@ -65,6 +71,25 @@ class ProfilesControllerTest {
             SessionPhase.RUNNING,
             controller.state.value.sessions.sessions["arch"]?.phase,
         )
+    }
+
+    @Test
+    fun refreshListsDroidspacesContainers() = runBlocking {
+        val controller = ProfilesController(
+            context = ContextWrapper(null),
+            core = core,
+            scope = scope,
+            listDroidspacesContainers = { listOf("Debian", "Arch", "Arch") },
+        )
+
+        controller.refreshDroidspacesContainers()
+
+        val state = withTimeout(2_000) {
+            controller.state.first {
+                !it.droidspacesLoading && it.droidspacesContainers.isNotEmpty()
+            }
+        }
+        assertEquals(listOf("Arch", "Debian"), state.droidspacesContainers)
     }
 
     @Test
@@ -195,6 +220,102 @@ class ProfilesControllerTest {
         assertEquals(ProfileScreen.List, controller.state.value.screen)
     }
 
+    private fun rootfs(): File = temporaryFolder.newFolder("alpine").apply {
+        File(this, "etc").mkdirs()
+        File(this, "etc/os-release").writeText("ID=alpine\n")
+        File(this, "bin").mkdirs()
+        File(this, "bin/sh").writeText("")
+    }
+
+    @Test
+    fun createDraftSubmitsCreateAndSaveAndEmitsProfileCreated() = runBlocking {
+        val rootfs = rootfs()
+        core.readResult = DocumentContent("alpine-demo", "template", "rev-1")
+        val controller = controller()
+        val event = async(Dispatchers.Unconfined) { controller.events.first() }
+
+        controller.create(
+            ProfileDraft.Proot(
+                id = "alpine-demo",
+                rootfs = rootfs.absolutePath,
+                shell = "/bin/sh",
+            ),
+        )
+
+        assertEquals(2, core.submitted.size)
+        assertTrue(core.submitted[0] is Command.Document.Create)
+        val save = core.submitted[1] as Command.Document.Save
+        assertEquals("alpine-demo", save.id)
+        assertEquals("rev-1", save.expectedRevision)
+        assertTrue(save.text.contains("runtime = \"proot\""))
+        assertTrue(save.text.contains("rootfs = \"${rootfs.absolutePath}\""))
+        assertEquals(ProfilesEvent.ProfileCreated, event.await())
+        assertEquals(ProfileScreen.List, controller.state.value.screen)
+    }
+
+    @Test
+    fun createDraftValidationFailureDoesNotSubmit() {
+        val controller = controller()
+
+        controller.create(
+            ProfileDraft.Proot(
+                id = "alpine-demo",
+                rootfs = "/does/not/exist",
+                shell = "/bin/sh",
+            ),
+        )
+
+        assertTrue(core.submitted.isEmpty())
+        assertTrue(controller.state.value.error?.contains("rootfs") == true)
+    }
+
+    @Test
+    fun createDraftSaveFailureDeletesTheTemplate() {
+        val rootfs = rootfs()
+        core.readResult = DocumentContent("alpine-demo", "template", "rev-2")
+        core.outcomes.add(CommandOutcome.Success("created"))
+        core.outcomes.add(CommandOutcome.Failure(CommandError.InvalidDocument("alpine-demo", "bad")))
+        val controller = controller()
+
+        controller.create(
+            ProfileDraft.Proot(
+                id = "alpine-demo",
+                rootfs = rootfs.absolutePath,
+                shell = "/bin/sh",
+            ),
+        )
+
+        assertEquals(3, core.submitted.size)
+        assertTrue(core.submitted[0] is Command.Document.Create)
+        assertTrue(core.submitted[1] is Command.Document.Save)
+        assertEquals(
+            Command.Document.Delete("alpine-demo", "rev-2"),
+            core.submitted[2],
+        )
+        assertTrue(controller.state.value.error?.contains("invalid") == true)
+    }
+
+    @Test
+    fun createDraftDroidspacesDoesNotNeedARootfs() {
+        core.readResult = DocumentContent("arch-ds", "template", "rev-3")
+        val controller = controller()
+
+        controller.create(
+            ProfileDraft.Droidspaces(
+                id = "arch-ds",
+                container = "Arch",
+                user = "beauty",
+            ),
+        )
+
+        assertEquals(2, core.submitted.size)
+        val save = core.submitted[1] as Command.Document.Save
+        assertTrue(save.text.contains("runtime = \"droidspaces\""))
+        assertTrue(save.text.contains("container = \"Arch\""))
+        assertTrue(save.text.contains("user = \"beauty\""))
+        assertFalse(save.text.contains("rootfs"))
+    }
+
     private class FakeCore : CoreApi {
         val documents = mutableListOf<ProfileDocument>()
         var sessions = RuntimeSnapshot(emptyMap(), null)
@@ -202,6 +323,7 @@ class ProfilesControllerTest {
         var readResult: DocumentContent? = null
         var outcome: CommandOutcome = CommandOutcome.Success("ok")
         val submitted = mutableListOf<Command>()
+        val outcomes = java.util.ArrayDeque<CommandOutcome>()
         var listener: ((CoreEvent) -> Unit)? = null
 
         override fun documents(): List<ProfileDocument> = documents.toList()
@@ -210,7 +332,7 @@ class ProfilesControllerTest {
         override fun logs(id: String, lines: Int): String? = logs[id]
         override fun submit(command: Command, onDone: (CommandOutcome) -> Unit) {
             submitted += command
-            onDone(outcome)
+            onDone(outcomes.pollFirst() ?: outcome)
         }
 
         override fun addListener(listener: (CoreEvent) -> Unit) {

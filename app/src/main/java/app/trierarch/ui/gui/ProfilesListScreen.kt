@@ -39,13 +39,13 @@ internal fun ProfilesListScreen(
     onOpenUpdates: () -> Unit,
     onOpenRootfs: () -> Unit,
     onPickArchive: (String) -> Unit,
+    onCreate: () -> Unit,
 ) {
-    var showCreate by remember { mutableStateOf(false) }
     var showImport by remember { mutableStateOf(false) }
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Trierarch") {
-            HeaderAction("Create") { showCreate = true }
+            HeaderAction("Create", onClick = onCreate)
             HeaderAction("Import") { showImport = true }
             HeaderAction("Terminal", onClick = onTerminal)
         }
@@ -75,12 +75,6 @@ internal fun ProfilesListScreen(
         }
     }
 
-    if (showCreate) {
-        CreateProfileDialog(
-            onDismiss = { showCreate = false },
-            onCreate = profilesController::create,
-        )
-    }
     if (showImport) {
         ImportProfileDialog(
             onDismiss = { showImport = false },

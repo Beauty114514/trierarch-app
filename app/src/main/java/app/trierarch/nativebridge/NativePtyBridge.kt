@@ -65,6 +65,9 @@ object NativePtyBridge {
     /** Removes an imported rootfs and returns the removed path. */
     external fun removeRootfs(filesDirectory: String, name: String): String
 
+    /** Lists DroidSpaces containers from the backend workspace; requires root. */
+    external fun listDroidspacesContainers(): String
+
     external fun isDroidspacesRunning(container: String): Boolean
 
     external fun stopDroidspaces(container: String)
