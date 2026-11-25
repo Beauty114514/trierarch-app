@@ -37,6 +37,7 @@ internal fun ProfilesListScreen(
     profilesController: ProfilesController,
     onTerminal: () -> Unit,
     onOpenUpdates: () -> Unit,
+    onOpenRootfs: () -> Unit,
     onPickArchive: (String) -> Unit,
 ) {
     var showCreate by remember { mutableStateOf(false) }
@@ -55,6 +56,7 @@ internal fun ProfilesListScreen(
                 .verticalScroll(rememberScrollState()),
         ) {
             UpdatesEntry(updates, onOpenUpdates)
+            RootfsEntry(onOpenRootfs)
             SectionLabel("ENVIRONMENTS · ${profiles.documents.size}")
             if (profiles.documents.isEmpty()) {
                 EmptyState()
@@ -104,6 +106,29 @@ private fun UpdatesEntry(updates: UpdatesState, onClick: () -> Unit) {
             Text(
                 text = updates.summaryText(),
                 color = if (updates.hasAvailableUpdate()) GuiColors.Pending else GuiColors.Secondary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 4.dp),
+            )
+        }
+        Text("›", color = GuiColors.Secondary, fontSize = 22.sp)
+    }
+    GuiDivider()
+}
+
+@Composable
+private fun RootfsEntry(onClick: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick)
+            .padding(vertical = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f)) {
+            Text("Rootfs", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Download distro images from Linux Containers",
+                color = GuiColors.Secondary,
                 style = MaterialTheme.typography.bodySmall,
                 modifier = Modifier.padding(top = 4.dp),
             )

@@ -5,6 +5,8 @@ import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 
+internal class DownloadCancelledException : IOException("download cancelled")
+
 /** Downloads a file to a `.part` file, then verifies size and SHA-256. */
 internal object FileDownloader {
     fun download(
@@ -13,10 +15,12 @@ internal object FileDownloader {
         expectedSize: Long,
         expectedSha256: String,
         onProgress: (downloaded: Long, total: Long) -> Unit,
+        shouldCancel: () -> Boolean = { false },
     ): File {
         val partial = File(destination.parentFile, "${destination.name}.part")
         destination.parentFile?.mkdirs()
         partial.delete()
+        if (shouldCancel()) throw DownloadCancelledException()
         val connection = (URL(url).openConnection() as HttpURLConnection).apply {
             connectTimeout = 20_000
             readTimeout = 60_000
@@ -34,6 +38,7 @@ internal object FileDownloader {
                 partial.outputStream().use { output ->
                     val buffer = ByteArray(64 * 1024)
                     while (true) {
+                        if (shouldCancel()) throw DownloadCancelledException()
                         val count = input.read(buffer)
                         if (count < 0) break
                         output.write(buffer, 0, count)

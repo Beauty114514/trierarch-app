@@ -23,22 +23,26 @@ import androidx.compose.ui.unit.dp
 import app.trierarch.feature.profiles.ProfileScreen
 import app.trierarch.feature.profiles.ProfilesController
 import app.trierarch.feature.profiles.ProfilesEvent
+import app.trierarch.feature.rootfs.RootfsController
+import app.trierarch.feature.rootfs.RootfsEvent
 import app.trierarch.feature.updates.UpdateEvent
 import app.trierarch.feature.updates.UpdatesState
 import app.trierarch.feature.updates.UpdatesViewModel
 
 /**
- * The Compose host. It owns the ComposeView and the two pieces of UI state
- * (Updates open, IME inset); the feature layer owns everything else.
+ * The Compose host. It owns the ComposeView and the three pieces of UI state
+ * (Rootfs open, Updates open, IME inset); the feature layer owns everything else.
  */
 internal class GuiScreen(
     context: Context,
     private val profilesController: ProfilesController,
     private val updatesViewModel: UpdatesViewModel,
+    private val rootfsController: RootfsController,
     private val onClose: () -> Unit,
     private val onFollowSession: () -> Unit,
     private val onPickArchive: (String) -> Unit,
 ) {
+    private var showRootfs by mutableStateOf(false)
     private var showUpdates by mutableStateOf(false)
     private var imeBottomInset by mutableIntStateOf(0)
 
@@ -48,6 +52,8 @@ internal class GuiScreen(
                 GuiRoot(
                     profilesController = profilesController,
                     updatesViewModel = updatesViewModel,
+                    rootfsController = rootfsController,
+                    showRootfs = showRootfs,
                     showUpdates = showUpdates,
                     imeInset = imeBottomInset,
                     onFollowSession = onFollowSession,
@@ -60,6 +66,11 @@ internal class GuiScreen(
                         }
                     },
                     onCloseUpdates = { showUpdates = false },
+                    onOpenRootfs = {
+                        showRootfs = true
+                        rootfsController.load(false)
+                    },
+                    onCloseRootfs = { showRootfs = false },
                 )
             }
         }
@@ -76,6 +87,10 @@ internal class GuiScreen(
     }
 
     fun handleBack(): Boolean {
+        if (showRootfs) {
+            showRootfs = false
+            return true
+        }
         if (showUpdates) {
             showUpdates = false
             return true
@@ -92,6 +107,8 @@ internal class GuiScreen(
 private fun GuiRoot(
     profilesController: ProfilesController,
     updatesViewModel: UpdatesViewModel,
+    rootfsController: RootfsController,
+    showRootfs: Boolean,
     showUpdates: Boolean,
     imeInset: Int,
     onFollowSession: () -> Unit,
@@ -99,10 +116,13 @@ private fun GuiRoot(
     onPickArchive: (String) -> Unit,
     onOpenUpdates: () -> Unit,
     onCloseUpdates: () -> Unit,
+    onOpenRootfs: () -> Unit,
+    onCloseRootfs: () -> Unit,
 ) {
     val context = LocalContext.current
     val profiles by profilesController.state.collectAsState()
     val updates by updatesViewModel.state.collectAsState()
+    val rootfs by rootfsController.state.collectAsState()
 
     LaunchedEffect(Unit) {
         profilesController.events.collect { event ->
@@ -121,6 +141,14 @@ private fun GuiRoot(
             }
         }
     }
+    LaunchedEffect(Unit) {
+        rootfsController.events.collect { event ->
+            when (event) {
+                is RootfsEvent.Message ->
+                    Toast.makeText(context, event.text, Toast.LENGTH_LONG).show()
+            }
+        }
+    }
 
     val imeDp = with(LocalDensity.current) { imeInset.toDp() }
     Surface(modifier = Modifier.fillMaxSize(), color = Color.Black) {
@@ -134,7 +162,13 @@ private fun GuiRoot(
                     bottom = 16.dp + imeDp,
                 ),
         ) {
-            if (showUpdates) {
+            if (showRootfs) {
+                RootfsCatalogScreen(
+                    state = rootfs,
+                    controller = rootfsController,
+                    onBack = onCloseRootfs,
+                )
+            } else if (showUpdates) {
                 UpdatesScreen(
                     updates = updates,
                     updatesViewModel = updatesViewModel,
@@ -149,6 +183,7 @@ private fun GuiRoot(
                         profilesController = profilesController,
                         onTerminal = onClose,
                         onOpenUpdates = onOpenUpdates,
+                        onOpenRootfs = onOpenRootfs,
                         onPickArchive = onPickArchive,
                     )
                     is ProfileScreen.Details -> ProfileDetailsScreen(

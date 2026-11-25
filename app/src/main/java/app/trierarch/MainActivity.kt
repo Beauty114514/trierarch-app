@@ -22,6 +22,7 @@ import app.trierarch.core.ProfileService
 import app.trierarch.core.RootfsService
 import app.trierarch.core.SessionService
 import app.trierarch.feature.profiles.ProfilesController
+import app.trierarch.feature.rootfs.RootfsController
 import app.trierarch.feature.updates.UpdatesViewModel
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
@@ -41,6 +42,7 @@ class MainActivity : AppCompatActivity() {
     private val updatesViewModel: UpdatesViewModel by viewModels()
     private lateinit var core: Core
     private lateinit var profilesController: ProfilesController
+    private lateinit var rootfsController: RootfsController
     private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
     private lateinit var terminalContainer: FrameLayout
@@ -135,6 +137,7 @@ class MainActivity : AppCompatActivity() {
         )
         runtimeControlServer = RuntimeControlServer(this, core)
         profilesController = ProfilesController(applicationContext, core)
+        rootfsController = RootfsController(applicationContext)
         floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
@@ -150,6 +153,7 @@ class MainActivity : AppCompatActivity() {
             context = this,
             profilesController = profilesController,
             updatesViewModel = updatesViewModel,
+            rootfsController = rootfsController,
             onClose = { closeGui() },
             onFollowSession = { hideGuiLayer() },
             onPickArchive = { name ->
@@ -509,6 +513,7 @@ class MainActivity : AppCompatActivity() {
         rootKeyboard.stop()
         if (::guiScreen.isInitialized) guiScreen.release()
         if (::profilesController.isInitialized) profilesController.close()
+        if (::rootfsController.isInitialized) rootfsController.close()
         x11Host.release()
         runtimeControlServer?.close()
         runtimeControlServer = null
