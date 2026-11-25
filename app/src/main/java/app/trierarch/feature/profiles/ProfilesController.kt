@@ -4,7 +4,7 @@ import android.content.Context
 import android.net.Uri
 import app.trierarch.core.Command
 import app.trierarch.core.CommandOutcome
-import app.trierarch.core.Core
+import app.trierarch.core.CoreApi
 import app.trierarch.core.CoreEvent
 import java.io.File
 import kotlinx.coroutines.CoroutineScope
@@ -25,11 +25,11 @@ import kotlinx.coroutines.withContext
  */
 class ProfilesController(
     private val context: Context,
-    private val core: Core,
+    private val core: CoreApi,
+    private val scope: CoroutineScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate),
 ) {
     private val mutableState = MutableStateFlow(ProfilesState())
     private val mutableEvents = MutableSharedFlow<ProfilesEvent>(extraBufferCapacity = 8)
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val coreListener: (CoreEvent) -> Unit = { refresh() }
 
     val state: StateFlow<ProfilesState> = mutableState

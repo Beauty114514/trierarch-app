@@ -14,7 +14,7 @@ class Core(
     private val profiles: ProfileService,
     private val sessionService: SessionService,
     private val rootfs: RootfsService,
-) {
+) : CoreApi {
     private val listeners = CopyOnWriteArrayList<(CoreEvent) -> Unit>()
     private val main = Handler(Looper.getMainLooper())
     private val rootfsExecutor = Executors.newSingleThreadExecutor { runnable ->
@@ -27,25 +27,25 @@ class Core(
         }
     }
 
-    fun addListener(listener: (CoreEvent) -> Unit) {
+    override fun addListener(listener: (CoreEvent) -> Unit) {
         listeners += listener
     }
 
-    fun removeListener(listener: (CoreEvent) -> Unit) {
+    override fun removeListener(listener: (CoreEvent) -> Unit) {
         listeners -= listener
     }
 
-    fun documents(): List<ProfileDocument> = profiles.listDocuments()
+    override fun documents(): List<ProfileDocument> = profiles.listDocuments()
 
-    fun read(id: String): DocumentContent? = profiles.readDocument(id)
+    override fun read(id: String): DocumentContent? = profiles.readDocument(id)
 
-    fun sessions(): RuntimeSnapshot = sessionService.snapshot()
+    override fun sessions(): RuntimeSnapshot = sessionService.snapshot()
 
-    fun logs(id: String, lines: Int): String? = sessionService.logs(id, lines)
+    override fun logs(id: String, lines: Int): String? = sessionService.logs(id, lines)
 
     fun status(id: String?): CommandOutcome = sessionService.status(id)
 
-    fun submit(command: Command, onDone: (CommandOutcome) -> Unit) {
+    override fun submit(command: Command, onDone: (CommandOutcome) -> Unit) {
         when (command) {
             is Command.Session -> sessionService.dispatch(command, onDone)
             is Command.Document -> {
