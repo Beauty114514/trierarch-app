@@ -27,8 +27,16 @@ class ComponentStore(private val directory: File) {
         downloadedAt: Long = System.currentTimeMillis(),
     ) {
         val entries = downloaded().toMutableMap()
+        val previous = entries[id]
         entries[id] = DownloadedComponent(id, file, sha256, downloadedAt)
         write(entries)
+        // The old archive is no longer referenced by this component. Keep it
+        // only when another component still points at the same file.
+        if (previous != null && previous.file != file &&
+            entries.values.none { it.file == previous.file }
+        ) {
+            File(directory, previous.file).delete()
+        }
     }
 
     /** Deletes both the downloaded file and its index entry; rootfs copies are untouched. */

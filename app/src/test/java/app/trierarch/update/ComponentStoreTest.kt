@@ -31,17 +31,36 @@ class ComponentStoreTest {
     }
 
     @Test
-    fun aLaterDownloadReplacesTheEntry() {
+    fun aLaterDownloadReplacesTheEntryAndDeletesTheOldFile() {
         val store = store()
-        store.file("kwin.tar.zst").writeText("component")
+        val old = store.file("kwin-old.tar.zst").apply { writeText("old") }
+        val current = store.file("kwin-new.tar.zst").apply { writeText("new") }
         val next = "b".repeat(64)
-        store.record("kwin-compat", "kwin.tar.zst", sha, downloadedAt = 1)
-        store.record("kwin-compat", "kwin.tar.zst", next, downloadedAt = 2)
+        store.record("kwin-compat", old.name, sha, downloadedAt = 1)
 
-        val entries = store.downloaded()
-        assertEquals(1, entries.size)
-        assertEquals(next, entries.getValue("kwin-compat").sha256)
-        assertEquals(2L, entries.getValue("kwin-compat").downloadedAt)
+        store.record("kwin-compat", current.name, next, downloadedAt = 2)
+
+        val entry = store.downloaded().getValue("kwin-compat")
+        assertEquals(current.name, entry.file)
+        assertEquals(next, entry.sha256)
+        assertEquals(2L, entry.downloadedAt)
+        assertTrue(!old.exists())
+        assertTrue(current.exists())
+    }
+
+    @Test
+    fun anOldFileSharedWithAnotherComponentIsKept() {
+        val store = store()
+        val shared = store.file("shared.tar.zst").apply { writeText("shared") }
+        store.record("kwin-compat", shared.name, sha)
+        store.record("other-component", shared.name, sha)
+        val replacement = store.file("kwin-new.tar.zst").apply { writeText("new") }
+
+        store.record("kwin-compat", replacement.name, "b".repeat(64))
+
+        assertTrue(shared.exists())
+        assertEquals(replacement.name, store.downloaded().getValue("kwin-compat").file)
+        assertEquals(shared.name, store.downloaded().getValue("other-component").file)
     }
 
     @Test
