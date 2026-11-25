@@ -17,8 +17,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.trierarch.feature.rootfs.DownloadedRootfs
+import app.trierarch.feature.rootfs.InstalledRootfs
 import app.trierarch.feature.rootfs.LxcImage
 import app.trierarch.feature.rootfs.RootfsController
 import app.trierarch.feature.rootfs.RootfsState
@@ -46,7 +49,10 @@ internal fun RootfsCatalogScreen(
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Rootfs") {
-            HeaderAction("Refresh", enabled = !state.loading) { controller.load(true) }
+            HeaderAction("Refresh", enabled = !state.loading) {
+                controller.load(true)
+                controller.refreshInstalled()
+            }
             HeaderAction("Back", onClick = onBack)
         }
         Text(
@@ -65,34 +71,42 @@ internal fun RootfsCatalogScreen(
                 .padding(top = 8.dp),
         )
         ErrorBanner(state.error)
-        when {
-            state.loading && state.images.isEmpty() -> Text(
-                text = "Loading images…",
-                color = GuiColors.Secondary,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 16.dp),
-            )
-            state.images.isEmpty() -> {
-                Text(
-                    text = "No images loaded.",
-                    color = GuiColors.Secondary,
-                    style = MaterialTheme.typography.bodySmall,
-                    modifier = Modifier.padding(top = 16.dp),
-                )
-                PrimaryAction("Retry") { controller.load(true) }
-            }
-            filtered.isEmpty() -> Text(
-                text = "No distribution matches \"$query\".",
-                color = GuiColors.Secondary,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(top = 16.dp),
-            )
-            else -> LazyColumn(
-                Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-            ) {
-                items(filtered, key = { it.product }) { image ->
+        LazyColumn(
+            Modifier
+                .fillMaxWidth()
+                .weight(1f),
+        ) {
+            item { InstalledSection(state.installed) }
+            item { SectionLabel("AVAILABLE · ${filtered.size}") }
+            when {
+                state.loading && state.images.isEmpty() -> item {
+                    Text(
+                        text = "Loading images…",
+                        color = GuiColors.Secondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+                state.images.isEmpty() -> item {
+                    Column {
+                        Text(
+                            text = "No images loaded.",
+                            color = GuiColors.Secondary,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 16.dp),
+                        )
+                        PrimaryAction("Retry") { controller.load(true) }
+                    }
+                }
+                filtered.isEmpty() -> item {
+                    Text(
+                        text = "No distribution matches \"$query\".",
+                        color = GuiColors.Secondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 16.dp),
+                    )
+                }
+                else -> items(filtered, key = { it.product }) { image ->
                     RootfsRow(image, state, controller) { targetImage, downloaded ->
                         extractTarget = targetImage to downloaded
                     }
@@ -112,6 +126,48 @@ internal fun RootfsCatalogScreen(
                 controller.install(downloaded, name)
             },
         )
+    }
+}
+
+@Composable
+private fun InstalledSection(installed: List<InstalledRootfs>) {
+    Column {
+        SectionLabel("INSTALLED · ${installed.size}")
+        Text(
+            text = "files/rootfs",
+            color = GuiColors.Secondary,
+            style = MaterialTheme.typography.bodySmall,
+        )
+        if (installed.isEmpty()) {
+            Text(
+                text = "No rootfs in files/rootfs.",
+                color = GuiColors.Secondary,
+                style = MaterialTheme.typography.bodySmall,
+                modifier = Modifier.padding(top = 8.dp, bottom = 8.dp),
+            )
+        } else {
+            installed.forEach { entry ->
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                ) {
+                    Text(
+                        text = entry.name,
+                        color = Color.White,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = FontFamily.Monospace,
+                    )
+                    Text(
+                        text = entry.path,
+                        color = GuiColors.Secondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
+                GuiDivider()
+            }
+        }
     }
 }
 

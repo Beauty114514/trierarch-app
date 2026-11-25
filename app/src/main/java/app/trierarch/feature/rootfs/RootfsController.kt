@@ -16,6 +16,12 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 
+data class InstalledRootfs(
+    val name: String,
+    val path: String,
+    val modifiedAt: Long,
+)
+
 data class RootfsState(
     val loading: Boolean = false,
     val images: List<LxcImage> = emptyList(),
@@ -23,6 +29,7 @@ data class RootfsState(
     val downloads: Map<String, DownloadState> = emptyMap(),
     val downloaded: List<DownloadedRootfs> = emptyList(),
     val installs: Map<String, InstallState> = emptyMap(),
+    val installed: List<InstalledRootfs> = emptyList(),
     val loadedAt: Long = 0,
 ) {
     sealed interface DownloadState {
@@ -92,6 +99,7 @@ class RootfsController(
 
     init {
         refreshDownloaded()
+        refreshInstalled()
     }
 
     fun load(force: Boolean = false) {
@@ -107,6 +115,7 @@ class RootfsController(
                         error = null,
                         loadedAt = System.currentTimeMillis(),
                     )
+                    refreshInstalled()
                 },
                 onFailure = { error ->
                     mutableState.value = mutableState.value.copy(
@@ -248,6 +257,7 @@ class RootfsController(
                     mutableEvents.tryEmit(
                         RootfsEvent.Message("Extracted $clean to files/rootfs/$clean"),
                     )
+                    refreshInstalled()
                 }
             }
         }
@@ -255,6 +265,29 @@ class RootfsController(
 
     fun refreshDownloaded() {
         mutableState.value = mutableState.value.copy(downloaded = store.list())
+    }
+
+    fun refreshInstalled() {
+        val installed = if (!rootfsDirectory.isDirectory) {
+            emptyList()
+        } else {
+            rootfsDirectory.listFiles().orEmpty()
+                .asSequence()
+                .filter { file ->
+                    file.isDirectory && !file.name.startsWith(".") &&
+                        !file.name.contains(".import-")
+                }
+                .sortedBy { it.name.lowercase() }
+                .map { file ->
+                    InstalledRootfs(
+                        name = file.name,
+                        path = file.absolutePath,
+                        modifiedAt = file.lastModified(),
+                    )
+                }
+                .toList()
+        }
+        mutableState.value = mutableState.value.copy(installed = installed)
     }
 
     private fun failInstall(downloaded: DownloadedRootfs, name: String, message: String) {

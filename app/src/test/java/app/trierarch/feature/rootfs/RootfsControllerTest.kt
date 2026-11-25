@@ -111,7 +111,13 @@ class RootfsControllerTest {
     fun installSubmitsImportKeepsTheArchiveAndRecordsThePath() {
         val store = store()
         val rootfs = temporaryFolder.newFolder("rootfs")
-        val core = FakeCore()
+        val core = FakeCore().apply {
+            onCommand = { command ->
+                if (command is Command.Document.Import) {
+                    File(rootfs, command.name).mkdirs()
+                }
+            }
+        }
         val controller = controller(
             store = store,
             core = core,
@@ -135,6 +141,27 @@ class RootfsControllerTest {
         val installed = controller.state.value.installs[downloaded.file]
         assertTrue(installed is RootfsState.InstallState.Installed)
         assertEquals(File(rootfs, "alpine").absolutePath, (installed as RootfsState.InstallState.Installed).path)
+        assertEquals(listOf("alpine"), controller.state.value.installed.map { it.name })
+    }
+
+    @Test
+    fun refreshInstalledListsOnlyVisibleDirectoriesInTheDefaultPath() {
+        val rootfs = temporaryFolder.newFolder("rootfs")
+        File(rootfs, "debian").mkdirs()
+        File(rootfs, "arch").mkdirs()
+        File(rootfs, ".alpine.import-1").mkdirs()
+        File(rootfs, "README").writeText("not a rootfs")
+        val controller = controller(
+            store = store(),
+            core = FakeCore(),
+            rootfsDirectory = rootfs,
+            downloadFile = { _, _, _, _ -> error("not used") },
+        )
+
+        controller.refreshInstalled()
+
+        assertEquals(listOf("arch", "debian"), controller.state.value.installed.map { it.name })
+        assertEquals(File(rootfs, "arch").absolutePath, controller.state.value.installed.first().path)
     }
 
     @Test
@@ -214,6 +241,7 @@ class RootfsControllerTest {
     private class FakeCore : CoreApi {
         val commands = mutableListOf<Command>()
         var outcome: CommandOutcome = CommandOutcome.Success("ok")
+        var onCommand: ((Command) -> Unit)? = null
 
         override fun documents(): List<ProfileDocument> = emptyList()
         override fun read(id: String): DocumentContent? = null
@@ -221,6 +249,7 @@ class RootfsControllerTest {
         override fun logs(id: String, lines: Int): String? = null
         override fun submit(command: Command, onDone: (CommandOutcome) -> Unit) {
             commands += command
+            onCommand?.invoke(command)
             onDone(outcome)
         }
 
