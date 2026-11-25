@@ -22,6 +22,16 @@ data class LxcImage(
     val recommended: Boolean
         get() = os.equals("Archlinux", ignoreCase = true)
 
+    /** Suggested rootfs directory name for the default install path. */
+    val defaultRootfsName: String
+        get() = buildString {
+            append(sanitize(os))
+            if (release.isNotBlank()) {
+                append('-')
+                append(sanitize(release))
+            }
+        }
+
     /** Deterministic archive name; native import names use a stricter rule later. */
     val fileName: String
         get() = buildString {

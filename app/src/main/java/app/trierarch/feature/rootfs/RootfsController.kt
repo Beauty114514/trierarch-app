@@ -2,6 +2,9 @@ package app.trierarch.feature.rootfs
 
 import android.content.Context
 import android.os.Build
+import app.trierarch.core.Command
+import app.trierarch.core.CommandOutcome
+import app.trierarch.core.CoreApi
 import app.trierarch.update.FileDownloader
 import java.io.File
 import java.util.concurrent.ConcurrentHashMap
@@ -19,11 +22,18 @@ data class RootfsState(
     val error: String? = null,
     val downloads: Map<String, DownloadState> = emptyMap(),
     val downloaded: List<DownloadedRootfs> = emptyList(),
+    val installs: Map<String, InstallState> = emptyMap(),
     val loadedAt: Long = 0,
 ) {
     sealed interface DownloadState {
         data class Downloading(val downloaded: Long, val total: Long) : DownloadState
         data class Failed(val message: String) : DownloadState
+    }
+
+    sealed interface InstallState {
+        data class Installing(val name: String) : InstallState
+        data class Installed(val name: String, val path: String) : InstallState
+        data class Failed(val name: String, val message: String) : InstallState
     }
 }
 
@@ -37,6 +47,8 @@ sealed interface RootfsEvent {
  */
 class RootfsController(
     private val store: RootfsDownloadStore,
+    private val rootfsDirectory: File,
+    private val core: CoreApi,
     private val loadImages: (force: Boolean) -> List<LxcImage>,
     private val downloadFile: (
         image: LxcImage,
@@ -48,8 +60,10 @@ class RootfsController(
         Thread(runnable, "trierarch-rootfs-downloads").apply { isDaemon = true }
     },
 ) {
-    constructor(context: Context) : this(
+    constructor(context: Context, core: CoreApi) : this(
         store = RootfsDownloadStore(File(context.filesDir, "downloads/rootfs")),
+        rootfsDirectory = File(context.filesDir, "rootfs"),
+        core = core,
         loadImages = { force ->
             LxcCatalog(
                 cacheFile = File(context.cacheDir, "lxc-images.json"),
@@ -195,8 +209,61 @@ class RootfsController(
         }
     }
 
+    fun install(downloaded: DownloadedRootfs, name: String) {
+        val current = mutableState.value
+        if (current.installs[downloaded.file] is RootfsState.InstallState.Installing) return
+        val clean = name.trim()
+        val validation = validateRootfsName(clean)
+        if (validation != null) {
+            failInstall(downloaded, clean, validation)
+            return
+        }
+        val archive = store.file(downloaded.file)
+        if (!archive.isFile) {
+            failInstall(downloaded, clean, "downloaded archive no longer exists")
+            return
+        }
+        val destination = File(rootfsDirectory, clean)
+        if (destination.exists()) {
+            failInstall(downloaded, clean, "rootfs name already exists: $clean")
+            return
+        }
+        mutableState.value = mutableState.value.copy(
+            installs = mutableState.value.installs + (
+                downloaded.file to RootfsState.InstallState.Installing(clean)
+                ),
+        )
+        core.submit(Command.Document.Import(archive.absolutePath, clean)) { outcome ->
+            when (outcome) {
+                is CommandOutcome.Failure -> failInstall(downloaded, clean, outcome.error.message)
+                is CommandOutcome.Success -> {
+                    mutableState.value = mutableState.value.copy(
+                        installs = mutableState.value.installs + (
+                            downloaded.file to RootfsState.InstallState.Installed(
+                                clean,
+                                destination.absolutePath,
+                            )
+                            ),
+                    )
+                    mutableEvents.tryEmit(
+                        RootfsEvent.Message("Extracted $clean to files/rootfs/$clean"),
+                    )
+                }
+            }
+        }
+    }
+
     fun refreshDownloaded() {
         mutableState.value = mutableState.value.copy(downloaded = store.list())
+    }
+
+    private fun failInstall(downloaded: DownloadedRootfs, name: String, message: String) {
+        mutableState.value = mutableState.value.copy(
+            installs = mutableState.value.installs + (
+                downloaded.file to RootfsState.InstallState.Failed(name, message)
+                ),
+        )
+        mutableEvents.tryEmit(RootfsEvent.Message(message))
     }
 
     fun close() {

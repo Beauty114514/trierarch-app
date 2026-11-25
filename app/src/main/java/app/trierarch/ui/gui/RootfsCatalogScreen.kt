@@ -18,6 +18,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import app.trierarch.feature.rootfs.DownloadedRootfs
 import app.trierarch.feature.rootfs.LxcImage
 import app.trierarch.feature.rootfs.RootfsController
 import app.trierarch.feature.rootfs.RootfsState
@@ -29,6 +30,7 @@ internal fun RootfsCatalogScreen(
     onBack: () -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
+    var extractTarget by remember { mutableStateOf<Pair<LxcImage, DownloadedRootfs>?>(null) }
     val filtered = remember(state.images, query) {
         val text = query.trim()
         if (text.isEmpty()) {
@@ -91,11 +93,25 @@ internal fun RootfsCatalogScreen(
                     .weight(1f),
             ) {
                 items(filtered, key = { it.product }) { image ->
-                    RootfsRow(image, state, controller)
+                    RootfsRow(image, state, controller) { targetImage, downloaded ->
+                        extractTarget = targetImage to downloaded
+                    }
                     GuiDivider()
                 }
             }
         }
+    }
+
+    extractTarget?.let { (image, downloaded) ->
+        ExtractRootfsDialog(
+            archive = downloaded.file,
+            suggestedName = image.defaultRootfsName,
+            onDismiss = { extractTarget = null },
+            onExtract = { name ->
+                extractTarget = null
+                controller.install(downloaded, name)
+            },
+        )
     }
 }
 
@@ -104,11 +120,13 @@ private fun RootfsRow(
     image: LxcImage,
     state: RootfsState,
     controller: RootfsController,
+    onExtract: (LxcImage, DownloadedRootfs) -> Unit,
 ) {
     val downloaded = state.downloaded.firstOrNull {
         it.product == image.product || it.file == image.fileName
     }
     val download = state.downloads[image.product]
+    val install = downloaded?.let { state.installs[it.file] }
 
     Column(
         Modifier
@@ -141,15 +159,55 @@ private fun RootfsRow(
                         modifier = Modifier.padding(top = 2.dp),
                     )
                 }
+                when (install) {
+                    is RootfsState.InstallState.Installing -> Text(
+                        text = "Extracting to files/rootfs/${install.name}…",
+                        color = GuiColors.Secondary,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    is RootfsState.InstallState.Installed -> Text(
+                        text = "Extracted to files/rootfs/${install.name}",
+                        color = GuiColors.Running,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    is RootfsState.InstallState.Failed -> Text(
+                        text = install.message,
+                        color = GuiColors.Error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                    null -> Unit
+                }
             }
             when {
                 downloaded != null -> {
-                    Text(
-                        text = "Downloaded",
-                        color = GuiColors.Running,
-                        style = MaterialTheme.typography.bodySmall,
-                    )
-                    TextAction("Delete", GuiColors.Error) { controller.remove(downloaded) }
+                    if (install is RootfsState.InstallState.Installing) {
+                        Text(
+                            text = "Extracting…",
+                            color = GuiColors.Secondary,
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    } else {
+                        when (install) {
+                            is RootfsState.InstallState.Installed -> Text(
+                                text = "Extracted",
+                                color = GuiColors.Running,
+                                style = MaterialTheme.typography.bodySmall,
+                            )
+                            is RootfsState.InstallState.Failed -> TextAction(
+                                "Retry",
+                                GuiColors.Pending,
+                            ) { onExtract(image, downloaded) }
+                            else -> TextAction("Extract", GuiColors.Running) {
+                                onExtract(image, downloaded)
+                            }
+                        }
+                        TextAction("Delete archive", GuiColors.Error) {
+                            controller.remove(downloaded)
+                        }
+                    }
                 }
                 download is RootfsState.DownloadState.Downloading -> {
                     TextAction("Cancel", GuiColors.Error) { controller.cancel(image) }

@@ -18,6 +18,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.trierarch.core.ProfileDocument
+import app.trierarch.feature.rootfs.validateRootfsName
 import app.trierarch.update.ComponentRelease
 
 @Composable
@@ -176,6 +177,67 @@ internal fun DeleteComponentDialog(
         },
         confirmButton = {
             TextButton(onClick = onConfirm) { Text("Delete", color = GuiColors.Error) }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+internal fun ExtractRootfsDialog(
+    archive: String,
+    suggestedName: String,
+    onDismiss: () -> Unit,
+    onExtract: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(suggestedName) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Extract rootfs") },
+        text = {
+            Column {
+                Text(
+                    "Extracts a copy to files/rootfs/<name>. " +
+                        "The archive $archive stays in files/downloads/rootfs.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GuiColors.Secondary,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it
+                        error = null
+                    },
+                    label = { Text("rootfs name") },
+                    singleLine = true,
+                    textStyle = TextStyle(fontFamily = FontFamily.Monospace),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                )
+                error?.let {
+                    Text(
+                        text = it,
+                        color = GuiColors.Error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val trimmed = name.trim()
+                val invalid = validateRootfsName(trimmed)
+                if (invalid != null) {
+                    error = invalid
+                } else {
+                    onExtract(trimmed)
+                    onDismiss()
+                }
+            }) { Text("Extract") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

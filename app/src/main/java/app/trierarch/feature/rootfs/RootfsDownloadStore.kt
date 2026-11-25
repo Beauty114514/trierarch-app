@@ -50,6 +50,8 @@ class RootfsDownloadStore(private val directory: File) {
         return removed
     }
 
+    fun file(name: String): File = File(directory, name)
+
     fun fileFor(image: LxcImage): File = File(directory, image.fileName)
 
     fun indexFile(): File = File(directory, INDEX)

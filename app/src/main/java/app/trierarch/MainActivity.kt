@@ -137,7 +137,7 @@ class MainActivity : AppCompatActivity() {
         )
         runtimeControlServer = RuntimeControlServer(this, core)
         profilesController = ProfilesController(applicationContext, core)
-        rootfsController = RootfsController(applicationContext)
+        rootfsController = RootfsController(applicationContext, core)
         floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
