@@ -490,6 +490,7 @@ dependencies {
     implementation(libs.material)
     implementation("androidx.annotation:annotation:1.9.0")
     implementation(libs.tomlj)
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(libs.androidx.junit)

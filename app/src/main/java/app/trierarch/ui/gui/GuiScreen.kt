@@ -5,7 +5,6 @@ import android.content.DialogInterface
 import android.graphics.Color
 import android.net.Uri
 import android.graphics.Typeface
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.text.InputType
@@ -28,25 +27,25 @@ import app.trierarch.core.ProfileDocument
 import app.trierarch.core.ProfileService
 import app.trierarch.core.SessionPhase
 import app.trierarch.core.SessionSnapshot
-import app.trierarch.update.ApkInstaller
-import app.trierarch.update.ApkVerifier
-import app.trierarch.update.AppRelease
+import app.trierarch.feature.updates.UpdateEvent
+import app.trierarch.feature.updates.UpdatesState
+import app.trierarch.feature.updates.UpdatesViewModel
 import app.trierarch.update.AppState
 import app.trierarch.update.ComponentRelease
 import app.trierarch.update.ComponentState
 import app.trierarch.update.ComponentStatus
-import app.trierarch.update.ComponentStore
-import app.trierarch.update.FileDownloader
-import app.trierarch.update.Manifest
-import app.trierarch.update.UpdateSource
-import app.trierarch.update.UpdateStatus
 import app.trierarch.update.check
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import java.io.File
 import java.util.Date
 import java.util.Locale
-import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 
 /**
  * The in-app GUI: a view over [Core]. It never owns sessions or writes profile
@@ -55,6 +54,7 @@ import java.util.concurrent.Executors
 class GuiScreen(
     private val context: Context,
     private val core: Core,
+    private val updatesViewModel: UpdatesViewModel,
     private val onClose: () -> Unit,
     private val onFollowSession: () -> Unit,
     private val onPickArchive: (String) -> Unit,
@@ -86,15 +86,9 @@ class GuiScreen(
     private var screen: Screen = Screen.List
     private var editor: EditText? = null
     private var imeInset = 0
-    private var updatesState: UpdatesState = UpdatesState.NotChecked
-    private var apkState: ApkDownloadState = ApkDownloadState.Idle
-    private val componentStore = ComponentStore(File(context.filesDir, "components"))
-    private val componentDownloads = mutableMapOf<String, ComponentDownloadState>()
-    private var released = false
+    private var updatesState: UpdatesState = updatesViewModel.state.value
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val updatesExecutor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "trierarch-updates").apply { isDaemon = true }
-    }
 
     private val listener: (CoreEvent) -> Unit = { event ->
         if (screen !is Screen.Editor && screen !is Screen.Logs &&
@@ -128,6 +122,20 @@ class GuiScreen(
             ),
         )
         core.addListener(listener)
+        scope.launch {
+            updatesViewModel.state.collect { state ->
+                updatesState = state
+                if (screen == Screen.List || screen is Screen.Updates) render()
+            }
+        }
+        scope.launch {
+            updatesViewModel.events.collect { event ->
+                when (event) {
+                    is UpdateEvent.Message ->
+                        Toast.makeText(context, event.text, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
         render()
     }
 
@@ -177,8 +185,7 @@ class GuiScreen(
     }
 
     fun release() {
-        released = true
-        updatesExecutor.shutdownNow()
+        scope.cancel()
         core.removeListener(listener)
     }
 
@@ -259,44 +266,8 @@ class GuiScreen(
         editor = null
         screen = Screen.Updates
         render()
-        if (updatesState is UpdatesState.NotChecked) checkUpdates()
-    }
-
-    private fun checkUpdates() {
-        if (updatesState is UpdatesState.Checking) return
-        if (apkState is ApkDownloadState.Downloading || apkState is ApkDownloadState.Verifying) return
-        if (componentDownloads.values.any {
-                it is ComponentDownloadState.Downloading || it === ComponentDownloadState.Verifying
-            }
-        ) {
-            return
-        }
-        apkState = ApkDownloadState.Idle
-        componentDownloads.clear()
-        updatesState = UpdatesState.Checking
-        render()
-        updatesExecutor.execute {
-            val result = runCatching {
-                val (code, name) = installedAppVersion()
-                val manifest = Manifest.parse(UpdateSource.fetch())
-                UpdatesState.Ready(
-                    manifest = manifest,
-                    status = manifest.check(
-                        code,
-                        componentStore.downloaded().mapValues { it.value.sha256 },
-                    ),
-                    installedVersionCode = code,
-                    installedVersionName = name,
-                    checkedAt = System.currentTimeMillis(),
-                )
-            }
-            mainHandler.post {
-                if (released) return@post
-                updatesState = result.getOrElse {
-                    UpdatesState.Failed(it.message ?: "update check failed")
-                }
-                if (screen == Screen.List || screen is Screen.Updates) render()
-            }
+        if (updatesState.phase == UpdatesState.Phase.NOT_CHECKED) {
+            updatesViewModel.check()
         }
     }
 
@@ -306,8 +277,10 @@ class GuiScreen(
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
         header.addView(
-            headerButton(if (updatesState is UpdatesState.Checking) "Checking…" else "Check") {
-                checkUpdates()
+            headerButton(
+                if (updatesState.phase == UpdatesState.Phase.CHECKING) "Checking…" else "Check",
+            ) {
+                updatesViewModel.check()
             },
         )
         header.addView(headerButton("Back") {
@@ -316,24 +289,31 @@ class GuiScreen(
         })
 
         content.addView(sectionLabel("APP"))
-        content.addView(info("current", currentVersionText()))
-        when (val state = updatesState) {
-            UpdatesState.NotChecked -> content.addView(info("latest", "not checked"))
-            UpdatesState.Checking -> content.addView(info("latest", "checking…"))
-            is UpdatesState.Failed -> content.addView(TextView(context).apply {
-                setText(state.message)
+        content.addView(
+            info(
+                "current",
+                "${updatesState.installedVersionName} (${updatesState.installedVersionCode})",
+            ),
+        )
+        when (updatesState.phase) {
+            UpdatesState.Phase.NOT_CHECKED -> content.addView(info("latest", "not checked"))
+            UpdatesState.Phase.CHECKING -> content.addView(info("latest", "checking…"))
+            UpdatesState.Phase.FAILED -> content.addView(TextView(context).apply {
+                setText(updatesState.error ?: "update check failed")
                 setTextColor(errorText)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
                 setPadding(0, dp(10), 0, 0)
             })
-            is UpdatesState.Ready -> {
+            UpdatesState.Phase.READY -> {
+                val manifest = updatesState.manifest ?: return
+                val status = updatesState.status ?: return
                 content.addView(
                     info(
                         "latest",
-                        "${state.manifest.app.versionName} (${state.manifest.app.versionCode})",
+                        "${manifest.app.versionName} (${manifest.app.versionCode})",
                     ),
                 )
-                val appState = state.status.app.state
+                val appState = status.app.state
                 content.addView(
                     statusText(
                         if (appState == AppState.UPDATE_AVAILABLE) "Update available" else "Up to date",
@@ -341,34 +321,33 @@ class GuiScreen(
                     ),
                 )
                 if (appState == AppState.UPDATE_AVAILABLE) {
-                    content.addView(apkControls(state.manifest.app))
+                    content.addView(apkControls(updatesState))
                 }
                 content.addView(sectionLabel("COMPONENTS"))
-                state.status.components.forEach { componentStatus ->
+                status.components.forEach { componentStatus ->
                     content.addView(componentRow(componentStatus))
                 }
-                content.addView(TextView(context).apply {
-                    setText("Last checked: ${timeText(state.checkedAt)}")
-                    setTextColor(secondaryText)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                    setPadding(0, dp(18), 0, 0)
-                })
+                if (updatesState.checkedAt > 0) {
+                    content.addView(TextView(context).apply {
+                        setText("Last checked: ${timeText(updatesState.checkedAt)}")
+                        setTextColor(secondaryText)
+                        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                        setPadding(0, dp(18), 0, 0)
+                    })
+                }
             }
         }
     }
 
-    private fun apkControls(app: AppRelease): View {
+    private fun apkControls(state: UpdatesState): View {
+        val app = state.manifest?.app ?: return View(context)
         val box = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(0, dp(10), 0, 0)
         }
-        when (val state = apkState) {
-            ApkDownloadState.Idle -> {
-                box.addView(MaterialButton(context).apply {
-                    minWidth = 0
-                    text = "Download"
-                    setOnClickListener { downloadApk() }
-                })
+        when (val apk = state.apk) {
+            UpdatesState.ApkState.Idle -> {
+                box.addView(headerButton("Download") { updatesViewModel.downloadApk() })
                 box.addView(TextView(context).apply {
                     setText("${megabytes(app.apkSize)} · ${app.versionName}")
                     setTextColor(secondaryText)
@@ -376,31 +355,19 @@ class GuiScreen(
                     setPadding(0, dp(4), 0, 0)
                 })
             }
-            is ApkDownloadState.Downloading -> {
-                box.addView(statusText(downloadText(state.downloaded, state.total), secondaryText))
+            is UpdatesState.ApkState.Downloading -> {
+                box.addView(statusText(downloadText(apk.downloaded, apk.total), secondaryText))
             }
-            ApkDownloadState.Verifying -> {
+            UpdatesState.ApkState.Verifying -> {
                 box.addView(statusText("Verifying…", secondaryText))
             }
-            is ApkDownloadState.Ready -> {
-                box.addView(MaterialButton(context).apply {
-                    minWidth = 0
-                    text = "Install"
-                    setOnClickListener { installApk() }
-                })
-                box.addView(statusText("Downloaded ${state.versionName}", runningText))
+            is UpdatesState.ApkState.Ready -> {
+                box.addView(headerButton("Install") { updatesViewModel.installApk() })
+                box.addView(statusText("Downloaded ${apk.versionName}", runningText))
             }
-            is ApkDownloadState.Failed -> {
-                box.addView(TextView(context).apply {
-                    setText(state.message)
-                    setTextColor(errorText)
-                    setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-                })
-                box.addView(MaterialButton(context).apply {
-                    minWidth = 0
-                    text = "Retry"
-                    setOnClickListener { downloadApk() }
-                })
+            is UpdatesState.ApkState.Failed -> {
+                box.addView(statusText(apk.message, errorText))
+                box.addView(headerButton("Retry") { updatesViewModel.downloadApk() })
             }
         }
         return box
@@ -410,65 +377,6 @@ class GuiScreen(
         val percent = if (total > 0) ((downloaded * 100) / total).toInt() else 0
         return "Downloading… $percent% (${megabytes(downloaded)} / ${megabytes(total)})"
     }
-
-    private fun downloadApk() {
-        val ready = updatesState as? UpdatesState.Ready ?: return
-        val app = ready.manifest.app
-        if (ready.status.app.state != AppState.UPDATE_AVAILABLE) return
-        if (apkState is ApkDownloadState.Downloading || apkState is ApkDownloadState.Verifying) return
-        apkState = ApkDownloadState.Downloading(0, app.apkSize)
-        render()
-        updatesExecutor.execute {
-            val destination = File(
-                context.cacheDir,
-                "updates/Trierarch-${safeName(app.versionName)}.apk",
-            )
-            var lastPercent = -1
-            val result = runCatching {
-                FileDownloader.download(
-                    app.apkUrl,
-                    destination,
-                    app.apkSize,
-                    app.apkSha256,
-                ) { downloaded, total ->
-                    val percent = if (total > 0) ((downloaded * 100) / total).toInt() else -1
-                    if (percent == lastPercent) return@download
-                    lastPercent = percent
-                    mainHandler.post {
-                        if (released) return@post
-                        if (apkState is ApkDownloadState.Downloading) {
-                            apkState = ApkDownloadState.Downloading(downloaded, total)
-                            if (screen is Screen.Updates) render()
-                        }
-                    }
-                }
-                mainHandler.post {
-                    if (released) return@post
-                    apkState = ApkDownloadState.Verifying
-                    if (screen is Screen.Updates) render()
-                }
-                ApkVerifier.verify(context, destination, app.versionCode)
-                destination
-            }
-            mainHandler.post {
-                if (released) return@post
-                apkState = result.fold(
-                    onSuccess = { ApkDownloadState.Ready(it, app.versionName) },
-                    onFailure = { ApkDownloadState.Failed(it.message ?: "update failed") },
-                )
-                if (screen is Screen.Updates) render()
-            }
-        }
-    }
-
-    private fun installApk() {
-        val ready = apkState as? ApkDownloadState.Ready ?: return
-        runCatching { ApkInstaller.install(context, ready.file) }
-            .onFailure { showError(it.message ?: "unable to start the installer") }
-    }
-
-    private fun safeName(value: String): String =
-        value.replace(Regex("[^A-Za-z0-9._-]"), "_")
 
     private fun megabytes(bytes: Long): String =
         String.format(Locale.US, "%.1f MB", bytes / 1024.0 / 1024.0)
@@ -484,18 +392,18 @@ class GuiScreen(
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
         })
-        when (val download = componentDownloads[component.id]) {
-            is ComponentDownloadState.Downloading -> {
+        when (val download = updatesState.components[component.id]) {
+            is UpdatesState.ComponentDownload.Downloading -> {
                 box.addView(
                     statusText(downloadText(download.downloaded, download.total), secondaryText),
                 )
             }
-            ComponentDownloadState.Verifying -> {
+            UpdatesState.ComponentDownload.Verifying -> {
                 box.addView(statusText("Verifying…", secondaryText))
             }
-            is ComponentDownloadState.Failed -> {
+            is UpdatesState.ComponentDownload.Failed -> {
                 box.addView(statusText(download.message, errorText))
-                box.addView(headerButton("Retry") { downloadComponent(component) })
+                box.addView(headerButton("Retry") { updatesViewModel.downloadComponent(component) })
             }
             null -> when (status.state) {
                 ComponentState.NOT_DOWNLOADED, ComponentState.UPDATE_AVAILABLE -> {
@@ -505,7 +413,9 @@ class GuiScreen(
                             componentStateColor(status.state),
                         ),
                     )
-                    box.addView(headerButton("Download") { downloadComponent(component) })
+                    box.addView(
+                        headerButton("Download") { updatesViewModel.downloadComponent(component) },
+                    )
                 }
                 ComponentState.UP_TO_DATE -> {
                     box.addView(statusText("Downloaded", runningText))
@@ -531,103 +441,10 @@ class GuiScreen(
                 "Removes files/components/${component.file}. " +
                     "A copy already placed in a rootfs is not touched.",
             )
-            .setPositiveButton("Delete") { _, _ ->
-                val removed = componentStore.remove(component.id)
-                if (removed == null) {
-                    showError("nothing to delete for ${component.id}")
-                    return@setPositiveButton
-                }
-                Toast.makeText(context, "Deleted ${removed.file}", Toast.LENGTH_SHORT).show()
-                refreshComponentStatuses()
-                if (screen is Screen.Updates) render()
-            }
+            .setPositiveButton("Delete") { _, _ -> updatesViewModel.deleteComponent(component) }
             .setNegativeButton("Cancel", null)
             .show()
     }
-
-    private fun downloadComponent(component: ComponentRelease) {
-        val current = componentDownloads[component.id]
-        if (current is ComponentDownloadState.Downloading ||
-            current === ComponentDownloadState.Verifying
-        ) {
-            return
-        }
-        componentDownloads[component.id] = ComponentDownloadState.Downloading(0, component.size)
-        render()
-        updatesExecutor.execute {
-            val destination = componentStore.file(component.file)
-            var lastPercent = -1
-            val result = runCatching {
-                FileDownloader.download(
-                    component.url,
-                    destination,
-                    component.size,
-                    component.sha256,
-                ) { downloaded, total ->
-                    val percent = if (total > 0) ((downloaded * 100) / total).toInt() else -1
-                    if (percent == lastPercent) return@download
-                    lastPercent = percent
-                    mainHandler.post {
-                        if (released) return@post
-                        if (componentDownloads[component.id] is ComponentDownloadState.Downloading) {
-                            componentDownloads[component.id] =
-                                ComponentDownloadState.Downloading(downloaded, total)
-                            if (screen is Screen.Updates) render()
-                        }
-                    }
-                }
-                mainHandler.post {
-                    if (released) return@post
-                    componentDownloads[component.id] = ComponentDownloadState.Verifying
-                    if (screen is Screen.Updates) render()
-                }
-                componentStore.record(component.id, component.file, component.sha256)
-                destination
-            }
-            mainHandler.post {
-                if (released) return@post
-                if (result.isSuccess) {
-                    componentDownloads.remove(component.id)
-                    refreshComponentStatuses()
-                    Toast.makeText(
-                        context,
-                        "Saved to files/components/${component.file}",
-                        Toast.LENGTH_LONG,
-                    ).show()
-                } else {
-                    componentDownloads[component.id] = ComponentDownloadState.Failed(
-                        result.exceptionOrNull()?.message ?: "download failed",
-                    )
-                }
-                if (screen is Screen.Updates) render()
-            }
-        }
-    }
-
-    private fun refreshComponentStatuses() {
-        val ready = updatesState as? UpdatesState.Ready ?: return
-        updatesState = ready.copy(
-            status = ready.manifest.check(
-                ready.installedVersionCode,
-                componentStore.downloaded().mapValues { it.value.sha256 },
-            ),
-        )
-    }
-
-    private fun installedAppVersion(): Pair<Long, String> {
-        val info = context.packageManager.getPackageInfo(context.packageName, 0)
-        val code = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            info.longVersionCode
-        } else {
-            info.versionCode.toLong()
-        }
-        return code to (info.versionName ?: "")
-    }
-
-    private fun currentVersionText(): String = runCatching {
-        val (code, name) = installedAppVersion()
-        "$name ($code)"
-    }.getOrDefault("unknown")
 
     private fun componentStateText(state: ComponentState): String = when (state) {
         ComponentState.NOT_DOWNLOADED -> "Not downloaded"
@@ -642,16 +459,16 @@ class GuiScreen(
     }
 
     private fun updatesHaveAvailable(): Boolean {
-        val state = updatesState as? UpdatesState.Ready ?: return false
-        return state.status.app.state == AppState.UPDATE_AVAILABLE ||
-            state.status.components.any { it.state == ComponentState.UPDATE_AVAILABLE }
+        val status = updatesState.status ?: return false
+        return status.app.state == AppState.UPDATE_AVAILABLE ||
+            status.components.any { it.state == ComponentState.UPDATE_AVAILABLE }
     }
 
-    private fun updatesSummary(): String = when (val state = updatesState) {
-        UpdatesState.NotChecked -> "Check for app and component updates"
-        UpdatesState.Checking -> "Checking…"
-        is UpdatesState.Failed -> "Check failed"
-        is UpdatesState.Ready ->
+    private fun updatesSummary(): String = when (updatesState.phase) {
+        UpdatesState.Phase.NOT_CHECKED -> "Check for app and component updates"
+        UpdatesState.Phase.CHECKING -> "Checking…"
+        UpdatesState.Phase.FAILED -> "Check failed"
+        UpdatesState.Phase.READY ->
             if (updatesHaveAvailable()) "Update available" else "Up to date"
     }
 
@@ -1188,33 +1005,6 @@ class GuiScreen(
         data class Editor(val id: String, val revision: String) : Screen
         data class Logs(val id: String) : Screen
         data object Updates : Screen
-    }
-
-    private sealed interface ComponentDownloadState {
-        data class Downloading(val downloaded: Long, val total: Long) : ComponentDownloadState
-        data object Verifying : ComponentDownloadState
-        data class Failed(val message: String) : ComponentDownloadState
-    }
-
-    private sealed interface ApkDownloadState {
-        data object Idle : ApkDownloadState
-        data class Downloading(val downloaded: Long, val total: Long) : ApkDownloadState
-        data object Verifying : ApkDownloadState
-        data class Ready(val file: File, val versionName: String) : ApkDownloadState
-        data class Failed(val message: String) : ApkDownloadState
-    }
-
-    private sealed interface UpdatesState {
-        data object NotChecked : UpdatesState
-        data object Checking : UpdatesState
-        data class Ready(
-            val manifest: Manifest,
-            val status: UpdateStatus,
-            val installedVersionCode: Long,
-            val installedVersionName: String,
-            val checkedAt: Long,
-        ) : UpdatesState
-        data class Failed(val message: String) : UpdatesState
     }
 
     private companion object {

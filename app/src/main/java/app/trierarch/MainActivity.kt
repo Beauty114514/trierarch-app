@@ -21,6 +21,7 @@ import app.trierarch.core.Core
 import app.trierarch.core.ProfileService
 import app.trierarch.core.RootfsService
 import app.trierarch.core.SessionService
+import app.trierarch.feature.updates.UpdatesViewModel
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
 import app.trierarch.runtime.RuntimeControlServer
@@ -36,6 +37,7 @@ import com.termux.view.TerminalView
 /** The first Trierarch profile: a shell using the app's private files directory as its home. */
 class MainActivity : AppCompatActivity() {
     private val terminalViewModel: DefaultTerminalViewModel by viewModels()
+    private val updatesViewModel: UpdatesViewModel by viewModels()
     private lateinit var core: Core
     private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
@@ -144,6 +146,7 @@ class MainActivity : AppCompatActivity() {
         guiScreen = GuiScreen(
             context = this,
             core = core,
+            updatesViewModel = updatesViewModel,
             onClose = { closeGui() },
             onFollowSession = { hideGuiLayer() },
             onPickArchive = { name ->
