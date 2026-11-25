@@ -34,6 +34,8 @@ internal fun RootfsCatalogScreen(
 ) {
     var query by remember { mutableStateOf("") }
     var extractTarget by remember { mutableStateOf<Pair<LxcImage, DownloadedRootfs>?>(null) }
+    var renameTarget by remember { mutableStateOf<InstalledRootfs?>(null) }
+    var deleteTarget by remember { mutableStateOf<InstalledRootfs?>(null) }
     val filtered = remember(state.images, query) {
         val text = query.trim()
         if (text.isEmpty()) {
@@ -76,7 +78,13 @@ internal fun RootfsCatalogScreen(
                 .fillMaxWidth()
                 .weight(1f),
         ) {
-            item { InstalledSection(state.installed) }
+            item {
+                InstalledSection(
+                    installed = state.installed,
+                    onRename = { renameTarget = it },
+                    onDelete = { deleteTarget = it },
+                )
+            }
             item { SectionLabel("AVAILABLE · ${filtered.size}") }
             when {
                 state.loading && state.images.isEmpty() -> item {
@@ -116,6 +124,28 @@ internal fun RootfsCatalogScreen(
         }
     }
 
+    renameTarget?.let { entry ->
+        RenameRootfsDialog(
+            currentName = entry.name,
+            onDismiss = { renameTarget = null },
+            onRename = { name ->
+                renameTarget = null
+                controller.renameInstalled(entry, name)
+            },
+        )
+    }
+
+    deleteTarget?.let { entry ->
+        DeleteRootfsDialog(
+            entry = entry,
+            onDismiss = { deleteTarget = null },
+            onDelete = {
+                deleteTarget = null
+                controller.deleteInstalled(entry)
+            },
+        )
+    }
+
     extractTarget?.let { (image, downloaded) ->
         ExtractRootfsDialog(
             archive = downloaded.file,
@@ -130,7 +160,11 @@ internal fun RootfsCatalogScreen(
 }
 
 @Composable
-private fun InstalledSection(installed: List<InstalledRootfs>) {
+private fun InstalledSection(
+    installed: List<InstalledRootfs>,
+    onRename: (InstalledRootfs) -> Unit,
+    onDelete: (InstalledRootfs) -> Unit,
+) {
     Column {
         SectionLabel("INSTALLED · ${installed.size}")
         Text(
@@ -164,6 +198,10 @@ private fun InstalledSection(installed: List<InstalledRootfs>) {
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 2.dp),
                     )
+                    Row {
+                        TextAction("Rename") { onRename(entry) }
+                        TextAction("Delete", GuiColors.Error) { onDelete(entry) }
+                    }
                 }
                 GuiDivider()
             }
@@ -201,7 +239,7 @@ private fun RootfsRow(
                 )
                 if (image.recommended) {
                     Text(
-                        text = "文档推荐",
+                        text = "Recommended",
                         color = GuiColors.Pending,
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 2.dp),

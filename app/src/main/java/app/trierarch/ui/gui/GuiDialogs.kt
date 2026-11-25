@@ -18,6 +18,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import app.trierarch.core.ProfileDocument
+import app.trierarch.feature.rootfs.InstalledRootfs
 import app.trierarch.feature.rootfs.validateRootfsName
 import app.trierarch.update.ComponentRelease
 
@@ -238,6 +239,89 @@ internal fun ExtractRootfsDialog(
                     onDismiss()
                 }
             }) { Text("Extract") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+internal fun RenameRootfsDialog(
+    currentName: String,
+    onDismiss: () -> Unit,
+    onRename: (String) -> Unit,
+) {
+    var name by remember { mutableStateOf(currentName) }
+    var error by remember { mutableStateOf<String?>(null) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Rename rootfs") },
+        text = {
+            Column {
+                Text(
+                    "Current name: $currentName",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = GuiColors.Secondary,
+                )
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = {
+                        name = it
+                        error = null
+                    },
+                    label = { Text("new name") },
+                    singleLine = true,
+                    textStyle = TextStyle(fontFamily = FontFamily.Monospace),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                )
+                error?.let {
+                    Text(
+                        text = it,
+                        color = GuiColors.Error,
+                        style = MaterialTheme.typography.bodySmall,
+                        modifier = Modifier.padding(top = 4.dp),
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                val trimmed = name.trim()
+                val invalid = validateRootfsName(trimmed)
+                if (invalid != null) {
+                    error = invalid
+                } else {
+                    onRename(trimmed)
+                    onDismiss()
+                }
+            }) { Text("Rename") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        },
+    )
+}
+
+@Composable
+internal fun DeleteRootfsDialog(
+    entry: InstalledRootfs,
+    onDismiss: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Delete ${entry.name}?") },
+        text = {
+            Text(
+                "Removes ${entry.path}. Profiles that reference it are checked first.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+        },
+        confirmButton = {
+            TextButton(onClick = onDelete) { Text("Delete", color = GuiColors.Error) }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("Cancel") }

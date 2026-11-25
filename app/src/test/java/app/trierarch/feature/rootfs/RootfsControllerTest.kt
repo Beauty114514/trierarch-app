@@ -8,6 +8,8 @@ import app.trierarch.core.CoreEvent
 import app.trierarch.core.DocumentContent
 import app.trierarch.core.ProfileDocument
 import app.trierarch.core.RuntimeSnapshot
+import app.trierarch.core.SessionPhase
+import app.trierarch.core.SessionSnapshot
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.Executor
@@ -145,6 +147,113 @@ class RootfsControllerTest {
     }
 
     @Test
+    fun renamesAnUnusedInstalledRootfs() {
+        val rootfs = temporaryFolder.newFolder("rootfs")
+        File(rootfs, "arch").mkdirs()
+        val core = FakeCore()
+        val controller = controller(
+            store = store(),
+            core = core,
+            rootfsDirectory = rootfs,
+            downloadFile = { _, _, _, _ -> error("not used") },
+        )
+        val entry = controller.state.value.installed.single()
+
+        controller.renameInstalled(entry, "debian")
+
+        assertTrue(File(rootfs, "debian").isDirectory)
+        assertFalse(File(rootfs, "arch").exists())
+        assertEquals(listOf("debian"), controller.state.value.installed.map { it.name })
+        assertTrue(core.commands.isEmpty())
+    }
+
+    @Test
+    fun rejectsRenameWhenAProfileReferencesTheRootfs() {
+        val rootfs = temporaryFolder.newFolder("rootfs")
+        File(rootfs, "arch").mkdirs()
+        val core = FakeCore()
+        core.addProfile("arch-demo", File(rootfs, "arch").absolutePath)
+        val controller = controller(
+            store = store(),
+            core = core,
+            rootfsDirectory = rootfs,
+            downloadFile = { _, _, _, _ -> error("not used") },
+        )
+
+        controller.renameInstalled(controller.state.value.installed.single(), "debian")
+
+        assertTrue(File(rootfs, "arch").isDirectory)
+        assertFalse(File(rootfs, "debian").exists())
+        assertTrue(controller.state.value.error?.contains("referenced") == true)
+    }
+
+    @Test
+    fun rejectsRenameWhenARunningProfileUsesTheRootfs() {
+        val rootfs = temporaryFolder.newFolder("rootfs")
+        File(rootfs, "arch").mkdirs()
+        val core = FakeCore()
+        core.addProfile("arch-demo", File(rootfs, "arch").absolutePath)
+        core.sessions = RuntimeSnapshot(
+            mapOf("arch-demo" to SessionSnapshot("arch-demo", SessionPhase.RUNNING, true)),
+            null,
+        )
+        val controller = controller(
+            store = store(),
+            core = core,
+            rootfsDirectory = rootfs,
+            downloadFile = { _, _, _, _ -> error("not used") },
+        )
+
+        controller.renameInstalled(controller.state.value.installed.single(), "debian")
+
+        assertTrue(controller.state.value.error?.contains("running") == true)
+    }
+
+    @Test
+    fun deletesAnUnusedInstalledRootfs() {
+        val rootfs = temporaryFolder.newFolder("rootfs")
+        File(rootfs, "arch").mkdirs()
+        val core = FakeCore().apply {
+            onCommand = { command ->
+                if (command is Command.Document.Remove) {
+                    File(rootfs, "arch").deleteRecursively()
+                }
+            }
+        }
+        val controller = controller(
+            store = store(),
+            core = core,
+            rootfsDirectory = rootfs,
+            downloadFile = { _, _, _, _ -> error("not used") },
+        )
+
+        controller.deleteInstalled(controller.state.value.installed.single())
+
+        assertEquals(listOf(Command.Document.Remove("arch")), core.commands)
+        assertTrue(controller.state.value.installed.isEmpty())
+    }
+
+    @Test
+    fun rejectsDeleteWhenAProfileReferencesTheRootfs() {
+        val rootfs = temporaryFolder.newFolder("rootfs")
+        File(rootfs, "arch").mkdirs()
+        val core = FakeCore()
+        core.addProfile("arch-demo", File(rootfs, "arch").absolutePath)
+        val controller = controller(
+            store = store(),
+            core = core,
+            rootfsDirectory = rootfs,
+            downloadFile = { _, _, _, _ -> error("not used") },
+        )
+
+        controller.deleteInstalled(controller.state.value.installed.single())
+
+        assertTrue(core.commands.isEmpty())
+        assertTrue(File(rootfs, "arch").isDirectory)
+        assertTrue(controller.state.value.error?.contains("referenced") == true)
+    }
+
+    @Test
     fun refreshInstalledListsOnlyVisibleDirectoriesInTheDefaultPath() {
         val rootfs = temporaryFolder.newFolder("rootfs")
         File(rootfs, "debian").mkdirs()
@@ -242,10 +351,27 @@ class RootfsControllerTest {
         val commands = mutableListOf<Command>()
         var outcome: CommandOutcome = CommandOutcome.Success("ok")
         var onCommand: ((Command) -> Unit)? = null
+        private val profiles = mutableListOf<ProfileDocument>()
+        private val contents = mutableMapOf<String, String>()
+        var sessions: RuntimeSnapshot = RuntimeSnapshot(emptyMap(), null)
 
-        override fun documents(): List<ProfileDocument> = emptyList()
-        override fun read(id: String): DocumentContent? = null
-        override fun sessions(): RuntimeSnapshot = RuntimeSnapshot(emptyMap(), null)
+        fun addProfile(id: String, rootfs: String) {
+            profiles += ProfileDocument(
+                file = File("/tmp/$id.toml"),
+                id = id,
+                runtime = "proot",
+                display = "none",
+                renderer = null,
+                error = null,
+            )
+            contents[id] = "runtime = \"proot\"\nrootfs = \"$rootfs\"\nshell = \"/bin/sh\"\n"
+        }
+
+        override fun documents(): List<ProfileDocument> = profiles.toList()
+        override fun read(id: String): DocumentContent? =
+            contents[id]?.let { DocumentContent(id, it, "rev") }
+
+        override fun sessions(): RuntimeSnapshot = sessions
         override fun logs(id: String, lines: Int): String? = null
         override fun submit(command: Command, onDone: (CommandOutcome) -> Unit) {
             commands += command

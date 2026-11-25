@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import org.tomlj.Toml
 
 data class InstalledRootfs(
     val name: String,
@@ -263,6 +264,60 @@ class RootfsController(
         }
     }
 
+    fun deleteInstalled(entry: InstalledRootfs) {
+        val users = usersOf(entry)
+        if (users.isNotEmpty()) {
+            actionError(usageMessage(users))
+            return
+        }
+        core.submit(Command.Document.Remove(entry.name)) { outcome ->
+            when (outcome) {
+                is CommandOutcome.Failure -> actionError(outcome.error.message)
+                is CommandOutcome.Success -> {
+                    mutableState.value = mutableState.value.copy(error = null)
+                    refreshInstalled()
+                    mutableEvents.tryEmit(RootfsEvent.Message("Deleted ${entry.name}"))
+                }
+            }
+        }
+    }
+
+    fun renameInstalled(entry: InstalledRootfs, newName: String) {
+        val clean = newName.trim()
+        validateRootfsName(clean)?.let {
+            actionError(it)
+            return
+        }
+        if (clean == entry.name) {
+            actionError("rootfs name is unchanged")
+            return
+        }
+        val users = usersOf(entry)
+        if (users.isNotEmpty()) {
+            actionError(usageMessage(users))
+            return
+        }
+        val destination = File(rootfsDirectory, clean)
+        if (destination.exists()) {
+            actionError("rootfs name already exists: $clean")
+            return
+        }
+        executor.execute {
+            val source = File(entry.path)
+            if (!source.isDirectory) {
+                actionError("rootfs no longer exists: ${entry.name}")
+                return@execute
+            }
+            if (!source.renameTo(destination)) {
+                actionError("unable to rename ${entry.name}")
+                return@execute
+            }
+            mutableState.value = mutableState.value.copy(error = null)
+            refreshInstalled()
+            mutableEvents.tryEmit(RootfsEvent.Message("Renamed ${entry.name} to $clean"))
+        }
+    }
+
     fun refreshDownloaded() {
         mutableState.value = mutableState.value.copy(downloaded = store.list())
     }
@@ -288,6 +343,31 @@ class RootfsController(
                 .toList()
         }
         mutableState.value = mutableState.value.copy(installed = installed)
+    }
+
+    private fun usersOf(entry: InstalledRootfs): List<String> {
+        val target = runCatching { File(entry.path).canonicalPath }.getOrDefault(entry.path)
+        return core.documents().mapNotNull { document ->
+            val text = core.read(document.id)?.text ?: return@mapNotNull null
+            val parsed = runCatching { Toml.parse(text) }.getOrNull() ?: return@mapNotNull null
+            if (parsed.hasErrors()) return@mapNotNull null
+            val rootfs = parsed.getString("rootfs")?.trim()?.takeIf { it.isNotEmpty() } ?: return@mapNotNull null
+            val path = runCatching { File(rootfs).canonicalPath }.getOrDefault(rootfs)
+            if (path == target) document.id else null
+        }
+    }
+
+    private fun usageMessage(users: List<String>): String {
+        val running = users.filter { it in core.sessions().sessions.keys }
+        return if (running.isNotEmpty()) {
+            "rootfs is in use by running profile: ${running.joinToString()}"
+        } else {
+            "rootfs is referenced by profile: ${users.joinToString()}; delete the profile first"
+        }
+    }
+
+    private fun actionError(message: String) {
+        mutableState.value = mutableState.value.copy(error = message)
     }
 
     private fun failInstall(downloaded: DownloadedRootfs, name: String, message: String) {
