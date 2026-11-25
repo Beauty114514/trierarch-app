@@ -3,10 +3,7 @@ package app.trierarch.ui.gui
 import android.content.Context
 import android.content.DialogInterface
 import android.graphics.Color
-import android.net.Uri
 import android.graphics.Typeface
-import android.os.Handler
-import android.os.Looper
 import android.text.InputType
 import android.util.TypedValue
 import android.view.Gravity
@@ -18,15 +15,14 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
-import app.trierarch.core.Command
-import app.trierarch.core.CommandOutcome
-import app.trierarch.core.Core
-import app.trierarch.core.CoreEvent
-import app.trierarch.core.DocumentContent
 import app.trierarch.core.ProfileDocument
 import app.trierarch.core.ProfileService
 import app.trierarch.core.SessionPhase
 import app.trierarch.core.SessionSnapshot
+import app.trierarch.feature.profiles.ProfileScreen
+import app.trierarch.feature.profiles.ProfilesController
+import app.trierarch.feature.profiles.ProfilesEvent
+import app.trierarch.feature.profiles.ProfilesState
 import app.trierarch.feature.updates.UpdateEvent
 import app.trierarch.feature.updates.UpdatesState
 import app.trierarch.feature.updates.UpdatesViewModel
@@ -37,7 +33,6 @@ import app.trierarch.update.ComponentStatus
 import app.trierarch.update.check
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
-import java.io.File
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.CoroutineScope
@@ -48,12 +43,12 @@ import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.launch
 
 /**
- * The in-app GUI: a view over [Core]. It never owns sessions or writes profile
- * files; every action goes through the core and every refresh re-reads it.
+ * The in-app GUI: it renders [ProfilesController] and [UpdatesViewModel] state
+ * and forwards intents. It never talks to Core, reads files or runs downloads.
  */
 class GuiScreen(
     private val context: Context,
-    private val core: Core,
+    private val profilesController: ProfilesController,
     private val updatesViewModel: UpdatesViewModel,
     private val onClose: () -> Unit,
     private val onFollowSession: () -> Unit,
@@ -83,20 +78,12 @@ class GuiScreen(
     }
     private val content = LinearLayout(context).apply { orientation = LinearLayout.VERTICAL }
 
-    private var screen: Screen = Screen.List
-    private var editor: EditText? = null
-    private var imeInset = 0
+    private var profilesState: ProfilesState = profilesController.state.value
     private var updatesState: UpdatesState = updatesViewModel.state.value
+    private var showUpdates = false
+    private var lastProfileScreen: ProfileScreen? = null
+    private var imeInset = 0
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val mainHandler = Handler(Looper.getMainLooper())
-
-    private val listener: (CoreEvent) -> Unit = { event ->
-        if (screen !is Screen.Editor && screen !is Screen.Logs &&
-            (event == CoreEvent.DocumentsChanged || event == CoreEvent.SessionsChanged)
-        ) {
-            render()
-        }
-    }
 
     init {
         column.addView(header)
@@ -121,11 +108,30 @@ class GuiScreen(
                 ViewGroup.LayoutParams.MATCH_PARENT,
             ),
         )
-        core.addListener(listener)
+        scope.launch {
+            profilesController.state.collect { state ->
+                profilesState = state
+                val screenChanged = state.screen != lastProfileScreen
+                lastProfileScreen = state.screen
+                if (state.error != null) showError(state.error) else hideError()
+                if (!showUpdates && (screenChanged || state.screen !is ProfileScreen.Editor)) {
+                    render()
+                }
+            }
+        }
+        scope.launch {
+            profilesController.events.collect { event ->
+                when (event) {
+                    ProfilesEvent.FollowSession -> onFollowSession()
+                    is ProfilesEvent.Message ->
+                        Toast.makeText(context, event.text, Toast.LENGTH_LONG).show()
+                }
+            }
+        }
         scope.launch {
             updatesViewModel.state.collect { state ->
                 updatesState = state
-                if (screen == Screen.List || screen is Screen.Updates) render()
+                if (showUpdates || profilesState.screen == ProfileScreen.List) render()
             }
         }
         scope.launch {
@@ -148,56 +154,39 @@ class GuiScreen(
         column.setPadding(dp(20), dp(16), dp(20), dp(16) + inset)
     }
 
-    /** Re-reads the core; never touches an editor with unsaved text. */
+    /** Re-reads the profile controller; never touches an editor with unsaved text. */
     fun refresh() {
-        if (screen is Screen.Editor) return
-        render()
+        profilesController.refresh()
     }
 
     /** Returns true when it navigated inside the GUI; false at the root list. */
-    fun handleBack(): Boolean = when (val current = screen) {
-        Screen.List -> false
-        is Screen.Editor -> {
-            editor = null
-            hideError()
-            screen = Screen.Details(current.id)
+    fun handleBack(): Boolean {
+        if (showUpdates) {
+            showUpdates = false
             render()
-            true
+            return true
         }
-        is Screen.Details -> {
-            hideError()
-            screen = Screen.List
-            render()
-            true
-        }
-        is Screen.Logs -> {
-            hideError()
-            screen = Screen.Details(current.id)
-            render()
-            true
-        }
-        Screen.Updates -> {
-            hideError()
-            screen = Screen.List
-            render()
-            true
-        }
+        val handled = profilesController.back()
+        if (handled) render()
+        return handled
     }
 
     fun release() {
         scope.cancel()
-        core.removeListener(listener)
     }
 
     private fun render() {
         header.removeAllViews()
         content.removeAllViews()
-        when (val current = screen) {
-            Screen.List -> renderList()
-            is Screen.Details -> renderDetails(current.id)
-            is Screen.Editor -> Unit
-            is Screen.Logs -> renderLogs(current.id)
-            Screen.Updates -> renderUpdates()
+        if (showUpdates) {
+            renderUpdates()
+            return
+        }
+        when (val current = profilesState.screen) {
+            ProfileScreen.List -> renderList()
+            is ProfileScreen.Details -> renderDetails(current.id)
+            is ProfileScreen.Editor -> renderEditor(current.id)
+            is ProfileScreen.Logs -> renderLogs(current.id)
         }
     }
 
@@ -210,8 +199,8 @@ class GuiScreen(
         header.addView(headerButton("Import") { promptImport() })
         header.addView(headerButton("Terminal") { onClose() })
 
-        val documents = core.documents()
-        val snapshot = core.sessions()
+        val documents = profilesState.documents
+        val snapshot = profilesState.sessions
         content.addView(updatesEntry())
         content.addView(sectionLabel("ENVIRONMENTS · ${documents.size}"))
         if (documents.isEmpty()) {
@@ -263,8 +252,7 @@ class GuiScreen(
 
     private fun openUpdates() {
         hideError()
-        editor = null
-        screen = Screen.Updates
+        showUpdates = true
         render()
         if (updatesState.phase == UpdatesState.Phase.NOT_CHECKED) {
             updatesViewModel.check()
@@ -284,7 +272,7 @@ class GuiScreen(
             },
         )
         header.addView(headerButton("Back") {
-            screen = Screen.List
+            showUpdates = false
             render()
         })
 
@@ -483,21 +471,16 @@ class GuiScreen(
         android.text.format.DateFormat.getTimeFormat(context).format(Date(millis))
 
     private fun renderDetails(id: String) {
-        val document = core.documents().firstOrNull { it.id == id }
+        val document = profilesState.documents.firstOrNull { it.id == id }
         if (document == null) {
-            screen = Screen.List
-            render()
+            profilesController.back()
             return
         }
         header.addView(
             title(document.id),
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
-        header.addView(headerButton("Back") {
-            hideError()
-            screen = Screen.List
-            render()
-        })
+        header.addView(headerButton("Back") { profilesController.back() })
 
         content.addView(sectionLabel("PROFILE"))
         content.addView(info("runtime", document.runtime.ifEmpty { "—" }))
@@ -508,7 +491,7 @@ class GuiScreen(
             ),
         )
         content.addView(info("renderer", document.renderer ?: "—"))
-        val snapshot = core.sessions()
+        val snapshot = profilesState.sessions
         val session = snapshot.sessions[document.id]
         content.addView(info("state", phaseText(session)))
 
@@ -529,14 +512,14 @@ class GuiScreen(
         val busy = snapshot.pending != null
         when (session?.phase ?: SessionPhase.STOPPED) {
             SessionPhase.STOPPED -> primary.addView(
-                primaryAction("Start", busy) { submit(Command.Session.Run(document.id)) },
+                primaryAction("Start", busy) { profilesController.run(document.id) },
             )
             SessionPhase.RUNNING -> {
                 primary.addView(
-                    primaryAction("Open", busy) { submit(Command.Session.Open(document.id)) },
+                    primaryAction("Open", busy) { profilesController.open(document.id) },
                 )
                 primary.addView(
-                    secondaryAction("Stop", busy) { submit(Command.Session.Stop(document.id)) },
+                    secondaryAction("Stop", busy) { profilesController.stop(document.id) },
                 )
             }
             SessionPhase.STARTING, SessionPhase.STOPPING -> primary.addView(
@@ -550,46 +533,10 @@ class GuiScreen(
             gravity = Gravity.CENTER_VERTICAL
             setPadding(0, dp(4), 0, 0)
         }
-        manage.addView(textAction("Edit") { openEditor(document.id) })
-        manage.addView(textAction("Logs") { openLogs(document.id) })
+        manage.addView(textAction("Edit") { profilesController.openEditor(document.id) })
+        manage.addView(textAction("Logs") { profilesController.openLogs(document.id) })
         manage.addView(textAction("Delete", errorText) { confirmDelete(document) })
         content.addView(manage)
-    }
-
-    private fun renderEditor(document: DocumentContent) {
-        header.removeAllViews()
-        content.removeAllViews()
-        header.addView(
-            title("Edit ${document.id}"),
-            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
-        )
-        header.addView(headerButton("Save") { saveEditor() })
-        header.addView(headerButton("Cancel") { cancelEditor() })
-
-        val field = EditText(context).apply {
-            setText(document.text)
-            setTextColor(Color.WHITE)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            typeface = Typeface.MONOSPACE
-            setBackgroundColor(fieldColor)
-            setPadding(dp(12), dp(12), dp(12), dp(12))
-            gravity = Gravity.TOP or Gravity.START
-            minLines = 18
-            inputType = InputType.TYPE_CLASS_TEXT or
-                InputType.TYPE_TEXT_FLAG_MULTI_LINE or
-                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
-        }
-        editor = field
-        content.addView(field, LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT,
-            ViewGroup.LayoutParams.WRAP_CONTENT,
-        ))
-        content.addView(TextView(context).apply {
-            text = "Raw TOML. Save checks that the file has not changed since it was opened."
-            setTextColor(secondaryText)
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
-            setPadding(0, dp(10), 0, 0)
-        })
     }
 
     private fun environmentRow(
@@ -602,7 +549,7 @@ class GuiScreen(
             setPadding(0, dp(14), 0, 0)
             isClickable = true
             isFocusable = true
-            setOnClickListener { openDetails(document.id) }
+            setOnClickListener { profilesController.openDetails(document.id) }
         }
         val line = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -688,14 +635,14 @@ class GuiScreen(
         }
         when (phase) {
             SessionPhase.STOPPED -> actions.addView(
-                primaryAction("Start", busy) { submit(Command.Session.Run(document.id)) },
+                primaryAction("Start", busy) { profilesController.run(document.id) },
             )
             SessionPhase.RUNNING -> {
                 actions.addView(
-                    primaryAction("Open", busy) { submit(Command.Session.Open(document.id)) },
+                    primaryAction("Open", busy) { profilesController.open(document.id) },
                 )
                 actions.addView(
-                    secondaryAction("Stop", busy) { submit(Command.Session.Stop(document.id)) },
+                    secondaryAction("Stop", busy) { profilesController.stop(document.id) },
                 )
             }
             SessionPhase.STARTING, SessionPhase.STOPPING -> actions.addView(
@@ -705,46 +652,15 @@ class GuiScreen(
         return actions
     }
 
-    private fun openDetails(id: String) {
-        hideError()
-        editor = null
-        screen = Screen.Details(id)
-        render()
-    }
-
-    private fun openEditor(id: String) {
-        hideError()
-        val document = core.read(id)
-        if (document == null) {
-            screen = Screen.List
-            showError("profile does not exist: $id")
-            render()
-            return
-        }
-        screen = Screen.Editor(id, document.revision)
-        renderEditor(document)
-    }
-
-    private fun openLogs(id: String) {
-        hideError()
-        editor = null
-        screen = Screen.Logs(id)
-        render()
-    }
-
     private fun renderLogs(id: String) {
         header.addView(
             title("Logs · $id"),
             LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
-        header.addView(headerButton("Refresh") { render() })
-        header.addView(headerButton("Back") {
-            screen = Screen.Details(id)
-            render()
-        })
-        val text = core.logs(id, 400)
+        header.addView(headerButton("Refresh") { profilesController.openLogs(id) })
+        header.addView(headerButton("Back") { profilesController.back() })
         content.addView(TextView(context).apply {
-            setText(text ?: "No session log yet.")
+            setText(profilesState.logText ?: "No session log yet.")
             setTextColor(Color.WHITE)
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
             typeface = Typeface.MONOSPACE
@@ -753,24 +669,41 @@ class GuiScreen(
         })
     }
 
-    private fun saveEditor() {
-        val field = editor ?: return
-        val current = screen as? Screen.Editor ?: return
-        submit(
-            Command.Document.Save(current.id, field.text.toString(), current.revision),
-            afterSuccess = {
-                editor = null
-                screen = Screen.List
-            },
+    private fun renderEditor(id: String) {
+        val field = EditText(context).apply {
+            setText(profilesState.editorText)
+            setTextColor(Color.WHITE)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            typeface = Typeface.MONOSPACE
+            setBackgroundColor(fieldColor)
+            setPadding(dp(12), dp(12), dp(12), dp(12))
+            gravity = Gravity.TOP or Gravity.START
+            minLines = 18
+            inputType = InputType.TYPE_CLASS_TEXT or
+                InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+        }
+        header.addView(
+            title("Edit $id"),
+            LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f),
         )
-    }
-
-    private fun cancelEditor() {
-        val current = screen as? Screen.Editor ?: return
-        editor = null
-        hideError()
-        screen = Screen.Details(current.id)
-        render()
+        header.addView(headerButton("Save") {
+            profilesController.saveEditor(field.text.toString())
+        })
+        header.addView(headerButton("Cancel") { profilesController.back() })
+        content.addView(
+            field,
+            LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+            ),
+        )
+        content.addView(TextView(context).apply {
+            text = "Raw TOML. Save checks that the file has not changed since it was opened."
+            setTextColor(secondaryText)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(0, dp(10), 0, 0)
+        })
     }
 
     private fun promptCreate() {
@@ -794,7 +727,7 @@ class GuiScreen(
                     return@setOnClickListener
                 }
                 dialog.dismiss()
-                submit(Command.Document.Create(id), afterSuccess = { screen = Screen.List })
+                profilesController.create(id)
             }
         }
         dialog.show()
@@ -822,75 +755,13 @@ class GuiScreen(
             .show()
     }
 
-    /** Copies the SAF stream to a real .xz file, then hands it to the core. */
-    fun importArchive(uri: Uri, name: String) {
-        showStatus("Reading archive…")
-        Thread {
-            val archive = File(context.cacheDir, "import-${System.nanoTime()}.tar.xz")
-            val copied = runCatching {
-                context.contentResolver.openInputStream(uri)?.use { input ->
-                    archive.outputStream().use { output -> input.copyTo(output) }
-                } ?: error("unable to open archive")
-                archive
-            }
-            mainHandler.post {
-                copied.onSuccess { file ->
-                    showStatus("Importing $name…")
-                    core.submit(Command.Document.Import(file.absolutePath, name)) { outcome ->
-                        file.delete()
-                        when (outcome) {
-                            is CommandOutcome.Failure -> showError(outcome.error.message)
-                            is CommandOutcome.Success -> {
-                                hideError()
-                                Toast.makeText(context, outcome.message, Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
-                }.onFailure { showError(it.message ?: "unable to read archive") }
-            }
-        }.start()
-    }
-
     private fun confirmDelete(document: ProfileDocument) {
         MaterialAlertDialogBuilder(context)
             .setTitle("Delete ${document.id}?")
             .setMessage("The profile file is removed. A running session is not stopped.")
-            .setPositiveButton("Delete") { _, _ ->
-                val current = core.read(document.id)
-                if (current == null) {
-                    showError("profile does not exist: ${document.id}")
-                    return@setPositiveButton
-                }
-                submit(
-                    Command.Document.Delete(current.id, current.revision),
-                    afterSuccess = { screen = Screen.List },
-                )
-            }
+            .setPositiveButton("Delete") { _, _ -> profilesController.delete(document.id) }
             .setNegativeButton("Cancel", null)
             .show()
-    }
-
-    private fun submit(command: Command, afterSuccess: (() -> Unit)? = null) {
-        hideError()
-        core.submit(command) { outcome ->
-            when (outcome) {
-                is CommandOutcome.Failure -> showError(outcome.error.message)
-                is CommandOutcome.Success -> {
-                    if (command is Command.Session.Run || command is Command.Session.Open) {
-                        // Follow the session and let its display host own focus.
-                        onFollowSession()
-                    }
-                    outcome.afterReply?.invoke()
-                    afterSuccess?.invoke()
-                }
-            }
-        }
-    }
-
-    private fun showStatus(message: String) {
-        errorLabel.setTextColor(secondaryText)
-        errorLabel.text = message
-        errorLabel.visibility = View.VISIBLE
     }
 
     private fun showError(message: String) {
@@ -998,14 +869,6 @@ class GuiScreen(
         value.toFloat(),
         context.resources.displayMetrics,
     ).toInt()
-
-    private sealed interface Screen {
-        data object List : Screen
-        data class Details(val id: String) : Screen
-        data class Editor(val id: String, val revision: String) : Screen
-        data class Logs(val id: String) : Screen
-        data object Updates : Screen
-    }
 
     private companion object {
         val secondaryText = 0xFF9CA3AF.toInt()

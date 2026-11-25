@@ -21,6 +21,7 @@ import app.trierarch.core.Core
 import app.trierarch.core.ProfileService
 import app.trierarch.core.RootfsService
 import app.trierarch.core.SessionService
+import app.trierarch.feature.profiles.ProfilesController
 import app.trierarch.feature.updates.UpdatesViewModel
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
@@ -39,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private val terminalViewModel: DefaultTerminalViewModel by viewModels()
     private val updatesViewModel: UpdatesViewModel by viewModels()
     private lateinit var core: Core
+    private lateinit var profilesController: ProfilesController
     private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
     private lateinit var terminalContainer: FrameLayout
@@ -55,7 +57,7 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             val name = pendingImportName ?: return@registerForActivityResult
             pendingImportName = null
-            if (uri != null) guiScreen.importArchive(uri, name)
+            if (uri != null) profilesController.importUri(uri, name)
         }
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
@@ -132,6 +134,7 @@ class MainActivity : AppCompatActivity() {
             ),
         )
         runtimeControlServer = RuntimeControlServer(this, core)
+        profilesController = ProfilesController(applicationContext, core)
         floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
@@ -145,7 +148,7 @@ class MainActivity : AppCompatActivity() {
         )
         guiScreen = GuiScreen(
             context = this,
-            core = core,
+            profilesController = profilesController,
             updatesViewModel = updatesViewModel,
             onClose = { closeGui() },
             onFollowSession = { hideGuiLayer() },
@@ -505,6 +508,7 @@ class MainActivity : AppCompatActivity() {
     override fun onDestroy() {
         rootKeyboard.stop()
         if (::guiScreen.isInitialized) guiScreen.release()
+        if (::profilesController.isInitialized) profilesController.close()
         x11Host.release()
         runtimeControlServer?.close()
         runtimeControlServer = null
