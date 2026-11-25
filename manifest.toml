@@ -12,11 +12,11 @@ notesUrl = "https://github.com/Beauty114514/trierarch-app/releases/tag/v0.5.1"
 [[components]]
 id = "kwin-compat"
 name = "KWin compatibility"
-version = "6.8.3-1"
-file = "kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst"
-url = "https://github.com/Beauty114514/trierarch-app/releases/download/v0.5.1/kwin-compat-6.8.3-1-archlinuxarm-aarch64.tar.zst"
-size = 4777818
-sha256 = "e55741cee9470cd9ca5a689083e3128fe5a29b82f41e689fafab4b35c272517a"
+version = "6.8.3-2"
+file = "kwin-compat-6.8.3-2-archlinuxarm-aarch64.tar.zst"
+url = "https://github.com/Beauty114514/trierarch-app/releases/download/v0.5.1/kwin-compat-6.8.3-2-archlinuxarm-aarch64.tar.zst"
+size = 4777815
+sha256 = "effdf791731305be2ed6947104c440c7f4655a55cb285ae1a7746d29ee4b0075"
 
 [[components]]
 id = "mesa-26"
