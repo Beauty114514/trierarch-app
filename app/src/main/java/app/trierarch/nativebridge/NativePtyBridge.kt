@@ -65,6 +65,9 @@ object NativePtyBridge {
     /** Removes an imported rootfs and returns the removed path. */
     external fun removeRootfs(filesDirectory: String, name: String): String
 
+    /** Extracts a file component archive into an app-private directory. */
+    external fun extractComponentArchive(archivePath: String, destinationPath: String)
+
     /** Lists DroidSpaces containers from the backend workspace; requires root. */
     external fun listDroidspacesContainers(): String
 

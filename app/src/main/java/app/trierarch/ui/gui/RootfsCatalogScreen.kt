@@ -31,6 +31,7 @@ internal fun RootfsCatalogScreen(
     state: RootfsState,
     controller: RootfsController,
     onBack: () -> Unit,
+    onComponents: (InstalledRootfs) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var extractTarget by remember { mutableStateOf<Pair<LxcImage, DownloadedRootfs>?>(null) }
@@ -83,6 +84,7 @@ internal fun RootfsCatalogScreen(
                     installed = state.installed,
                     onRename = { renameTarget = it },
                     onDelete = { deleteTarget = it },
+                    onComponents = onComponents,
                 )
             }
             item { SectionLabel("AVAILABLE · ${filtered.size}") }
@@ -164,6 +166,7 @@ private fun InstalledSection(
     installed: List<InstalledRootfs>,
     onRename: (InstalledRootfs) -> Unit,
     onDelete: (InstalledRootfs) -> Unit,
+    onComponents: (InstalledRootfs) -> Unit,
 ) {
     Column {
         SectionLabel("INSTALLED · ${installed.size}")
@@ -201,6 +204,7 @@ private fun InstalledSection(
                     Row {
                         TextAction("Rename") { onRename(entry) }
                         TextAction("Delete", GuiColors.Error) { onDelete(entry) }
+                        TextAction("Components") { onComponents(entry) }
                     }
                 }
                 GuiDivider()

@@ -23,6 +23,7 @@ import androidx.compose.ui.unit.dp
 import app.trierarch.feature.profiles.ProfileScreen
 import app.trierarch.feature.profiles.ProfilesController
 import app.trierarch.feature.profiles.ProfilesEvent
+import app.trierarch.feature.rootfs.InstalledRootfs
 import app.trierarch.feature.rootfs.RootfsController
 import app.trierarch.feature.rootfs.RootfsEvent
 import app.trierarch.feature.updates.UpdateEvent
@@ -44,6 +45,7 @@ internal class GuiScreen(
 ) {
     private var showNewProfile by mutableStateOf(false)
     private var showRootfs by mutableStateOf(false)
+    private var componentsRootfs by mutableStateOf<InstalledRootfs?>(null)
     private var showUpdates by mutableStateOf(false)
     private var imeBottomInset by mutableIntStateOf(0)
 
@@ -56,6 +58,7 @@ internal class GuiScreen(
                     rootfsController = rootfsController,
                     showNewProfile = showNewProfile,
                     showRootfs = showRootfs,
+                    componentsRootfs = componentsRootfs,
                     showUpdates = showUpdates,
                     imeInset = imeBottomInset,
                     onFollowSession = onFollowSession,
@@ -73,6 +76,11 @@ internal class GuiScreen(
                         rootfsController.load(false)
                     },
                     onCloseRootfs = { showRootfs = false },
+                    onOpenComponents = { entry ->
+                        showRootfs = false
+                        componentsRootfs = entry
+                    },
+                    onCloseComponents = { componentsRootfs = null },
                     onOpenNewProfile = {
                         profilesController.clearError()
                         rootfsController.refreshInstalled()
@@ -105,6 +113,10 @@ internal class GuiScreen(
             showNewProfile = false
             return true
         }
+        if (componentsRootfs != null) {
+            componentsRootfs = null
+            return true
+        }
         if (showRootfs) {
             showRootfs = false
             return true
@@ -128,6 +140,7 @@ private fun GuiRoot(
     rootfsController: RootfsController,
     showNewProfile: Boolean,
     showRootfs: Boolean,
+    componentsRootfs: InstalledRootfs?,
     showUpdates: Boolean,
     imeInset: Int,
     onFollowSession: () -> Unit,
@@ -137,6 +150,8 @@ private fun GuiRoot(
     onCloseUpdates: () -> Unit,
     onOpenRootfs: () -> Unit,
     onCloseRootfs: () -> Unit,
+    onOpenComponents: (InstalledRootfs) -> Unit,
+    onCloseComponents: () -> Unit,
     onOpenNewProfile: () -> Unit,
     onCloseNewProfile: () -> Unit,
     onProfileCreated: () -> Unit,
@@ -194,11 +209,17 @@ private fun GuiRoot(
                     onBack = onCloseNewProfile,
                     onOpenRootfs = onOpenRootfsFromNewProfile,
                 )
+            } else if (componentsRootfs != null) {
+                RootfsComponentsScreen(
+                    rootfs = componentsRootfs,
+                    onBack = onCloseComponents,
+                )
             } else if (showRootfs) {
                 RootfsCatalogScreen(
                     state = rootfs,
                     controller = rootfsController,
                     onBack = onCloseRootfs,
+                    onComponents = onOpenComponents,
                 )
             } else if (showUpdates) {
                 UpdatesScreen(
