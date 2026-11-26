@@ -47,3 +47,39 @@ class ProotCommandInstrumentedTest {
         assertTrue("output: $result", result.substring(newline + 1).contains("bash"))
     }
 }
+
+@RunWith(AndroidJUnit4::class)
+class ChrootCommandInstrumentedTest {
+    private fun rootfs(): File {
+        val context = InstrumentationRegistry.getInstrumentation().targetContext
+        return File(context.filesDir, "rootfs/archlinux-test")
+    }
+
+    private fun config(arguments: List<String>): Array<String> = buildList {
+        add("rootfs=${rootfs().absolutePath}")
+        add("launch_argv.count=${arguments.size}")
+        arguments.forEachIndexed { index, value -> add("launch_argv.$index=$value") }
+    }.toTypedArray()
+
+    @Test
+    fun runsACommandInsideChrootAndCapturesOutput() {
+        assumeTrue(rootfs().isDirectory)
+        val result = NativePtyBridge.runChrootCommand(
+            config(listOf("/bin/echo", "trierarch-chroot-probe")),
+        )
+        val newline = result.indexOf('\n')
+        assertTrue("output: $result", newline > 0)
+        assertTrue("output: $result", result.substring(newline + 1).contains("trierarch-chroot-probe"))
+    }
+
+    @Test
+    fun runsPacmanQueryInsideChroot() {
+        assumeTrue(rootfs().isDirectory)
+        val result = NativePtyBridge.runChrootCommand(
+            config(listOf("/usr/bin/pacman", "-Q", "bash")),
+        )
+        val newline = result.indexOf('\n')
+        assertTrue("output: $result", newline > 0)
+        assertTrue("output: $result", result.substring(newline + 1).contains("bash"))
+    }
+}
