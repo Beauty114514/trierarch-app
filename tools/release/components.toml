@@ -20,7 +20,13 @@ id = "mesa-27"
 name = "Mesa 27.0 (root)"
 version = "27.0.0-91"
 file = "mesa-27.0.0-91-root.tar.xz"
-install = "files"
+install = "pacman"
+packages = [
+  "mesa",
+  "vulkan-freedreno",
+  "vulkan-mesa-layers",
+  "vulkan-mesa-implicit-layers",
+]
 
 [[components]]
 id = "aquamarine"

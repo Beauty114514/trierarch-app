@@ -44,7 +44,11 @@ class PacmanTransaction(
                 .sortedBy { it.name }
                 .toList()
             require(packageFiles.isNotEmpty()) { "archive contains no .pkg.tar.* files" }
-            staging = environment.stagePackages(packageDirectory)
+            val flatDirectory = File(packageDirectory, "flat").apply { mkdirs() }
+            packageFiles.forEach { packageFile ->
+                packageFile.copyTo(File(flatDirectory, packageFile.name), overwrite = false)
+            }
+            staging = environment.stagePackages(flatDirectory)
             val guestPaths = packageFiles.map { "${staging}/${it.name}" }
             val command = listOf("pacman", "-U", "--noconfirm") + guestPaths
             val result = environment.runPacman(command)

@@ -225,6 +225,8 @@ private fun GuiRoot(
                 UpdatesScreen(
                     updates = updates,
                     updatesViewModel = updatesViewModel,
+                    installedRootfs = rootfs.installed,
+                    droidspacesContainers = profiles.droidspacesContainers,
                     onBack = onCloseUpdates,
                 )
             } else {

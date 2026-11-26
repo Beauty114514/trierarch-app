@@ -11,26 +11,39 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import app.trierarch.feature.components.PacmanTransaction
+import app.trierarch.feature.rootfs.InstalledRootfs
 import app.trierarch.feature.updates.UpdatesState
 import app.trierarch.feature.updates.UpdatesViewModel
 import app.trierarch.update.AppState
 import app.trierarch.update.ComponentRelease
 import app.trierarch.update.ComponentState
+import app.trierarch.update.ComponentInstallType
 import app.trierarch.update.ComponentStatus
+import java.io.File
 import java.util.Date
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @Composable
 internal fun UpdatesScreen(
     updates: UpdatesState,
     updatesViewModel: UpdatesViewModel,
+    installedRootfs: List<InstalledRootfs>,
+    droidspacesContainers: List<String>,
     onBack: () -> Unit,
 ) {
     var pendingDelete by remember { mutableStateOf<ComponentRelease?>(null) }
+    var pacmanTargetComponent by remember { mutableStateOf<ComponentRelease?>(null) }
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
 
     Column(Modifier.fillMaxSize()) {
         ScreenHeader("Updates") {
@@ -92,6 +105,7 @@ internal fun UpdatesScreen(
                                 status = componentStatus,
                                 updatesViewModel = updatesViewModel,
                                 onDelete = { pendingDelete = it },
+                                onInstallPackages = { pacmanTargetComponent = it },
                             )
                         }
                         if (updates.checkedAt > 0) {
@@ -108,6 +122,31 @@ internal fun UpdatesScreen(
         }
     }
 
+    pacmanTargetComponent?.let { component ->
+        PacmanInstallDialog(
+            component = component,
+            installedRootfs = installedRootfs,
+            droidspacesContainers = droidspacesContainers,
+            onDismiss = { pacmanTargetComponent = null },
+            onInstall = { target ->
+                pacmanTargetComponent = null
+                scope.launch {
+                    val result = withContext(Dispatchers.IO) {
+                        runCatching {
+                            val archive = File(context.filesDir, "components/${component.file}")
+                            PacmanTransaction(target.environment())
+                                .install(archive, component.install.packages)
+                        }
+                    }
+                    val message = result.fold(
+                        onSuccess = { "Installed ${component.name} into ${target.displayName}" },
+                        onFailure = { "Install failed: ${it.message}" },
+                    )
+                    android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+                }
+            },
+        )
+    }
     pendingDelete?.let { component ->
         DeleteComponentDialog(
             component = component,
@@ -156,6 +195,7 @@ private fun ComponentRow(
     status: ComponentStatus,
     updatesViewModel: UpdatesViewModel,
     onDelete: (ComponentRelease) -> Unit,
+    onInstallPackages: (ComponentRelease) -> Unit,
 ) {
     val component = status.release
     Column(Modifier.padding(top = 12.dp)) {
@@ -193,6 +233,9 @@ private fun ComponentRow(
                         style = MaterialTheme.typography.bodySmall,
                         modifier = Modifier.padding(top = 2.dp),
                     )
+                    if (component.install.type == ComponentInstallType.PACMAN) {
+                        TextAction("Install packages") { onInstallPackages(component) }
+                    }
                     TextAction("Delete", GuiColors.Error) { onDelete(component) }
                 }
             }
