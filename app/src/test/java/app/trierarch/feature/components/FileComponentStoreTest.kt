@@ -70,4 +70,18 @@ class FileComponentStoreTest {
         store.delete(rootfs, "missing")
         assertTrue(store.entries(rootfs).isEmpty())
     }
+
+    @Test
+    fun anArchiveInstallIsOneTopLevelComponentFolder() {
+        val store = store()
+        val rootfs = temporaryFolder.newFolder("rootfs")
+        val root = store.rootfsComponents(rootfs).apply { mkdirs() }
+        val folder = File(root, "kwin-compat-6.8.3-2-archlinuxarm-aarch64").apply { mkdirs() }
+        File(folder, "libkwin.so").writeText("lib")
+
+        val entries = store.entries(rootfs)
+        assertEquals(1, entries.size)
+        assertTrue(entries.single().directory)
+        assertEquals("kwin-compat-6.8.3-2-archlinuxarm-aarch64", entries.single().name)
+    }
 }

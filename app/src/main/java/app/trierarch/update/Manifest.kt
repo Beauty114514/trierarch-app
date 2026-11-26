@@ -35,6 +35,13 @@ data class AppRelease(
     val notesUrl: String?,
 )
 
+enum class ComponentInstallType { FILES, PACMAN }
+
+data class ComponentInstall(
+    val type: ComponentInstallType = ComponentInstallType.FILES,
+    val packages: List<String> = emptyList(),
+)
+
 data class ComponentRelease(
     val id: String,
     val name: String,
@@ -44,6 +51,7 @@ data class ComponentRelease(
     val url: String,
     val size: Long,
     val sha256: String,
+    val install: ComponentInstall = ComponentInstall(),
 )
 
 enum class AppState { UP_TO_DATE, UPDATE_AVAILABLE }
@@ -145,6 +153,7 @@ private fun parseComponent(value: TomlTable, index: Int): ComponentRelease {
         url = requiredUrl(value, "url", owner),
         size = requiredPositiveLong(value, "size", owner),
         sha256 = requiredSha256(value, "sha256", owner),
+        install = parseInstall(value, owner),
     )
 }
 
@@ -180,4 +189,34 @@ private fun requiredSha256(value: TomlTable, key: String, owner: String): String
         throw ManifestException("$owner.$key must be a lowercase SHA-256 hex digest")
     }
     return text
+}
+
+private fun parseInstall(value: TomlTable, owner: String): ComponentInstall {
+    val table = value.getTable("install") ?: return ComponentInstall()
+    val type = table.getString("type")?.trim()?.ifEmpty { null } ?: "files"
+    val packages = table.getArray("packages")?.let { array ->
+        (0 until array.size()).map { index ->
+            (array.getString(index) ?: throw ManifestException(
+                "$owner.install.packages[$index] must be a string"
+            )).trim()
+        }
+    }.orEmpty()
+    if (packages.any { it.isEmpty() || it.contains('/') || it.contains('\\') }) {
+        throw ManifestException("$owner.install.packages contains an invalid package name")
+    }
+    return when (type) {
+        "files" -> {
+            if (packages.isNotEmpty()) {
+                throw ManifestException("$owner.install.type = files cannot list packages")
+            }
+            ComponentInstall(ComponentInstallType.FILES)
+        }
+        "pacman" -> {
+            if (packages.isEmpty()) {
+                throw ManifestException("$owner.install.type = pacman requires packages")
+            }
+            ComponentInstall(ComponentInstallType.PACMAN, packages)
+        }
+        else -> throw ManifestException("$owner.install.type is unsupported: $type")
+    }
 }

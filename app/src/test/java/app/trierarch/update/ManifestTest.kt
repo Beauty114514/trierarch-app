@@ -9,6 +9,7 @@ class ManifestTest {
     private val apkSha = "a".repeat(64)
     private val kwinSha = "b".repeat(64)
     private val aquaSha = "c".repeat(64)
+    private val mesaSha = "d".repeat(64)
 
     private val defaultComponents = """
         [[components]]
@@ -163,6 +164,80 @@ class ManifestTest {
 
         assertThrows(ManifestException::class.java) {
             Manifest.parse(manifest(components = traversal))
+        }
+    }
+
+    @Test
+    fun parsesExplicitComponentInstallTypes() {
+        val components = """
+            [[components]]
+            id = "kwin-compat"
+            name = "KWin compatibility"
+            file = "kwin-compat.tar.zst"
+            url = "https://example.com/kwin-compat.tar.zst"
+            size = 10
+            sha256 = "$kwinSha"
+
+            install = { type = "files" }
+
+            [[components]]
+            id = "mesa-27"
+            name = "Mesa 27"
+            file = "mesa-27.tar.xz"
+            url = "https://example.com/mesa-27.tar.xz"
+            size = 10
+            sha256 = "$mesaSha"
+
+            install = { type = "pacman", packages = ["mesa", "vulkan-freedreno"] }
+        """.trimIndent()
+
+        val manifest = Manifest.parse(manifest(components = components))
+
+        assertEquals(ComponentInstallType.FILES, manifest.components[0].install.type)
+        assertEquals(emptyList<String>(), manifest.components[0].install.packages)
+        assertEquals(ComponentInstallType.PACMAN, manifest.components[1].install.type)
+        assertEquals(
+            listOf("mesa", "vulkan-freedreno"),
+            manifest.components[1].install.packages,
+        )
+    }
+
+    @Test
+    fun defaultsMissingInstallTypeToFiles() {
+        val manifest = Manifest.parse(manifest())
+        assertEquals(ComponentInstallType.FILES, manifest.components[0].install.type)
+    }
+
+    @Test
+    fun rejectsInvalidInstallDescriptions() {
+        val pacmanWithoutPackages = """
+            [[components]]
+            id = "mesa-27"
+            name = "Mesa 27"
+            file = "mesa-27.tar.xz"
+            url = "https://example.com/mesa-27.tar.xz"
+            size = 10
+            sha256 = "$mesaSha"
+
+            install = { type = "pacman" }
+        """.trimIndent()
+        assertThrows(ManifestException::class.java) {
+            Manifest.parse(manifest(components = pacmanWithoutPackages))
+        }
+
+        val filesWithPackages = """
+            [[components]]
+            id = "kwin-compat"
+            name = "KWin compatibility"
+            file = "kwin-compat.tar.zst"
+            url = "https://example.com/kwin-compat.tar.zst"
+            size = 10
+            sha256 = "$kwinSha"
+
+            install = { type = "files", packages = ["mesa"] }
+        """.trimIndent()
+        assertThrows(ManifestException::class.java) {
+            Manifest.parse(manifest(components = filesWithPackages))
         }
     }
 }

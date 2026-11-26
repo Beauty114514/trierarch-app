@@ -64,25 +64,26 @@ class FileComponentStore(private val componentsDirectory: File) {
     }
 
     private fun installArchive(root: File, archive: File): List<String> {
+        val name = archive.name
+            .removeSuffix(".tar.zst")
+            .removeSuffix(".tar.xz")
+        val destination = File(root, name)
+        require(!destination.exists()) {
+            "delete the existing $name before installing a new copy"
+        }
         val staging = File(root, ".install-${System.nanoTime()}")
         try {
             NativePtyBridge.extractComponentArchive(
                 archivePath = archive.absolutePath,
                 destinationPath = staging.absolutePath,
             )
-            val children = staging.listFiles().orEmpty()
-            require(children.isNotEmpty()) { "archive did not contain any files" }
-            val conflicts = children.map { it.name }.filter { File(root, it).exists() }
-            require(conflicts.isEmpty()) {
-                "delete the existing ${conflicts.joinToString(", ")} before installing again"
+            require(staging.listFiles().orEmpty().isNotEmpty()) {
+                "archive did not contain any files"
             }
-            children.forEach { child ->
-                require(child.renameTo(File(root, child.name))) {
-                    "could not move ${child.name} into the component directory"
-                }
+            require(staging.renameTo(destination)) {
+                "could not move the extracted component into $name"
             }
-            staging.deleteRecursively()
-            return children.map { it.name }
+            return listOf(name)
         } catch (error: Throwable) {
             staging.deleteRecursively()
             throw error
