@@ -21,6 +21,11 @@ public final class CursorVisibilityController {
         setVisible(true);
     }
 
+    /** Direct touchscreen input needs a pointer position but no cursor. */
+    public void onTouchscreenActivity() {
+        setVisible(false);
+    }
+
     public void reset() {
         setVisible(true);
     }
