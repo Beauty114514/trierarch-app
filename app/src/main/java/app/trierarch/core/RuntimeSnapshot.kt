@@ -1,6 +1,6 @@
 package app.trierarch.core
 
-/** Lifecycle phase the GUI shows for one profile. */
+/** Lifecycle phase of one profile. */
 enum class SessionPhase {
     STOPPED,
     STARTING,
@@ -15,7 +15,7 @@ data class SessionSnapshot(
     val active: Boolean,
 )
 
-/** A read-only view of the runtime sessions for the GUI. */
+/** A read-only view of the runtime sessions. */
 data class RuntimeSnapshot(
     val sessions: Map<String, SessionSnapshot>,
     val pending: String?,

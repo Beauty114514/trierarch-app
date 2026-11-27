@@ -59,7 +59,7 @@ class SessionService(
 
 
 
-    /** Structured runtime state for the GUI; the CLI keeps its text status. */
+    /** Structured runtime state. */
     fun snapshot(): RuntimeSnapshot {
         val pendingNow = pending
         return buildRuntimeSnapshot(

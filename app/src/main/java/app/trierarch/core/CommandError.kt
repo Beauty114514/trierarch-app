@@ -3,7 +3,7 @@ package app.trierarch.core
 /**
  * A typed failure from the core.
  *
- * [message] is for humans (the CLI prints it, the GUI shows it); [code] is the
+ * [message] is for humans; [code] is the
  * stable, machine-readable form the CLI maps to exit codes.
  */
 sealed interface CommandError {

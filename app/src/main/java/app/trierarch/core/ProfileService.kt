@@ -18,7 +18,7 @@ class ProfileService internal constructor(private val directory: File) {
     fun read(file: File): String = file.readText()
 
     /**
-     * Read-only projection of the profile directory for the GUI.
+     * Read-only projection of the profile directory.
      *
      * It never writes and never throws: an invalid document is reported through
      * [ProfileDocument.error] with the same text the CLI prints.
