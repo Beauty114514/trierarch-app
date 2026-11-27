@@ -8,6 +8,7 @@ import android.os.Build
 import android.os.IBinder
 import android.view.ViewGroup
 import android.widget.FrameLayout
+import app.trierarch.input.PointerMode
 import com.termux.x11.IX11Server
 import com.termux.x11.LorieView
 import com.termux.x11.X11ServerService
@@ -95,6 +96,10 @@ class X11HostController(
             releasePressedKeys()
             visibility = android.view.View.INVISIBLE
         }
+    }
+
+    fun setPointerMode(mode: PointerMode) {
+        display?.setPointerMode(mode)
     }
 
     fun showAndroidKeyboard() {

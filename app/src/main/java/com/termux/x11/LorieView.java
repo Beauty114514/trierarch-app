@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import androidx.annotation.Keep;
 
 import app.trierarch.input.PointerInputRouter;
+import app.trierarch.input.PointerMode;
 import app.trierarch.input.PhysicalKeyEvent;
 import app.trierarch.input.PhysicalKeyboardRouter;
 import app.trierarch.input.AndroidImeController;
@@ -138,6 +139,10 @@ public final class LorieView extends SurfaceView {
     @Override public boolean onTouchEvent(MotionEvent event) {
         if (nativeHandle == 0) return true;
         return inputRouter.onTouchEvent(this, event);
+    }
+
+    public void setPointerMode(PointerMode mode) {
+        inputRouter.setMode(mode);
     }
 
     public void showAndroidKeyboard() {

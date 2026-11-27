@@ -212,6 +212,7 @@ class MainActivity : AppCompatActivity() {
             },
             onFailure = onFailure,
         )
+        x11Host.setPointerMode(pointerMode)
     }
 
     private fun showTerminal(surface: DisplaySurface) {
@@ -307,6 +308,7 @@ class MainActivity : AppCompatActivity() {
             returnToShellAction(),
             keyboardAction(),
             desktopImeModeAction(),
+            pointerModeAction(),
         )
         DisplaySurface.WAYLAND -> listOf(
             returnToShellAction(),
@@ -376,6 +378,7 @@ class MainActivity : AppCompatActivity() {
         }
         uiPreferences.edit().putString(KEY_POINTER_MODE, pointerMode.name).apply()
         waylandSurface?.setPointerMode(pointerMode)
+        x11Host.setPointerMode(pointerMode)
         setDisplayedSurface(displayedSurface)
     }
 
