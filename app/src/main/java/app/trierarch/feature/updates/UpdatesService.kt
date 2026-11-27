@@ -78,7 +78,7 @@ class UpdatesService(
         val destination = components.file(component.file)
         val file = downloadFile(component.url, destination, component.size, component.sha256, onProgress)
         onVerifying()
-        components.record(component.id, component.file, component.sha256)
+        components.record(component)
         return file
     }
 

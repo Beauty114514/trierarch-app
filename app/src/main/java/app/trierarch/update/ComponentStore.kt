@@ -8,16 +8,35 @@ data class DownloadedComponent(
     val file: String,
     val sha256: String,
     val downloadedAt: Long,
+    val name: String? = null,
+    val version: String? = null,
+    val installType: String? = null,
+    val packages: List<String> = emptyList(),
 )
 
 /**
  * The flat `files/components` store: release file names plus a small index of
- * what was downloaded. It deliberately does not touch a rootfs.
+ * what was downloaded.
+ *
+ * Entries are keyed by file name, not by component id. Downloading a newer
+ * release keeps older archives so a component family can expose more than one
+ * version at a time.
  */
 class ComponentStore(private val directory: File) {
+    /** Latest downloaded release per component id, used for update checks. */
     @Synchronized
     fun downloaded(): Map<String, DownloadedComponent> =
-        readEntries().filterValues { entry -> File(directory, entry.file).isFile }
+        entries().values
+            .filter { entry -> File(directory, entry.file).isFile }
+            .groupBy { it.id }
+            .mapValues { (_, values) -> values.maxBy { it.downloadedAt } }
+
+    /** Every downloaded release, including older versions of the same id. */
+    @Synchronized
+    fun all(): List<DownloadedComponent> =
+        entries().values
+            .filter { entry -> File(directory, entry.file).isFile }
+            .sortedWith(compareBy({ it.id }, { it.downloadedAt }, { it.file }))
 
     @Synchronized
     fun record(
@@ -25,33 +44,70 @@ class ComponentStore(private val directory: File) {
         file: String,
         sha256: String,
         downloadedAt: Long = System.currentTimeMillis(),
+        name: String? = null,
+        version: String? = null,
+        installType: String? = null,
+        packages: List<String> = emptyList(),
     ) {
-        val entries = downloaded().toMutableMap()
-        val previous = entries[id]
-        entries[id] = DownloadedComponent(id, file, sha256, downloadedAt)
-        write(entries)
-        // The old archive is no longer referenced by this component. Keep it
-        // only when another component still points at the same file.
-        if (previous != null && previous.file != file &&
-            entries.values.none { it.file == previous.file }
-        ) {
-            File(directory, previous.file).delete()
-        }
+        record(
+            DownloadedComponent(
+                id = id,
+                file = file,
+                sha256 = sha256,
+                downloadedAt = downloadedAt,
+                name = name,
+                version = version,
+                installType = installType,
+                packages = packages,
+            ),
+        )
     }
 
-    /** Deletes both the downloaded file and its index entry; rootfs copies are untouched. */
     @Synchronized
-    fun remove(id: String): DownloadedComponent? {
-        val entries = readEntries().toMutableMap()
-        val removed = entries.remove(id) ?: return null
-        File(directory, removed.file).delete()
+    fun record(component: ComponentRelease, downloadedAt: Long = System.currentTimeMillis()) {
+        record(
+            DownloadedComponent(
+                id = component.id,
+                file = component.file,
+                sha256 = component.sha256,
+                downloadedAt = downloadedAt,
+                name = component.name,
+                version = component.version,
+                installType = component.install.type.name.lowercase(),
+                packages = component.install.packages,
+            ),
+        )
+    }
+
+    private fun record(entry: DownloadedComponent) {
+        val entries = entries().toMutableMap()
+        entries[key(entry.id, entry.file)] = entry
+        write(entries)
+    }
+
+    /**
+     * Remove one release. When file is null, remove every release of the id
+     * for compatibility with the previous update screen.
+     */
+    @Synchronized
+    fun remove(id: String, file: String? = null): DownloadedComponent? {
+        val entries = entries().toMutableMap()
+        val removed = if (file != null) {
+            entries.remove(key(id, file))
+        } else {
+            val matching = entries.values.filter { it.id == id }
+            entries.entries.removeAll { it.value.id == id }
+            matching.maxByOrNull { it.downloadedAt }
+        } ?: return null
+        val stillReferenced = entries.values.any { it.file == removed.file }
+        if (!stillReferenced) File(directory, removed.file).delete()
         write(entries)
         return removed
     }
 
     fun file(name: String): File = File(directory, name)
 
-    private fun readEntries(): Map<String, DownloadedComponent> {
+    private fun entries(): Map<String, DownloadedComponent> {
         val index = File(directory, INDEX)
         if (!index.isFile) return emptyMap()
         return runCatching {
@@ -63,11 +119,17 @@ class ComponentStore(private val directory: File) {
                 val id = entry.getString("id") ?: return@mapNotNull null
                 val file = entry.getString("file") ?: return@mapNotNull null
                 val sha256 = entry.getString("sha256") ?: return@mapNotNull null
-                id to DownloadedComponent(
+                key(id, file) to DownloadedComponent(
                     id = id,
                     file = file,
                     sha256 = sha256,
                     downloadedAt = entry.getLong("downloadedAt") ?: 0L,
+                    name = entry.getString("name")?.ifBlank { null },
+                    version = entry.getString("version")?.ifBlank { null },
+                    installType = entry.getString("installType")?.ifBlank { null },
+                    packages = entry.getArray("packages")?.let { packages ->
+                        (0 until packages.size()).mapNotNull { packages.getString(it) }
+                    }.orEmpty(),
                 )
             }.toMap()
         }.getOrDefault(emptyMap())
@@ -79,17 +141,26 @@ class ComponentStore(private val directory: File) {
         }
         val text = buildString {
             appendLine("# Generated by the Updates screen. Do not edit by hand.")
-            entries.values.sortedBy { it.id }.forEach { entry ->
-                appendLine()
-                appendLine("[[downloads]]")
-                appendLine("id = ${tomlString(entry.id)}")
-                appendLine("file = ${tomlString(entry.file)}")
-                appendLine("sha256 = ${tomlString(entry.sha256)}")
-                appendLine("downloadedAt = ${entry.downloadedAt}")
-            }
+            entries.values.sortedWith(compareBy({ it.id }, { it.downloadedAt }, { it.file }))
+                .forEach { entry ->
+                    appendLine()
+                    appendLine("[[downloads]]")
+                    appendLine("id = ${tomlString(entry.id)}")
+                    appendLine("file = ${tomlString(entry.file)}")
+                    appendLine("sha256 = ${tomlString(entry.sha256)}")
+                    appendLine("downloadedAt = ${entry.downloadedAt}")
+                    entry.name?.let { appendLine("name = ${tomlString(it)}") }
+                    entry.version?.let { appendLine("version = ${tomlString(it)}") }
+                    entry.installType?.let { appendLine("installType = ${tomlString(it)}") }
+                    if (entry.packages.isNotEmpty()) {
+                        appendLine("packages = [${entry.packages.joinToString(", ") { tomlString(it) }}]")
+                    }
+                }
         }
         File(directory, INDEX).writeText(text)
     }
+
+    private fun key(id: String, file: String): String = "$id\u0000$file"
 
     private fun tomlString(value: String): String =
         "\"" + value.replace("\\", "\\\\").replace("\"", "\\\"") + "\""
