@@ -8,6 +8,7 @@ import java.io.File
  */
 sealed interface PacmanTarget {
     val displayName: String
+    val id: String
     fun environment(): PacmanEnvironment
 
     data class Proot(
@@ -16,6 +17,7 @@ sealed interface PacmanTarget {
         val nativeLibraryDirectory: File,
         val cacheDirectory: File,
     ) : PacmanTarget {
+        override val id: String = "proot:${rootfs.absolutePath}"
         override fun environment(): PacmanEnvironment =
             ProotPacmanEnvironment(rootfs, nativeLibraryDirectory, cacheDirectory)
     }
@@ -24,6 +26,7 @@ sealed interface PacmanTarget {
         override val displayName: String,
         val rootfs: File,
     ) : PacmanTarget {
+        override val id: String = "chroot:${rootfs.absolutePath}"
         override fun environment(): PacmanEnvironment =
             ChrootPacmanEnvironment(rootfs)
     }
@@ -33,6 +36,7 @@ sealed interface PacmanTarget {
         val container: String,
         val cacheDirectory: File,
     ) : PacmanTarget {
+        override val id: String = "droidspaces:$container"
         override fun environment(): PacmanEnvironment =
             DroidSpacesPacmanEnvironment(container, cacheDirectory)
     }

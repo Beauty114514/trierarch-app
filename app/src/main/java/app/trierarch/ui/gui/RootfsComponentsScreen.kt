@@ -24,11 +24,17 @@ import androidx.compose.ui.unit.dp
 import app.trierarch.feature.components.FileComponentEntry
 import app.trierarch.feature.components.FileComponentStore
 import app.trierarch.feature.components.FileComponentsController
+import app.trierarch.feature.components.InstallReceiptStore
 import app.trierarch.feature.components.PacmanTarget
 import app.trierarch.feature.components.PacmanTransaction
 import app.trierarch.update.ComponentInstallType
 import app.trierarch.update.ComponentRelease
+import app.trierarch.update.ComponentState
 import app.trierarch.update.ComponentStatus
+import app.trierarch.update.InstallReceipt
+import app.trierarch.update.ReleasePhase
+import app.trierarch.update.ReleaseStatus
+import app.trierarch.update.ReleaseStatusResolver
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -55,9 +61,14 @@ internal fun RootfsComponentsScreen(
         app.trierarch.feature.components.FileComponentsState(),
     )).collectAsState()
     var pacmanComponent by remember { mutableStateOf<ComponentRelease?>(null) }
-    var installedPackages by remember { mutableStateOf<Map<String, Map<String, String>>>(emptyMap()) }
-    var checkingPackages by remember { mutableStateOf<String?>(null) }
+    var releaseStatuses by remember { mutableStateOf<Map<String, ReleaseStatus>>(emptyMap()) }
+    var refreshing by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+    val receiptStore = remember { InstallReceiptStore(File(context.filesDir, "components/receipts")) }
+    val pacman = packageComponents.filter {
+        it.release.install.type == ComponentInstallType.PACMAN &&
+            it.state == ComponentState.UP_TO_DATE
+    }
 
     fun targetEnvironment(): PacmanTarget? = when (target) {
         is ComponentsTarget.DroidSpaces -> PacmanTarget.DroidSpaces(
@@ -71,18 +82,29 @@ internal fun RootfsComponentsScreen(
         )
     }
 
-    fun checkInstalled(component: ComponentRelease, pacmanTarget: PacmanTarget? = targetEnvironment()) {
-        if (pacmanTarget == null || checkingPackages != null) return
-        checkingPackages = component.id
+    fun resolveStatuses(pacmanTarget: PacmanTarget, snapshot: app.trierarch.update.PackageSnapshot) {
+        releaseStatuses = pacman.associate { status ->
+            val release = status.release
+            release.id to ReleaseStatusResolver.resolve(
+                release = release,
+                downloaded = true,
+                receipt = receiptStore.receipt(pacmanTarget.id, release.id, release.version),
+                snapshot = snapshot,
+            )
+        }
+    }
+
+    fun refreshStatus(pacmanTarget: PacmanTarget? = targetEnvironment()) {
+        if (pacmanTarget == null || refreshing) return
+        refreshing = true
+        val packages = pacman.flatMap { it.release.install.packageNames }.distinct()
         scope.launch {
-            val versions = withContext(Dispatchers.IO) {
-                runCatching {
-                    PacmanTransaction(pacmanTarget.environment())
-                        .query(component.install.packageNames)
-                }.getOrDefault(emptyMap())
+            val snapshot = withContext(Dispatchers.IO) {
+                runCatching { PacmanTransaction(pacmanTarget.environment()).snapshot(packages) }
+                    .getOrNull()
             }
-            installedPackages = installedPackages + (component.id to versions)
-            checkingPackages = null
+            if (snapshot != null) resolveStatuses(pacmanTarget, snapshot)
+            refreshing = false
         }
     }
 
@@ -95,7 +117,10 @@ internal fun RootfsComponentsScreen(
                         .uninstall(component.install.packageNames)
                 }
             }
-            installedPackages = installedPackages - component.id
+            if (result.isSuccess) {
+                receiptStore.remove(pacmanTarget.id, component.id, component.version)
+                releaseStatuses = releaseStatuses - component.id
+            }
             val message = result.fold(
                 onSuccess = { "Uninstalled ${component.name}" },
                 onFailure = { "Uninstall failed: ${it.message}" },
@@ -112,7 +137,10 @@ internal fun RootfsComponentsScreen(
             .fillMaxWidth()
             .verticalScroll(rememberScrollState()),
     ) {
-        ScreenHeader("Components") { HeaderAction("Back", onClick = onBack) }
+        ScreenHeader("Components") {
+            HeaderAction("Refresh status", enabled = !refreshing) { refreshStatus() }
+            HeaderAction("Back", onClick = onBack)
+        }
         Text(
             text = when (target) {
                 is ComponentsTarget.AppRootfs -> target.rootfs.name
@@ -211,10 +239,6 @@ internal fun RootfsComponentsScreen(
         }
 
         SectionLabel("PACMAN COMPONENTS")
-        val pacman = packageComponents.filter {
-            it.release.install.type == ComponentInstallType.PACMAN &&
-                it.state == app.trierarch.update.ComponentState.UP_TO_DATE
-        }
         if (pacman.isEmpty()) {
             Text(
                 text = "No downloaded pacman components. Download them from Updates first.",
@@ -237,20 +261,46 @@ internal fun RootfsComponentsScreen(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    val versions = installedPackages[status.release.id].orEmpty()
-                    val installed = status.release.install.packageNames.all { versions.containsKey(it) }
-                    if (installed) {
+                    val release = status.release
+                    val resolved = releaseStatuses[release.id]
+                    if (resolved == null) {
+                        Column(Modifier.padding(start = 8.dp)) {
+                            PrimaryAction("Install packages") { pacmanComponent = release }
+                            TextAction("Refresh status") { refreshStatus() }
+                        }
+                    } else if (resolved.canUninstall) {
                         Column(Modifier.padding(start = 8.dp)) {
                             StatusLine(
-                                versions.entries.joinToString(", ") { "${it.key} ${it.value}" },
+                                resolved.installedVersions.entries.joinToString(", ") {
+                                    "${it.key} ${it.value}"
+                                },
                                 GuiColors.Running,
                             )
-                            TextAction("Uninstall", GuiColors.Error) { uninstall(status.release) }
+                            TextAction("Uninstall", GuiColors.Error) { uninstall(release) }
+                        }
+                    } else if (resolved.installed) {
+                        Column(Modifier.padding(start = 8.dp)) {
+                            StatusLine(
+                                resolved.installedVersions.entries.joinToString(", ") {
+                                    "${it.key} ${it.value}"
+                                },
+                                if (resolved.phase == ReleasePhase.EXTERNAL) GuiColors.Secondary else GuiColors.Running,
+                            )
+                            if (resolved.requiredBy.isNotEmpty()) {
+                                StatusLine(
+                                    "Required by: ${resolved.requiredBy.joinToString(", ")}",
+                                    GuiColors.Error,
+                                )
+                            } else {
+                                StatusLine("Installed outside Trierarch; no safe uninstall", GuiColors.Secondary)
+                            }
                         }
                     } else {
                         Column(Modifier.padding(start = 8.dp)) {
-                            PrimaryAction("Install packages") { pacmanComponent = status.release }
-                            TextAction("Check installed") { checkInstalled(status.release) }
+                            PrimaryAction("Install packages") { pacmanComponent = release }
+                            if (resolved.phase == ReleasePhase.MISMATCH) {
+                                StatusLine("Installed version differs", GuiColors.Pending)
+                            }
                         }
                     }
                 }
@@ -281,11 +331,30 @@ internal fun RootfsComponentsScreen(
                             )
                         }
                     }
+                    if (result.isSuccess) {
+                        val snapshot = withContext(Dispatchers.IO) {
+                            runCatching {
+                                PacmanTransaction(pacmanTarget.environment())
+                                    .snapshot(component.install.packageNames)
+                            }.getOrNull()
+                        }
+                        val installed = snapshot?.installed
+                            ?.filterKeys { it in component.install.packageNames }
+                            .orEmpty()
+                        receiptStore.record(
+                            InstallReceipt(
+                                target = pacmanTarget.id,
+                                componentId = component.id,
+                                releaseVersion = component.version,
+                                packages = installed,
+                            ),
+                        )
+                        if (snapshot != null) resolveStatuses(pacmanTarget, snapshot)
+                    }
                     val message = result.fold(
                         onSuccess = { "Installed ${component.name}" },
                         onFailure = { "Install failed: ${it.message}" },
                     )
-                    if (result.isSuccess) checkInstalled(component, pacmanTarget)
                     android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
                 }
             },

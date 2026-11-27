@@ -29,5 +29,8 @@ class PacmanTargetTest {
             PacmanTarget.DroidSpaces("Arch", "Arch", cache).environment()
                 is DroidSpacesPacmanEnvironment,
         )
+        assertEquals("proot:${rootfs.absolutePath}", PacmanTarget.Proot("PRoot", rootfs, native, cache).id)
+        assertEquals("chroot:${rootfs.absolutePath}", PacmanTarget.Chroot("chroot", rootfs).id)
+        assertEquals("droidspaces:Arch", PacmanTarget.DroidSpaces("Arch", "Arch", cache).id)
     }
 }
