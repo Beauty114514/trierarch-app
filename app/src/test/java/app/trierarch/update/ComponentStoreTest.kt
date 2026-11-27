@@ -31,7 +31,7 @@ class ComponentStoreTest {
     }
 
     @Test
-    fun aLaterDownloadKeepsTheOldFileAndAllReleases() {
+    fun aLaterDownloadReplacesThePreviousArchive() {
         val store = store()
         val old = store.file("kwin-old.tar.zst").apply { writeText("old") }
         val current = store.file("kwin-new.tar.zst").apply { writeText("new") }
@@ -44,8 +44,7 @@ class ComponentStoreTest {
         assertEquals(current.name, entry.file)
         assertEquals(next, entry.sha256)
         assertEquals(2L, entry.downloadedAt)
-        assertEquals(listOf("1", "2"), store.all().map { it.version })
-        assertTrue(old.exists())
+        assertTrue(!old.exists())
         assertTrue(current.exists())
     }
 
@@ -62,7 +61,6 @@ class ComponentStoreTest {
         assertTrue(shared.exists())
         assertEquals(replacement.name, store.downloaded().getValue("kwin-compat").file)
         assertEquals(shared.name, store.downloaded().getValue("other-component").file)
-        assertEquals(3, store.all().size)
     }
 
     @Test

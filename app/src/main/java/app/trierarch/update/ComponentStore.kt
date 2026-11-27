@@ -16,9 +16,8 @@ data class DownloadedComponent(
  * The flat `files/components` store: release file names plus a small index of
  * what was downloaded.
  *
- * Entries are keyed by file name, not by component id. Downloading a newer
- * release keeps older archives so a component family can expose more than one
- * version at a time.
+ * Only the latest downloaded release per component id is kept. Installed
+ * copies inside a rootfs are user-owned and are never touched here.
  */
 class ComponentStore(private val directory: File) {
     /** Latest downloaded release per component id, used for update checks. */
@@ -28,13 +27,6 @@ class ComponentStore(private val directory: File) {
             .filter { entry -> File(directory, entry.file).isFile }
             .groupBy { it.id }
             .mapValues { (_, values) -> values.maxBy { it.downloadedAt } }
-
-    /** Every downloaded release, including older versions of the same id. */
-    @Synchronized
-    fun all(): List<DownloadedComponent> =
-        entries().values
-            .filter { entry -> File(directory, entry.file).isFile }
-            .sortedWith(compareBy({ it.id }, { it.downloadedAt }, { it.file }))
 
     @Synchronized
     fun record(
@@ -59,6 +51,13 @@ class ComponentStore(private val directory: File) {
 
     private fun record(entry: DownloadedComponent) {
         val entries = entries().toMutableMap()
+        val previous = entries.values.filter { it.id == entry.id }
+        entries.entries.removeAll { it.value.id == entry.id }
+        previous.forEach { old ->
+            if (old.file != entry.file && entries.values.none { it.file == old.file }) {
+                File(directory, old.file).delete()
+            }
+        }
         entries[key(entry.id, entry.file)] = entry
         write(entries)
     }
