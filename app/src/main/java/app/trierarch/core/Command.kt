@@ -8,8 +8,6 @@ sealed interface Command {
         data class Open(val id: String) : Session
         data class Stop(val id: String?) : Session
 
-        /** Presentation only: brings the in-app GUI forward without touching a session. */
-        data object OpenGui : Session
     }
 
     /** Profile document mutations; reads are [Core] queries. */

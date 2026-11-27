@@ -242,7 +242,6 @@ internal object ControlProtocol {
             "open" if (fields.size == 3) -> Request.Execute(Command.Session.Open(fields[2]))
             "stop" if (fields.size == 2) -> Request.Execute(Command.Session.Stop(null))
             "stop" if (fields.size == 3) -> Request.Execute(Command.Session.Stop(fields[2]))
-            "gui.open" if (fields.size == 2) -> Request.Execute(Command.Session.OpenGui)
             "documents.list" if (fields.size == 2) -> Request.ListDocuments
             "documents.read" if (fields.size == 3) -> Request.ReadDocument(fields[2])
             "logs.tail" if (fields.size == 4) -> {

@@ -111,7 +111,6 @@ class MainActivity : AppCompatActivity() {
                     override fun showWayland() = showWaylandSurface()
                     override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
                         showX11Display(onReady, onFailure)
-                    override fun showGui() = showTerminal(DisplaySurface.INTERNAL_SHELL)
                     override fun showSession(id: String, display: String) = openSession(id, display)
                     override fun releaseX11() = x11Host.release()
                     override fun runOnMain(action: () -> Unit) = runOnUiThread(action)

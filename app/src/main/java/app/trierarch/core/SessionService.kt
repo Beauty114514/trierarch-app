@@ -23,7 +23,6 @@ class SessionService(
         fun showRuntimeTerminal()
         fun showWayland()
         fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit)
-        fun showGui()
         fun showSession(id: String, display: String)
         fun releaseX11()
         fun runOnMain(action: () -> Unit)
@@ -39,7 +38,6 @@ class SessionService(
             is Command.Session.Open -> openSession(command.id, completion)
             is Command.Session.Stop -> stop(command.id, completion)
             // Switching screens must never start, stop, or rebuild a session.
-            is Command.Session.OpenGui -> openGui(completion)
         }
     }
 
@@ -59,10 +57,7 @@ class SessionService(
         )
     }
 
-    private fun openGui(completion: (CommandOutcome) -> Unit) {
-        displayHost.showGui()
-        completion(CommandOutcome.Success("gui opened"))
-    }
+
 
     /** Structured runtime state for the GUI; the CLI keeps its text status. */
     fun snapshot(): RuntimeSnapshot {

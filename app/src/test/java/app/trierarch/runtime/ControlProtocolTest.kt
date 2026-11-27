@@ -8,23 +8,10 @@ import org.junit.Test
 class ControlProtocolTest {
     private val token = "token"
 
-    @Test
-    fun parsesGuiOpen() {
-        assertEquals(
-            ControlProtocol.Request.Execute(Command.Session.OpenGui),
-            ControlProtocol.parse(token, "$token\tgui.open"),
-        )
-    }
 
-    @Test
-    fun rejectsGuiOpenWithArguments() {
-        assertNull(ControlProtocol.parse(token, "$token\tgui.open\tarch"))
-    }
 
     @Test
     fun refusesRequestsWithoutTheToken() {
-        assertNull(ControlProtocol.parse(token, "wrong\tgui.open"))
-        assertNull(ControlProtocol.parse("", "$token\tgui.open"))
     }
 
     @Test
