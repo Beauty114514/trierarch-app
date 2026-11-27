@@ -68,15 +68,6 @@ object NativePtyBridge {
     /** Extracts a file component archive into an app-private directory. */
     external fun extractComponentArchive(archivePath: String, destinationPath: String)
 
-    /** Runs one command inside a PRoot rootfs; returns "<exit>\n<output>". */
-    external fun runProotCommand(config: Array<String>): String
-
-    /** Runs one command inside a chroot rootfs; returns "<exit>\n<output>". */
-    external fun runChrootCommand(config: Array<String>): String
-
-    /** Runs one command inside a DroidSpaces container; requires root. */
-    external fun runDroidspacesCommand(config: Array<String>): String
-
     /** Lists DroidSpaces containers from the backend workspace; requires root. */
     external fun listDroidspacesContainers(): String
 

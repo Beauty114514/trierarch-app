@@ -177,19 +177,6 @@ def render_manifest(
                 f"sha256 = {toml_string(asset_digest(asset))}",
             ]
         )
-        install = component.get("install", "files")
-        if install == "files":
-            lines.append('install = { type = "files" }')
-        elif install == "pacman":
-            packages = component.get("packages")
-            if not isinstance(packages, list) or not packages:
-                raise ManifestError(
-                    f"component {comp_id} install = pacman needs a non-empty packages list"
-                )
-            rendered = ", ".join(toml_string(str(package)) for package in packages)
-            lines.append(f"install = {{ type = \"pacman\", packages = [{rendered}] }}")
-        else:
-            raise ManifestError(f"component {comp_id} has unsupported install: {install}")
     return "\n".join(lines) + "\n"
 
 

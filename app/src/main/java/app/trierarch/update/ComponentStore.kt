@@ -10,8 +10,6 @@ data class DownloadedComponent(
     val downloadedAt: Long,
     val name: String? = null,
     val version: String? = null,
-    val installType: String? = null,
-    val packages: List<String> = emptyList(),
 )
 
 /**
@@ -46,8 +44,6 @@ class ComponentStore(private val directory: File) {
         downloadedAt: Long = System.currentTimeMillis(),
         name: String? = null,
         version: String? = null,
-        installType: String? = null,
-        packages: List<String> = emptyList(),
     ) {
         record(
             DownloadedComponent(
@@ -57,24 +53,6 @@ class ComponentStore(private val directory: File) {
                 downloadedAt = downloadedAt,
                 name = name,
                 version = version,
-                installType = installType,
-                packages = packages,
-            ),
-        )
-    }
-
-    @Synchronized
-    fun record(component: ComponentRelease, downloadedAt: Long = System.currentTimeMillis()) {
-        record(
-            DownloadedComponent(
-                id = component.id,
-                file = component.file,
-                sha256 = component.sha256,
-                downloadedAt = downloadedAt,
-                name = component.name,
-                version = component.version,
-                installType = component.install.type.name.lowercase(),
-                packages = component.install.packages.map { it.name },
             ),
         )
     }
@@ -126,10 +104,6 @@ class ComponentStore(private val directory: File) {
                     downloadedAt = entry.getLong("downloadedAt") ?: 0L,
                     name = entry.getString("name")?.ifBlank { null },
                     version = entry.getString("version")?.ifBlank { null },
-                    installType = entry.getString("installType")?.ifBlank { null },
-                    packages = entry.getArray("packages")?.let { packages ->
-                        (0 until packages.size()).mapNotNull { packages.getString(it) }
-                    }.orEmpty(),
                 )
             }.toMap()
         }.getOrDefault(emptyMap())
@@ -151,10 +125,6 @@ class ComponentStore(private val directory: File) {
                     appendLine("downloadedAt = ${entry.downloadedAt}")
                     entry.name?.let { appendLine("name = ${tomlString(it)}") }
                     entry.version?.let { appendLine("version = ${tomlString(it)}") }
-                    entry.installType?.let { appendLine("installType = ${tomlString(it)}") }
-                    if (entry.packages.isNotEmpty()) {
-                        appendLine("packages = [${entry.packages.joinToString(", ") { tomlString(it) }}]")
-                    }
                 }
         }
         File(directory, INDEX).writeText(text)

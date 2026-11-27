@@ -35,7 +35,6 @@ file = "mesa-27.0.0-91-root.tar.xz"
 url = "https://github.com/Beauty114514/trierarch-app/releases/download/v0.5.1/mesa-27.0.0-91-root.tar.xz"
 size = 6952768
 sha256 = "2fa508dca09034168ac1741b417ae2e435ea170796cd2ed97c02c8330e786a61"
-install = { type = "pacman", packages = ["mesa", "vulkan-freedreno", "vulkan-mesa-layers", "vulkan-mesa-implicit-layers"] }
 
 [[components]]
 id = "aquamarine"
