@@ -37,10 +37,17 @@ data class AppRelease(
 
 enum class ComponentInstallType { FILES, PACMAN }
 
+data class ComponentPackage(
+    val name: String,
+    val version: String? = null,
+)
+
 data class ComponentInstall(
     val type: ComponentInstallType = ComponentInstallType.FILES,
-    val packages: List<String> = emptyList(),
-)
+    val packages: List<ComponentPackage> = emptyList(),
+) {
+    val packageNames: List<String> get() = packages.map { it.name }
+}
 
 data class ComponentRelease(
     val id: String,
@@ -196,14 +203,30 @@ private fun parseInstall(value: TomlTable, owner: String): ComponentInstall {
     val type = table.getString("type")?.trim()?.ifEmpty { null } ?: "files"
     val packages = table.getArray("packages")?.let { array ->
         (0 until array.size()).map { index ->
-            (array.getString(index) ?: throw ManifestException(
-                "$owner.install.packages[$index] must be a string"
-            )).trim()
+            val rawPackage = array.get(index)
+            val packageName: String
+            val packageVersion: String?
+            when (rawPackage) {
+                is String -> {
+                    packageName = rawPackage.trim()
+                    packageVersion = null
+                }
+                is TomlTable -> {
+                    packageName = rawPackage.getString("name")?.trim().orEmpty()
+                    packageVersion = rawPackage.getString("version")?.trim()?.ifEmpty { null }
+                }
+                else -> throw ManifestException(
+                    "$owner.install.packages[$index] must be a string or table"
+                )
+            }
+            if (packageName.isEmpty() || packageName.contains('/') || packageName.contains('\\')) {
+                throw ManifestException(
+                    "$owner.install.packages[$index] has an invalid package name"
+                )
+            }
+            ComponentPackage(packageName, packageVersion)
         }
     }.orEmpty()
-    if (packages.any { it.isEmpty() || it.contains('/') || it.contains('\\') }) {
-        throw ManifestException("$owner.install.packages contains an invalid package name")
-    }
     return when (type) {
         "files" -> {
             if (packages.isNotEmpty()) {

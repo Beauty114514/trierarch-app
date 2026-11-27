@@ -74,7 +74,7 @@ class ComponentStore(private val directory: File) {
                 name = component.name,
                 version = component.version,
                 installType = component.install.type.name.lowercase(),
-                packages = component.install.packages,
+                packages = component.install.packages.map { it.name },
             ),
         )
     }

@@ -69,7 +69,7 @@ internal fun PacmanInstallDialog(
         text = {
             Column {
                 Text(
-                    text = "pacman packages: ${component.install.packages.joinToString(", ")}",
+                    text = "pacman packages: ${component.install.packageNames.joinToString(", ")}",
                     color = GuiColors.Secondary,
                     style = MaterialTheme.typography.bodySmall,
                 )

@@ -78,7 +78,7 @@ internal fun RootfsComponentsScreen(
             val versions = withContext(Dispatchers.IO) {
                 runCatching {
                     PacmanTransaction(pacmanTarget.environment())
-                        .query(component.install.packages)
+                        .query(component.install.packageNames)
                 }.getOrDefault(emptyMap())
             }
             installedPackages = installedPackages + (component.id to versions)
@@ -92,7 +92,7 @@ internal fun RootfsComponentsScreen(
             val result = withContext(Dispatchers.IO) {
                 runCatching {
                     PacmanTransaction(pacmanTarget.environment())
-                        .uninstall(component.install.packages)
+                        .uninstall(component.install.packageNames)
                 }
             }
             installedPackages = installedPackages - component.id
@@ -232,13 +232,13 @@ internal fun RootfsComponentsScreen(
                     Column(Modifier.weight(1f)) {
                         Text(status.release.name, style = MaterialTheme.typography.bodyMedium)
                         Text(
-                            text = status.release.install.packages.joinToString(", "),
+                            text = status.release.install.packageNames.joinToString(", "),
                             color = GuiColors.Secondary,
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
                     val versions = installedPackages[status.release.id].orEmpty()
-                    val installed = status.release.install.packages.all { versions.containsKey(it) }
+                    val installed = status.release.install.packageNames.all { versions.containsKey(it) }
                     if (installed) {
                         Column(Modifier.padding(start = 8.dp)) {
                             StatusLine(
@@ -277,7 +277,7 @@ internal fun RootfsComponentsScreen(
                         runCatching {
                             PacmanTransaction(pacmanTarget.environment()).install(
                                 File(context.filesDir, "components/${component.file}"),
-                                component.install.packages,
+                                component.install.packageNames,
                             )
                         }
                     }

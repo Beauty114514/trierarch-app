@@ -194,10 +194,10 @@ class ManifestTest {
         val manifest = Manifest.parse(manifest(components = components))
 
         assertEquals(ComponentInstallType.FILES, manifest.components[0].install.type)
-        assertEquals(emptyList<String>(), manifest.components[0].install.packages)
+        assertEquals(emptyList<ComponentPackage>(), manifest.components[0].install.packages)
         assertEquals(ComponentInstallType.PACMAN, manifest.components[1].install.type)
         assertEquals(
-            listOf("mesa", "vulkan-freedreno"),
+            listOf(ComponentPackage("mesa"), ComponentPackage("vulkan-freedreno")),
             manifest.components[1].install.packages,
         )
     }
@@ -239,5 +239,33 @@ class ManifestTest {
         assertThrows(ManifestException::class.java) {
             Manifest.parse(manifest(components = filesWithPackages))
         }
+    }
+
+    @Test
+    fun parsesPackageVersionsFromPacmanPackages() {
+        val components = """
+            [[components]]
+            id = "mesa"
+            name = "Mesa"
+            version = "27.0.0-91"
+            file = "mesa.tar.xz"
+            url = "https://example.com/mesa.tar.xz"
+            size = 10
+            sha256 = "$mesaSha"
+            install = { type = "pacman", packages = [
+                { name = "mesa", version = "1:27.0.0-91" },
+                { name = "vulkan-freedreno", version = "1:27.0.0-91" }
+            ] }
+        """.trimIndent()
+
+        val manifest = Manifest.parse(manifest(components = components))
+
+        assertEquals(
+            listOf(
+                ComponentPackage("mesa", "1:27.0.0-91"),
+                ComponentPackage("vulkan-freedreno", "1:27.0.0-91"),
+            ),
+            manifest.components.single().install.packages,
+        )
     }
 }
