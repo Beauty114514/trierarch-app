@@ -361,9 +361,9 @@ class MainActivity : AppCompatActivity() {
     private fun pointerModeAction() = FloatingMenuAction(
         id = "pointer-mode",
         icon = if (pointerMode == PointerMode.TOUCHPAD) {
-            R.drawable.ic_floating_action_terminal
+            R.drawable.ic_floating_action_touchpad
         } else {
-            R.drawable.ic_floating_action_keyboard
+            R.drawable.ic_floating_action_touchscreen
         },
         contentDescription = if (pointerMode == PointerMode.TOUCHPAD) {
             "Touchpad mode; switch to direct touchscreen"
