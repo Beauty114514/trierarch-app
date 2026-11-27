@@ -9,6 +9,7 @@ import android.os.SystemClock
 import android.graphics.PixelFormat
 import android.util.Log
 import app.trierarch.input.PointerInputRouter
+import app.trierarch.input.PointerMode
 import app.trierarch.input.PhysicalKeyEvent
 import app.trierarch.input.PhysicalKeyboardRouter
 import app.trierarch.input.AndroidImeController
@@ -98,6 +99,10 @@ class WaylandSurfaceView(
 
     override fun onCreateInputConnection(outAttrs: android.view.inputmethod.EditorInfo): android.view.inputmethod.InputConnection =
         androidIme.createInputConnection(outAttrs)
+
+    fun setPointerMode(mode: PointerMode) {
+        inputRouter.setMode(mode)
+    }
 
     fun releasePressedKeys() {
         keyboardRouter.releaseAll(SystemClock.uptimeMillis())

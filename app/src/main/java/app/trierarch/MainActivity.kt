@@ -21,6 +21,7 @@ import app.trierarch.core.ProfileService
 import app.trierarch.core.RootfsService
 import app.trierarch.core.SessionService
 import app.trierarch.input.KeyboardPanelController
+import app.trierarch.input.PointerMode
 import app.trierarch.input.RootKeyboardCapture
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.terminal.DefaultTerminalViewModel
@@ -51,12 +52,19 @@ class MainActivity : AppCompatActivity() {
         getSharedPreferences("trierarch-ui", MODE_PRIVATE)
     }
     private var desktopImeMode = DesktopImeMode.OVERLAY
+    private var pointerMode = PointerMode.TOUCHPAD
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         desktopImeMode = DesktopImeMode.from(
             uiPreferences.getString(KEY_DESKTOP_IME_MODE, null),
         )
+        pointerMode = runCatching {
+            PointerMode.valueOf(
+                uiPreferences.getString(KEY_POINTER_MODE, PointerMode.TOUCHPAD.name)
+                    ?: PointerMode.TOUCHPAD.name,
+            )
+        }.getOrDefault(PointerMode.TOUCHPAD)
         WindowCompat.getInsetsController(window, window.decorView).apply {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
@@ -177,6 +185,7 @@ class MainActivity : AppCompatActivity() {
             )
         }
         waylandSurface?.apply {
+            setPointerMode(pointerMode)
             visibility = android.view.View.VISIBLE
             attachHostSurface()
             requestFocus()
@@ -292,12 +301,16 @@ class MainActivity : AppCompatActivity() {
     private fun actionsFor(surface: DisplaySurface): List<FloatingMenuAction> = when (surface) {
         DisplaySurface.INTERNAL_SHELL -> emptyList()
         DisplaySurface.RUNTIME_SHELL -> listOf(returnToShellAction())
-        DisplaySurface.X11,
-        DisplaySurface.WAYLAND
-        -> listOf(
+        DisplaySurface.X11 -> listOf(
             returnToShellAction(),
             keyboardAction(),
             desktopImeModeAction(),
+        )
+        DisplaySurface.WAYLAND -> listOf(
+            returnToShellAction(),
+            keyboardAction(),
+            desktopImeModeAction(),
+            pointerModeAction(),
         )
     }
 
@@ -339,6 +352,29 @@ class MainActivity : AppCompatActivity() {
         },
     ) {
         toggleDesktopImeMode()
+    }
+
+    private fun pointerModeAction() = FloatingMenuAction(
+        id = "pointer-mode",
+        icon = if (pointerMode == PointerMode.TOUCHPAD) {
+            R.drawable.ic_floating_action_terminal
+        } else {
+            R.drawable.ic_floating_action_keyboard
+        },
+        contentDescription = if (pointerMode == PointerMode.TOUCHPAD) {
+            "Touchpad mode; switch to direct touchscreen"
+        } else {
+            "Touchscreen mode; switch to touchpad"
+        },
+    ) {
+        pointerMode = if (pointerMode == PointerMode.TOUCHPAD) {
+            PointerMode.TOUCHSCREEN
+        } else {
+            PointerMode.TOUCHPAD
+        }
+        uiPreferences.edit().putString(KEY_POINTER_MODE, pointerMode.name).apply()
+        waylandSurface?.setPointerMode(pointerMode)
+        setDisplayedSurface(displayedSurface)
     }
 
     private fun toggleDesktopImeMode() {
@@ -411,6 +447,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         const val TAG = "TrierarchSurface"
         const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
+        const val KEY_POINTER_MODE = "pointer_mode"
     }
 
     private enum class DisplaySurface {

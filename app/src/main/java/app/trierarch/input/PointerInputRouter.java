@@ -9,6 +9,8 @@ public final class PointerInputRouter {
     private final PointerEventSink sink;
     private final PhysicalMouseInputHandler physicalMouseHandler;
     private final TouchpadInputHandler touchpadHandler;
+    private final TouchscreenInputHandler touchscreenHandler;
+    private PointerMode mode = PointerMode.TOUCHPAD;
     private final CursorVisibilityController cursorVisibilityController;
 
     public PointerInputRouter(Context context, PointerEventSink sink,
@@ -16,6 +18,7 @@ public final class PointerInputRouter {
         this.sink = sink;
         physicalMouseHandler = new PhysicalMouseInputHandler(sink);
         touchpadHandler = new TouchpadInputHandler(context, sink);
+        touchscreenHandler = new TouchscreenInputHandler(context, sink);
         cursorVisibilityController = new CursorVisibilityController(cursorSink);
     }
 
@@ -25,7 +28,9 @@ public final class PointerInputRouter {
             return physicalMouseHandler.onPointerEvent(view, event);
         }
         cursorVisibilityController.onTouchActivity();
-        return touchpadHandler.onTouchEvent(view, event);
+        return mode == PointerMode.TOUCHSCREEN
+                ? touchscreenHandler.onTouchEvent(view, event)
+                : touchpadHandler.onTouchEvent(view, event);
     }
 
     public boolean onGenericMotionEvent(View view, MotionEvent event) {
@@ -34,7 +39,9 @@ public final class PointerInputRouter {
             return physicalMouseHandler.onPointerEvent(view, event);
         }
         cursorVisibilityController.onTouchActivity();
-        return touchpadHandler.onGenericMotionEvent(event);
+        return mode == PointerMode.TOUCHSCREEN
+                ? touchscreenHandler.onGenericMotionEvent(event)
+                : touchpadHandler.onGenericMotionEvent(event);
     }
 
     public boolean onHoverEvent(View view, MotionEvent event) {
@@ -43,11 +50,24 @@ public final class PointerInputRouter {
             return physicalMouseHandler.onPointerEvent(view, event);
         }
         cursorVisibilityController.onTouchActivity();
-        return touchpadHandler.onHoverEvent(view, event);
+        return mode == PointerMode.TOUCHSCREEN
+                ? touchscreenHandler.onHoverEvent(view, event)
+                : touchpadHandler.onHoverEvent(view, event);
+    }
+
+    public void setMode(PointerMode mode) {
+        this.mode = mode;
+        if (mode != PointerMode.TOUCHPAD) touchpadHandler.cancel(null);
+        if (mode != PointerMode.TOUCHSCREEN) touchscreenHandler.cancel();
+    }
+
+    public PointerMode getMode() {
+        return mode;
     }
 
     public void cancel(View view) {
         touchpadHandler.cancel(view);
+        touchscreenHandler.cancel();
         physicalMouseHandler.cancel();
         sink.cancel();
         cursorVisibilityController.reset();
