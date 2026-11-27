@@ -45,7 +45,7 @@ internal class GuiScreen(
 ) {
     private var showNewProfile by mutableStateOf(false)
     private var showRootfs by mutableStateOf(false)
-    private var componentsTarget by mutableStateOf<ComponentsTarget?>(null)
+    private var componentsRootfs by mutableStateOf<InstalledRootfs?>(null)
     private var showUpdates by mutableStateOf(false)
     private var imeBottomInset by mutableIntStateOf(0)
 
@@ -58,7 +58,7 @@ internal class GuiScreen(
                     rootfsController = rootfsController,
                     showNewProfile = showNewProfile,
                     showRootfs = showRootfs,
-                    componentsTarget = componentsTarget,
+                    componentsRootfs = componentsRootfs,
                     showUpdates = showUpdates,
                     imeInset = imeBottomInset,
                     onFollowSession = onFollowSession,
@@ -74,7 +74,6 @@ internal class GuiScreen(
                     onOpenRootfs = {
                         showRootfs = true
                         rootfsController.load(false)
-                        profilesController.refreshDroidspacesContainers()
                         if (updatesViewModel.state.value.phase == UpdatesState.Phase.NOT_CHECKED) {
                             updatesViewModel.check()
                         }
@@ -82,13 +81,9 @@ internal class GuiScreen(
                     onCloseRootfs = { showRootfs = false },
                     onOpenComponents = { entry ->
                         showRootfs = false
-                        componentsTarget = ComponentsTarget.AppRootfs(entry)
+                        componentsRootfs = entry
                     },
-                    onOpenComponentsDroidspaces = { container ->
-                        showRootfs = false
-                        componentsTarget = ComponentsTarget.DroidSpaces(container)
-                    },
-                    onCloseComponents = { componentsTarget = null },
+                    onCloseComponents = { componentsRootfs = null },
                     onOpenNewProfile = {
                         profilesController.clearError()
                         rootfsController.refreshInstalled()
@@ -121,8 +116,8 @@ internal class GuiScreen(
             showNewProfile = false
             return true
         }
-        if (componentsTarget != null) {
-            componentsTarget = null
+        if (componentsRootfs != null) {
+            componentsRootfs = null
             return true
         }
         if (showRootfs) {
@@ -148,7 +143,7 @@ private fun GuiRoot(
     rootfsController: RootfsController,
     showNewProfile: Boolean,
     showRootfs: Boolean,
-    componentsTarget: ComponentsTarget?,
+    componentsRootfs: InstalledRootfs?,
     showUpdates: Boolean,
     imeInset: Int,
     onFollowSession: () -> Unit,
@@ -159,7 +154,6 @@ private fun GuiRoot(
     onOpenRootfs: () -> Unit,
     onCloseRootfs: () -> Unit,
     onOpenComponents: (InstalledRootfs) -> Unit,
-    onOpenComponentsDroidspaces: (String) -> Unit,
     onCloseComponents: () -> Unit,
     onOpenNewProfile: () -> Unit,
     onCloseNewProfile: () -> Unit,
@@ -218,10 +212,9 @@ private fun GuiRoot(
                     onBack = onCloseNewProfile,
                     onOpenRootfs = onOpenRootfsFromNewProfile,
                 )
-            } else if (componentsTarget != null) {
+            } else if (componentsRootfs != null) {
                 RootfsComponentsScreen(
-                    target = componentsTarget,
-                    packageComponents = updates.status?.components.orEmpty(),
+                    rootfs = componentsRootfs,
                     onBack = onCloseComponents,
                 )
             } else if (showRootfs) {
@@ -230,11 +223,6 @@ private fun GuiRoot(
                     controller = rootfsController,
                     onBack = onCloseRootfs,
                     onComponents = onOpenComponents,
-                    droidspacesContainers = profiles.droidspacesContainers,
-                    droidspacesLoading = profiles.droidspacesLoading,
-                    droidspacesError = profiles.droidspacesError,
-                    onRefreshDroidspaces = { profilesController.refreshDroidspacesContainers() },
-                    onComponentsDroidspaces = onOpenComponentsDroidspaces,
                 )
             } else if (showUpdates) {
                 UpdatesScreen(

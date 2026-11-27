@@ -32,11 +32,6 @@ internal fun RootfsCatalogScreen(
     controller: RootfsController,
     onBack: () -> Unit,
     onComponents: (InstalledRootfs) -> Unit,
-    droidspacesContainers: List<String>,
-    droidspacesLoading: Boolean,
-    droidspacesError: String?,
-    onRefreshDroidspaces: () -> Unit,
-    onComponentsDroidspaces: (String) -> Unit,
 ) {
     var query by remember { mutableStateOf("") }
     var extractTarget by remember { mutableStateOf<Pair<LxcImage, DownloadedRootfs>?>(null) }
@@ -60,7 +55,6 @@ internal fun RootfsCatalogScreen(
             HeaderAction("Refresh", enabled = !state.loading) {
                 controller.load(true)
                 controller.refreshInstalled()
-                onRefreshDroidspaces()
             }
             HeaderAction("Back", onClick = onBack)
         }
@@ -91,15 +85,6 @@ internal fun RootfsCatalogScreen(
                     onRename = { renameTarget = it },
                     onDelete = { deleteTarget = it },
                     onComponents = onComponents,
-                )
-            }
-            item {
-                DroidspacesSection(
-                    containers = droidspacesContainers,
-                    loading = droidspacesLoading,
-                    error = droidspacesError,
-                    onRefresh = onRefreshDroidspaces,
-                    onComponents = onComponentsDroidspaces,
                 )
             }
             item { SectionLabel("AVAILABLE · ${filtered.size}") }
@@ -362,56 +347,3 @@ private fun buildDateText(value: String): String {
 }
 
 
-@Composable
-private fun DroidspacesSection(
-    containers: List<String>,
-    loading: Boolean,
-    error: String?,
-    onRefresh: () -> Unit,
-    onComponents: (String) -> Unit,
-) {
-    Column {
-        SectionLabel("DROIDSPACES · ${containers.size}")
-        if (loading && containers.isEmpty()) {
-            Text(
-                text = "Loading containers…",
-                color = GuiColors.Secondary,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-        } else if (error != null && containers.isEmpty()) {
-            Text(
-                text = error,
-                color = GuiColors.Error,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-            HeaderAction("Retry") { onRefresh() }
-        } else if (containers.isEmpty()) {
-            Text(
-                text = "No DroidSpaces containers.",
-                color = GuiColors.Secondary,
-                style = MaterialTheme.typography.bodySmall,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-        } else {
-            containers.forEach { container ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(vertical = 6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = container,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontFamily = FontFamily.Monospace,
-                        modifier = Modifier.weight(1f),
-                    )
-                    TextAction("Components") { onComponents(container) }
-                }
-                GuiDivider()
-            }
-        }
-    }
-}
