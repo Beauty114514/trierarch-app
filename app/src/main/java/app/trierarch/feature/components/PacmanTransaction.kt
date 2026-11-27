@@ -1,6 +1,7 @@
 package app.trierarch.feature.components
 
 import app.trierarch.nativebridge.NativePtyBridge
+import app.trierarch.update.PackageSnapshot
 import java.io.File
 
 data class PacmanResult(val command: String, val output: String, val exitCode: Int) {
@@ -73,6 +74,34 @@ class PacmanTransaction(
                 if (parts.size == 2 && parts[0].isNotEmpty()) parts[0] to parts[1] else null
             }
             .toMap()
+    }
+
+    /** Returns installed versions and each package's Required By field. */
+    fun snapshot(packages: List<String>): PackageSnapshot {
+        if (packages.isEmpty()) return PackageSnapshot(emptyMap())
+        val installed = query(packages)
+        val info = environment.runPacman(listOf("pacman", "-Qi") + packages)
+        return PackageSnapshot(installed, parseRequiredBy(info.output))
+    }
+
+    private fun parseRequiredBy(output: String): Map<String, List<String>> {
+        val result = linkedMapOf<String, List<String>>()
+        var current: String? = null
+        output.lineSequence().forEach { line ->
+            val trimmed = line.trim()
+            if (trimmed.startsWith("Name") && trimmed.contains(':')) {
+                current = trimmed.substringAfter(':').trim()
+            } else if (trimmed.startsWith("Required By") && trimmed.contains(':')) {
+                val name = current ?: return@forEach
+                val value = trimmed.substringAfter(':').trim()
+                result[name] = if (value.isEmpty() || value == "None") {
+                    emptyList()
+                } else {
+                    value.split(Regex("\\s+"))
+                }
+            }
+        }
+        return result
     }
 
     fun uninstall(packages: List<String>): PacmanResult {

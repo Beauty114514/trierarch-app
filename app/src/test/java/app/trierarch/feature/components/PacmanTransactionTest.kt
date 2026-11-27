@@ -99,3 +99,55 @@ class PacmanTransactionTest {
         assertTrue(PacmanTransaction(environment).query(listOf("mesa")).isEmpty())
     }
 }
+
+class PacmanTransactionSnapshotTest {
+    @get:Rule
+    val temporaryFolder = TemporaryFolder()
+
+    private class SequencedEnvironment(
+        private val results: MutableList<PacmanResult>,
+    ) : PacmanEnvironment {
+        override val displayName = "sequenced"
+        val commands = mutableListOf<List<String>>()
+
+        override fun stagePackages(packageDirectory: File): String = "/var/tmp/components"
+        override fun runPacman(arguments: List<String>): PacmanResult {
+            commands += arguments
+            return results.removeFirst()
+        }
+        override fun cleanup(stagingDirectory: String) = Unit
+    }
+
+    @Test
+    fun snapshotParsesInstalledVersionsAndRequiredBy() {
+        val environment = SequencedEnvironment(
+            mutableListOf(
+                PacmanResult("pacman", "mesa 1:27.0.0-91\n", 0),
+                PacmanResult(
+                    "pacman",
+                    "Name            : mesa\n" +
+                        "Version         : 1:27.0.0-91\n" +
+                        "Required By     : hyprland kwin\n\n" +
+                        "Name            : vulkan-freedreno\n" +
+                        "Version         : 1:27.0.0-91\n" +
+                        "Required By     : None\n",
+                    0,
+                ),
+            ),
+        )
+        val transaction = PacmanTransaction(environment)
+
+        val snapshot = transaction.snapshot(listOf("mesa", "vulkan-freedreno"))
+
+        assertEquals(mapOf("mesa" to "1:27.0.0-91"), snapshot.installed)
+        assertEquals(listOf("hyprland", "kwin"), snapshot.requiredBy["mesa"])
+        assertEquals(emptyList<String>(), snapshot.requiredBy["vulkan-freedreno"])
+        assertEquals(
+            listOf(
+                listOf("pacman", "-Q", "mesa", "vulkan-freedreno"),
+                listOf("pacman", "-Qi", "mesa", "vulkan-freedreno"),
+            ),
+            environment.commands,
+        )
+    }
+}
