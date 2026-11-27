@@ -291,8 +291,10 @@ class MainActivity : AppCompatActivity() {
         val controller = WindowCompat.getInsetsController(window, window.decorView)
         if (terminal) {
             controller.show(WindowInsetsCompat.Type.statusBars())
+            controller.hide(WindowInsetsCompat.Type.navigationBars())
         } else {
             controller.hide(WindowInsetsCompat.Type.statusBars())
+            controller.hide(WindowInsetsCompat.Type.navigationBars())
         }
         controller.isAppearanceLightStatusBars = false
         window.decorView.post { ViewCompat.requestApplyInsets(window.decorView) }
