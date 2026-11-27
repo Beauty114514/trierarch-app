@@ -2,7 +2,6 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    id("org.jetbrains.kotlin.plugin.compose") version "2.2.10"
 }
 
 val keystorePropertiesFile = rootProject.file("keystore.properties")
@@ -429,7 +428,6 @@ android {
     }
     buildFeatures {
         aidl = true
-        compose = true
     }
 
     sourceSets {
@@ -493,11 +491,6 @@ dependencies {
     implementation("androidx.annotation:annotation:1.9.0")
     implementation(libs.tomlj)
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.6.4")
-    implementation(platform("androidx.compose:compose-bom:2024.11.00"))
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.activity:activity-compose:1.9.3")
     testImplementation(libs.junit)
     testImplementation("org.json:json:20240303")
     androidTestImplementation(libs.androidx.espresso.core)

@@ -10,7 +10,6 @@ import android.view.WindowManager
 import android.widget.FrameLayout
 import android.widget.Toast
 import androidx.activity.addCallback
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
@@ -21,15 +20,11 @@ import app.trierarch.core.Core
 import app.trierarch.core.ProfileService
 import app.trierarch.core.RootfsService
 import app.trierarch.core.SessionService
-import app.trierarch.feature.profiles.ProfilesController
-import app.trierarch.feature.rootfs.RootfsController
-import app.trierarch.feature.updates.UpdatesViewModel
 import app.trierarch.input.KeyboardPanelController
 import app.trierarch.input.RootKeyboardCapture
 import app.trierarch.runtime.RuntimeControlServer
 import app.trierarch.terminal.DefaultTerminalViewModel
 import app.trierarch.terminal.TrierarchTerminalViewClient
-import app.trierarch.ui.gui.GuiScreen
 import app.trierarch.ui.FloatingActionMenuView
 import app.trierarch.ui.FloatingMenuAction
 import app.trierarch.wayland.WaylandSurfaceView
@@ -39,10 +34,7 @@ import com.termux.view.TerminalView
 /** The first Trierarch profile: a shell using the app's private files directory as its home. */
 class MainActivity : AppCompatActivity() {
     private val terminalViewModel: DefaultTerminalViewModel by viewModels()
-    private val updatesViewModel: UpdatesViewModel by viewModels()
     private lateinit var core: Core
-    private lateinit var profilesController: ProfilesController
-    private lateinit var rootfsController: RootfsController
     private var runtimeControlServer: RuntimeControlServer? = null
     private var terminalView: TerminalView? = null
     private lateinit var terminalContainer: FrameLayout
@@ -52,15 +44,6 @@ class MainActivity : AppCompatActivity() {
     private var waylandSurface: WaylandSurfaceView? = null
     private lateinit var floatingMenu: FloatingActionMenuView
     /** Opaque layer that covers the runtime surfaces; the terminal stays alive underneath. */
-    private lateinit var guiLayer: FrameLayout
-    private lateinit var guiScreen: GuiScreen
-    private var pendingImportName: String? = null
-    private val archivePicker =
-        registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            val name = pendingImportName ?: return@registerForActivityResult
-            pendingImportName = null
-            if (uri != null) profilesController.importUri(uri, name)
-        }
     private val rootKeyboard by lazy { RootKeyboardCapture(this) }
     /** Authoritative presentation state for controls scoped to a runtime surface. */
     private var displayedSurface = DisplaySurface.INTERNAL_SHELL
@@ -128,7 +111,7 @@ class MainActivity : AppCompatActivity() {
                     override fun showWayland() = showWaylandSurface()
                     override fun showX11(onReady: () -> Unit, onFailure: (String) -> Unit) =
                         showX11Display(onReady, onFailure)
-                    override fun showGui() = openGui()
+                    override fun showGui() = showTerminal(DisplaySurface.INTERNAL_SHELL)
                     override fun showSession(id: String, display: String) = openSession(id, display)
                     override fun releaseX11() = x11Host.release()
                     override fun runOnMain(action: () -> Unit) = runOnUiThread(action)
@@ -136,47 +119,12 @@ class MainActivity : AppCompatActivity() {
             ),
         )
         runtimeControlServer = RuntimeControlServer(this, core)
-        profilesController = ProfilesController(applicationContext, core)
-        rootfsController = RootfsController(applicationContext, core)
         floatingMenu = FloatingActionMenuView(
             context = this,
             preferences = getSharedPreferences("trierarch-ui", MODE_PRIVATE),
         )
         terminalContainer.addView(
             floatingMenu,
-            FrameLayout.LayoutParams(
-                ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.MATCH_PARENT,
-            ),
-        )
-        guiScreen = GuiScreen(
-            context = this,
-            profilesController = profilesController,
-            updatesViewModel = updatesViewModel,
-            rootfsController = rootfsController,
-            onClose = { closeGui() },
-            onFollowSession = { hideGuiLayer() },
-            onPickArchive = { name ->
-                pendingImportName = name
-                archivePicker.launch(arrayOf("*/*"))
-            },
-        )
-        guiLayer = FrameLayout(this).apply {
-            visibility = View.GONE
-            setBackgroundColor(android.graphics.Color.BLACK)
-            isClickable = true
-            isFocusable = true
-            isFocusableInTouchMode = true
-            addView(
-                guiScreen.view,
-                FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                ),
-            )
-        }
-        terminalContainer.addView(
-            guiLayer,
             FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -193,27 +141,14 @@ class MainActivity : AppCompatActivity() {
                 )
             }
             floatingMenu.setImeBottomInset(ime)
-            guiScreen.setImeInset(ime)
             insets
         }
         setContentView(terminalContainer)
-        onBackPressedDispatcher.addCallback(this) {
-            if (guiLayer.visibility == View.VISIBLE) {
-                if (!guiScreen.handleBack()) closeGui()
-            } else {
-                finish()
-            }
-        }
+        onBackPressedDispatcher.addCallback(this) { finish() }
         applyImeMode(displayedSurface)
         ViewCompat.requestApplyInsets(terminalContainer)
 
         attachTerminalSession()
-
-        // Restore the management frontend the app was last left in. Only the
-        // GUI and the CLI are remembered; runtime displays never overwrite it.
-        if (Frontend.from(uiPreferences.getString(KEY_FRONTEND, null)) == Frontend.GUI) {
-            openGui()
-        }
     }
 
     private fun attachTerminalSession() {
@@ -320,57 +255,7 @@ class MainActivity : AppCompatActivity() {
         applySystemBars(surface)
         applyImeMode(surface)
         floatingMenu.setActions(actionsFor(surface))
-        // A runtime surface can appear while the GUI layer is open (for example
-        // a CLI-driven run); keyboard focus must stay on the GUI.
-        if (guiLayer.visibility == View.VISIBLE) guiLayer.requestFocus()
-    }
 
-    /**
-     * Covers the runtime surface with the in-app GUI. The terminal view, its
-     * session, the shell scrollback and every running runtime stay untouched;
-     * only visibility and focus change.
-     */
-    private fun openGui() {
-        if (guiLayer.visibility == View.VISIBLE) return
-        rememberFrontend(Frontend.GUI)
-        keyboardPanel.hide()
-        guiScreen.refresh()
-        floatingMenu.visibility = View.GONE
-        guiLayer.visibility = View.VISIBLE
-        guiLayer.requestFocus()
-    }
-
-    /** Returns to the exact session that was displayed before the GUI opened. */
-    private fun closeGui() {
-        if (guiLayer.visibility != View.VISIBLE) return
-        rememberFrontend(Frontend.CLI)
-        hideGuiLayer()
-        when (displayedSurface) {
-            DisplaySurface.INTERNAL_SHELL,
-            DisplaySurface.RUNTIME_SHELL,
-            -> terminalView?.requestFocus()
-
-            DisplaySurface.X11 -> x11Host.requestFocus()
-            DisplaySurface.WAYLAND -> waylandSurface?.requestFocus()
-        }
-    }
-
-    /**
-     * Removes the layer without choosing a focus target. Whoever takes over the
-     * display (the session being started, or the caller) owns keyboard focus.
-     */
-    private fun hideGuiLayer() {
-        guiLayer.visibility = View.GONE
-        floatingMenu.setActions(actionsFor(displayedSurface))
-    }
-
-    /**
-     * Persists the management frontend the user is looking at. Runtime displays
-     * deliberately never write this: the restored value only answers
-     * "GUI or CLI?".
-     */
-    private fun rememberFrontend(frontend: Frontend) {
-        uiPreferences.edit().putString(KEY_FRONTEND, frontend.value).apply()
     }
 
     /**
@@ -505,15 +390,10 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         Log.i(TAG, "onResume display=$displayedSurface")
         if (displayedSurface == DisplaySurface.WAYLAND) rootKeyboard.start()
-        // The CLI may have created or deleted a profile while the GUI was hidden.
-        if (guiLayer.visibility == View.VISIBLE) guiScreen.refresh()
     }
 
     override fun onDestroy() {
         rootKeyboard.stop()
-        if (::guiScreen.isInitialized) guiScreen.release()
-        if (::profilesController.isInitialized) profilesController.close()
-        if (::rootfsController.isInitialized) rootfsController.close()
         x11Host.release()
         runtimeControlServer?.close()
         runtimeControlServer = null
@@ -529,31 +409,9 @@ class MainActivity : AppCompatActivity() {
                 values().firstOrNull { it.value == value } ?: OVERLAY
         }
     }
-
-    /**
-     * The app has two management frontends. Runtime displays (X11, Wayland, a
-     * container shell) are profile output, not a frontend, and never change
-     * this choice.
-     */
-    private enum class Frontend(val value: String) {
-        GUI("gui"),
-        CLI("cli");
-
-        companion object {
-            fun from(value: String?): Frontend =
-                values().firstOrNull { it.value == value } ?: CLI
-        }
-    }
-
     private companion object {
         const val TAG = "TrierarchSurface"
         const val KEY_DESKTOP_IME_MODE = "desktop_ime_mode"
-        const val KEY_FRONTEND = "frontend"
-        val SECONDARY_TEXT = 0xFF9CA3AF.toInt()
-        val ERROR_TEXT = 0xFFF87171.toInt()
-        val DIVIDER_COLOR = 0xFF23262B.toInt()
-        val RUNNING_TEXT = 0xFF7CE38B.toInt()
-        val PENDING_TEXT = 0xFFFBBF24.toInt()
     }
 
     private enum class DisplaySurface {
@@ -562,5 +420,4 @@ class MainActivity : AppCompatActivity() {
         X11,
         WAYLAND,
     }
-
 }
