@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import app.trierarch.feature.components.FileComponentEntry
 import app.trierarch.feature.components.FileComponentStore
 import app.trierarch.feature.components.FileComponentsController
+import app.trierarch.feature.components.PacmanTarget
 import app.trierarch.feature.components.PacmanTransaction
 import app.trierarch.update.ComponentInstallType
 import app.trierarch.update.ComponentRelease
@@ -54,7 +55,54 @@ internal fun RootfsComponentsScreen(
         app.trierarch.feature.components.FileComponentsState(),
     )).collectAsState()
     var pacmanComponent by remember { mutableStateOf<ComponentRelease?>(null) }
+    var installedPackages by remember { mutableStateOf<Map<String, Map<String, String>>>(emptyMap()) }
+    var checkingPackages by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+
+    fun targetEnvironment(): PacmanTarget? = when (target) {
+        is ComponentsTarget.DroidSpaces -> PacmanTarget.DroidSpaces(
+            displayName = "DroidSpaces · ${target.container}",
+            container = target.container,
+            cacheDirectory = context.cacheDir,
+        )
+        is ComponentsTarget.AppRootfs -> PacmanTarget.Chroot(
+            displayName = "chroot · ${target.rootfs.name}",
+            rootfs = File(target.rootfs.path),
+        )
+    }
+
+    fun checkInstalled(component: ComponentRelease, pacmanTarget: PacmanTarget? = targetEnvironment()) {
+        if (pacmanTarget == null || checkingPackages != null) return
+        checkingPackages = component.id
+        scope.launch {
+            val versions = withContext(Dispatchers.IO) {
+                runCatching {
+                    PacmanTransaction(pacmanTarget.environment())
+                        .query(component.install.packages)
+                }.getOrDefault(emptyMap())
+            }
+            installedPackages = installedPackages + (component.id to versions)
+            checkingPackages = null
+        }
+    }
+
+    fun uninstall(component: ComponentRelease) {
+        val pacmanTarget = targetEnvironment() ?: return
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    PacmanTransaction(pacmanTarget.environment())
+                        .uninstall(component.install.packages)
+                }
+            }
+            installedPackages = installedPackages - component.id
+            val message = result.fold(
+                onSuccess = { "Uninstalled ${component.name}" },
+                onFailure = { "Uninstall failed: ${it.message}" },
+            )
+            android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
+        }
+    }
 
     LaunchedEffect(target) { controller?.load() }
     DisposableEffect(controller) { onDispose { controller?.close() } }
@@ -189,7 +237,22 @@ internal fun RootfsComponentsScreen(
                             style = MaterialTheme.typography.bodySmall,
                         )
                     }
-                    PrimaryAction("Install packages") { pacmanComponent = status.release }
+                    val versions = installedPackages[status.release.id].orEmpty()
+                    val installed = status.release.install.packages.all { versions.containsKey(it) }
+                    if (installed) {
+                        Column(Modifier.padding(start = 8.dp)) {
+                            StatusLine(
+                                versions.entries.joinToString(", ") { "${it.key} ${it.value}" },
+                                GuiColors.Running,
+                            )
+                            TextAction("Uninstall", GuiColors.Error) { uninstall(status.release) }
+                        }
+                    } else {
+                        Column(Modifier.padding(start = 8.dp)) {
+                            PrimaryAction("Install packages") { pacmanComponent = status.release }
+                            TextAction("Check installed") { checkInstalled(status.release) }
+                        }
+                    }
                 }
                 GuiDivider()
             }
@@ -222,6 +285,7 @@ internal fun RootfsComponentsScreen(
                         onSuccess = { "Installed ${component.name}" },
                         onFailure = { "Install failed: ${it.message}" },
                     )
+                    if (result.isSuccess) checkInstalled(component, pacmanTarget)
                     android.widget.Toast.makeText(context, message, android.widget.Toast.LENGTH_LONG).show()
                 }
             },
