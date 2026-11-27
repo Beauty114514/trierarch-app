@@ -21,6 +21,12 @@ public final class TouchscreenInputHandler {
     private boolean longPressed;
     private boolean scrolling;
     private boolean suppressTap;
+    private boolean multiGesture;
+    private boolean multiMoved;
+    private int maxPointerCount;
+    private float multiStartX;
+    private float multiStartY;
+    private long downTime;
     private int heldButton;
     private float lastScrollX;
     private float lastScrollY;
@@ -47,34 +53,52 @@ public final class TouchscreenInputHandler {
                 longPressed = false;
                 scrolling = false;
                 suppressTap = false;
+                multiGesture = false;
+                multiMoved = false;
+                maxPointerCount = 1;
+                downTime = event.getDownTime();
                 lastScrollX = downX;
                 lastScrollY = downY;
                 sink.moveAbsolute(downX, downY);
                 handler.postDelayed(longPress, LONG_PRESS_MILLIS);
                 return true;
             case MotionEvent.ACTION_POINTER_DOWN:
+                maxPointerCount = Math.max(maxPointerCount, event.getPointerCount());
                 if (event.getPointerCount() >= 2) {
                     handler.removeCallbacks(longPress);
                     releaseHeldButton();
                     dragging = false;
                     longPressed = false;
-                    scrolling = true;
+                    multiGesture = true;
+                    multiMoved = false;
+                    scrolling = false;
                     suppressTap = true;
-                    lastScrollX = centroidX(event);
-                    lastScrollY = centroidY(event);
+                    multiStartX = centroidX(event);
+                    multiStartY = centroidY(event);
+                    lastScrollX = multiStartX;
+                    lastScrollY = multiStartY;
                 }
                 return true;
             case MotionEvent.ACTION_MOVE:
-                if (scrolling && event.getPointerCount() >= 2) {
+                if (multiGesture) {
+                    if (event.getPointerCount() < 2) return true;
                     float centerX = centroidX(event);
                     float centerY = centroidY(event);
-                    sink.scroll(lastScrollX - centerX, lastScrollY - centerY,
-                            PointerEventSink.ScrollSource.FINGER);
-                    lastScrollX = centerX;
-                    lastScrollY = centerY;
+                    if (!multiMoved &&
+                            (Math.abs(centerX - multiStartX) > touchSlop ||
+                                Math.abs(centerY - multiStartY) > touchSlop)) {
+                        multiMoved = true;
+                        scrolling = true;
+                    }
+                    if (scrolling) {
+                        sink.scroll(lastScrollX - centerX, lastScrollY - centerY,
+                                PointerEventSink.ScrollSource.FINGER);
+                        lastScrollX = centerX;
+                        lastScrollY = centerY;
+                    }
                     return true;
                 }
-                if (scrolling || suppressTap) return true;
+                if (suppressTap) return true;
                 float x = event.getX();
                 float y = event.getY();
                 if (!dragging && (Math.abs(x - downX) > touchSlop ||
@@ -89,13 +113,13 @@ public final class TouchscreenInputHandler {
                 sink.moveAbsolute(x, y);
                 return true;
             case MotionEvent.ACTION_POINTER_UP:
-                if (scrolling) {
+                if (multiGesture) {
                     scrolling = false;
                     suppressTap = true;
                 }
                 return true;
             case MotionEvent.ACTION_UP:
-                finish();
+                finish(event);
                 return true;
             case MotionEvent.ACTION_CANCEL:
                 cancel();
@@ -142,12 +166,22 @@ public final class TouchscreenInputHandler {
         longPressed = false;
         scrolling = false;
         suppressTap = false;
+        multiGesture = false;
+        multiMoved = false;
+        maxPointerCount = 0;
         sink.cancel();
     }
 
-    private void finish() {
+    private void finish(MotionEvent event) {
         handler.removeCallbacks(longPress);
-        if (longPressed) {
+        if (multiGesture) {
+            if (!multiMoved && !scrolling &&
+                    event.getEventTime() - downTime < LONG_PRESS_MILLIS) {
+                int button = maxPointerCount >= 3 ? 2 : 3;
+                sink.setButton(button, true);
+                sink.setButton(button, false);
+            }
+        } else if (longPressed) {
             if (heldButton != 0) sink.setButton(heldButton, false);
         } else if (dragging) {
             if (heldButton != 0) sink.setButton(heldButton, false);
@@ -160,5 +194,8 @@ public final class TouchscreenInputHandler {
         longPressed = false;
         scrolling = false;
         suppressTap = false;
+        multiGesture = false;
+        multiMoved = false;
+        maxPointerCount = 0;
     }
 }
